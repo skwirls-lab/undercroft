@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Undercroft
 
-## Getting Started
+Play Magic: The Gathering Commander against AI opponents in your browser.
 
-First, run the development server:
+## Quick Start
 
 ```bash
+# Install dependencies
+npm install
+
+# Copy env template and fill in Firebase config
+cp env.template .env.local
+
+# Run dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14+ (App Router), TypeScript |
+| UI | TailwindCSS, shadcn/ui, Framer Motion, Lucide icons |
+| Auth | Firebase Authentication (Google OAuth) |
+| Database | Cloud Firestore (decks, settings), IndexedDB/Dexie (card cache) |
+| Game Engine | Pure TypeScript, client-side, deterministic |
+| AI Opponents | LLM-powered (Groq/OpenAI/Anthropic) via API routes, with heuristic fallback |
+| Card Data | Scryfall Oracle dataset (local JSON → IndexedDB) |
+| Hosting | Vercel (Git-push deploys) |
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/           # Next.js pages and API routes
+├── engine/        # Game engine (pure TS, no DOM)
+│   ├── types.ts         # Core type definitions
+│   ├── GameEngine.ts    # Top-level orchestrator
+│   ├── GameState.ts     # State model and helpers
+│   ├── TurnManager.ts   # Phase/step/priority
+│   ├── ZoneManager.ts   # Card zone management
+│   ├── ManaSystem.ts    # Mana parsing and payment
+│   └── ActionValidator.ts # Legal action enumeration
+├── ai/            # AI player system
+│   ├── AIPlayerController.ts
+│   ├── PromptBuilder.ts
+│   └── FallbackAI.ts
+├── cards/         # Card data layer (Scryfall → IndexedDB)
+├── store/         # Zustand state stores
+├── components/    # React components (ui/ + game/)
+└── lib/           # Firebase config, DB, utils
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Key Concepts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Engine is authoritative**: The game engine enforces all rules. AI only chooses from legal actions.
+- **Client-side for MVP**: Game runs in the browser. No game server needed for single-player vs AI.
+- **Tiered card rendering**: Pip view (tiny) → art crop (medium) → full card (hover/click) to handle crowded boards.
+- **LLM is optional**: Heuristic fallback AI works without any API key configured.
 
-## Deploy on Vercel
+## Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See `env.template` for required Firebase configuration.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+AI API keys are configured per-user in the Settings page and stored locally in the browser.
