@@ -6,10 +6,12 @@ interface SettingsStore {
   aiProvider: AIProviderConfig | null;
   cardDataLoaded: boolean;
   cardDataProgress: number;
+  forgeServerUrl: string;
 
   setAIProvider: (config: AIProviderConfig | null) => void;
   setCardDataLoaded: (loaded: boolean) => void;
   setCardDataProgress: (progress: number) => void;
+  setForgeServerUrl: (url: string) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -18,10 +20,12 @@ export const useSettingsStore = create<SettingsStore>()(
       aiProvider: null,
       cardDataLoaded: false,
       cardDataProgress: 0,
+      forgeServerUrl: 'ws://localhost:7000/game',
 
       setAIProvider: (config) => set({ aiProvider: config }),
       setCardDataLoaded: (loaded) => set({ cardDataLoaded: loaded }),
       setCardDataProgress: (progress) => set({ cardDataProgress: progress }),
+      setForgeServerUrl: (url) => set({ forgeServerUrl: url }),
     }),
     {
       name: 'undercroft-settings',
@@ -29,6 +33,7 @@ export const useSettingsStore = create<SettingsStore>()(
       partialize: (state) => ({
         aiProvider: state.aiProvider,
         cardDataLoaded: state.cardDataLoaded,
+        forgeServerUrl: state.forgeServerUrl,
       }),
     }
   )
