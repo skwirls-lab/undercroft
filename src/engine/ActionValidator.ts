@@ -293,6 +293,14 @@ export function getLegalActions(state: GameState, playerId: string): GameAction[
   const now = Date.now();
 
   if (state.isGameOver) return actions;
+
+  // If there's a pending choice, the only action available is RESOLVE_CHOICE
+  if (state.pendingChoice && state.pendingChoice.playerId === playerId) {
+    // No actions are generated here — the UI reads pendingChoice directly
+    // and sends a RESOLVE_CHOICE action with the player's selection
+    return actions;
+  }
+
   if (!hasPriority(state, playerId)) return actions;
 
   const player = state.players.find((p) => p.id === playerId);

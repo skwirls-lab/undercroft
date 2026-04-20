@@ -8,6 +8,7 @@ import { Hand } from './Hand';
 import { PhaseTracker } from './PhaseTracker';
 import { CombatControls } from './CombatControls';
 import { StackDisplay } from './StackDisplay';
+import { SearchPicker } from './SearchPicker';
 import { Button } from '@/components/ui/button';
 import { useGameStore } from '@/store/gameStore';
 import { getCardsInZone } from '@/engine/GameState';
@@ -215,6 +216,20 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
       }
     },
     [filteredLegalActions, performAction]
+  );
+
+  // Handle pending choice resolution (search library, etc.)
+  const handleResolveChoice = useCallback(
+    (chosenCardIds: string[]) => {
+      if (!gameState?.pendingChoice) return;
+      performAction({
+        type: 'RESOLVE_CHOICE',
+        playerId: currentPlayerId,
+        payload: { chosenCardIds },
+        timestamp: Date.now(),
+      });
+    },
+    [gameState?.pendingChoice, currentPlayerId, performAction]
   );
 
   const handlePassPriority = useCallback(() => {
@@ -612,6 +627,22 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+      {/* Search Picker overlay for library search choices */}
+      <AnimatePresence>
+        {gameState.pendingChoice &&
+          gameState.pendingChoice.type === 'search_library' &&
+          gameState.pendingChoice.playerId === currentPlayerId && (
+            <SearchPicker
+              pendingChoice={gameState.pendingChoice}
+              cards={
+                (gameState.pendingChoice.cardInstanceIds || [])
+                  .map(id => gameState.cardInstances.get(id))
+                  .filter((c): c is CardInstance => !!c)
+              }
+              onConfirm={handleResolveChoice}
+            />
+          )}
       </AnimatePresence>
     </div>
   );

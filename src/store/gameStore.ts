@@ -133,6 +133,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { engine, gameState, aiControllers } = get();
     if (!engine || !gameState || gameState.isGameOver) return;
 
+    // Handle pending choices for AI players first
+    if (gameState.pendingChoice) {
+      const choicePlayer = gameState.players.find(p => p.id === gameState.pendingChoice!.playerId);
+      if (choicePlayer?.isAI) {
+        set({ isProcessing: true });
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const pending = gameState.pendingChoice;
+        // AI auto-picks the first matching card for search
+        const chosenCardIds = pending.cardInstanceIds && pending.cardInstanceIds.length > 0
+          ? [pending.cardInstanceIds[0]]
+          : [];
+        const result = engine.processAction({
+          type: 'RESOLVE_CHOICE',
+          playerId: pending.playerId,
+          payload: { chosenCardIds },
+          timestamp: Date.now(),
+        });
+        set({
+          gameState: result.newState,
+          legalActions: result.legalActions,
+          events: [...get().events, ...result.events],
+          isProcessing: false,
+        });
+        return;
+      }
+      return; // Human player has pending choice — don't process AI turn
+    }
+
     const currentPlayerId = gameState.priority.playerWithPriority;
     const currentPlayer = gameState.players.find((p) => p.id === currentPlayerId);
     if (!currentPlayer?.isAI) return;

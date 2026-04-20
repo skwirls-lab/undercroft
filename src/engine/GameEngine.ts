@@ -262,6 +262,8 @@ export class GameEngine {
         return this.processDeclareBlockers(action);
       case 'ACTIVATE_ABILITY':
         return this.processActivateAbility(action);
+      case 'RESOLVE_CHOICE':
+        return this.processResolveChoice(action);
       case 'CONCEDE':
         return this.processConcede(action);
       default:
@@ -532,7 +534,103 @@ export class GameEngine {
       })
     );
 
+    // If effect resolution produced a pending choice, set it and return
+    if (resolution.pendingChoice) {
+      this.state = { ...this.state, pendingChoice: resolution.pendingChoice };
+      this.state.events.push(...events);
+      return {
+        newState: this.state,
+        events,
+        legalActions: [], // No actions until choice is resolved
+      };
+    }
+
     // Check SBAs after ability resolution
+    this.checkStateBasedActions(events);
+
+    this.state.events.push(...events);
+    return {
+      newState: this.state,
+      events,
+      legalActions: this.getLegalActionsForPlayer(action.playerId),
+    };
+  }
+
+  private processResolveChoice(action: GameAction): ActionResult {
+    const events: GameEvent[] = [];
+    const pending = this.state.pendingChoice;
+    if (!pending) return this.errorResult('No pending choice to resolve');
+
+    // Clear the pending choice
+    this.state = { ...this.state, pendingChoice: null };
+
+    if (pending.type === 'search_library') {
+      const chosenCardIds = action.payload.chosenCardIds as string[] | undefined;
+      const meta = pending.metadata || {};
+      const destination = (meta.destination as string) || 'hand';
+      const entersTapped = !!meta.entersTapped;
+
+      // Move chosen card(s) to destination
+      if (chosenCardIds && chosenCardIds.length > 0) {
+        for (const cardId of chosenCardIds) {
+          const card = this.state.cardInstances.get(cardId);
+          if (!card) continue;
+
+          if (destination === 'battlefield') {
+            const moveResult = moveCard(this.state, cardId, 'battlefield');
+            this.state = moveResult.state;
+            events.push(...moveResult.events);
+
+            // Apply enters tapped if specified
+            if (entersTapped) {
+              const newInstances = new Map(this.state.cardInstances);
+              const movedCard = newInstances.get(cardId);
+              if (movedCard) {
+                newInstances.set(cardId, { ...movedCard, tapped: true });
+                this.state = { ...this.state, cardInstances: newInstances };
+              }
+            }
+
+            events.push(
+              createEvent('ZONE_TRANSFER', pending.playerId, {
+                cardInstanceId: cardId,
+                cardName: card.cardData.name,
+                fromZone: 'library',
+                toZone: 'battlefield',
+                reason: 'search',
+              })
+            );
+          } else {
+            // Default: move to hand
+            const moveResult = moveCard(this.state, cardId, 'hand');
+            this.state = moveResult.state;
+            events.push(...moveResult.events);
+
+            events.push(
+              createEvent('ZONE_TRANSFER', pending.playerId, {
+                cardInstanceId: cardId,
+                cardName: card.cardData.name,
+                fromZone: 'library',
+                toZone: 'hand',
+                reason: 'search',
+              })
+            );
+          }
+        }
+      }
+
+      // Shuffle library after search
+      this.state = shuffleZone(this.state, pending.playerId, 'library');
+
+      // If there's a spell to move to graveyard after resolving
+      const moveToGy = meta.moveToGraveyardAfter as string | undefined;
+      if (moveToGy) {
+        const moveResult = moveCard(this.state, moveToGy, 'graveyard');
+        this.state = moveResult.state;
+      }
+    }
+
+    // Check SBAs after choice resolution
     this.checkStateBasedActions(events);
 
     this.state.events.push(...events);
@@ -981,6 +1079,12 @@ export class GameEngine {
       newState = effectResult.state;
       events.push(...effectResult.events);
 
+      // If effect needs player choice, set pending and return
+      if (effectResult.pendingChoice) {
+        newState = { ...newState, pendingChoice: effectResult.pendingChoice };
+        return { state: newState, events };
+      }
+
       events.push(
         createEvent('ABILITY_RESOLVED', item.controllerId, {
           cardInstanceId: item.sourceInstanceId,
@@ -1026,6 +1130,11 @@ export class GameEngine {
       newState = effectResult.state;
       events.push(...effectResult.events);
 
+      if (effectResult.pendingChoice) {
+        newState = { ...newState, pendingChoice: effectResult.pendingChoice };
+        return { state: newState, events };
+      }
+
       // Check for ETB triggers
       const enteredCard = newState.cardInstances.get(item.sourceInstanceId);
       if (enteredCard) {
@@ -1045,9 +1154,17 @@ export class GameEngine {
       }
     } else {
       // Non-permanent spells: resolve effects, then go to graveyard
-      const effectResult = resolveSpellEffects(newState, item);
-      newState = effectResult.state;
-      events.push(...effectResult.events);
+      const effectResult2 = resolveSpellEffects(newState, item);
+      newState = effectResult2.state;
+      events.push(...effectResult2.events);
+
+      if (effectResult2.pendingChoice) {
+        // Store source card ID so we can move to graveyard after choice
+        const choice = { ...effectResult2.pendingChoice };
+        choice.metadata = { ...choice.metadata, moveToGraveyardAfter: item.sourceInstanceId };
+        newState = { ...newState, pendingChoice: choice };
+        return { state: newState, events };
+      }
 
       const moveResult = moveCard(newState, item.sourceInstanceId, 'graveyard');
       newState = moveResult.state;

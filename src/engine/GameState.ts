@@ -127,6 +127,7 @@ export function createInitialGameState(
     turn,
     priority,
     combat: null,
+    pendingChoice: null,
     events: [],
     winner: null,
     isGameOver: false,

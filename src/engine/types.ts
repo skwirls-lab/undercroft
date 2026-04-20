@@ -228,7 +228,8 @@ export type GameActionType =
   | 'PAY_COST'
   | 'CONCEDE'
   | 'TAP_FOR_MANA'
-  | 'UNTAP_PERMANENT';
+  | 'UNTAP_PERMANENT'
+  | 'RESOLVE_CHOICE';
 
 export interface GameAction {
   type: GameActionType;
@@ -280,6 +281,29 @@ export interface GameEvent {
   timestamp: number;
 }
 
+// --- Pending Player Choice (Forge-style input requests) ---
+
+export type PendingChoiceType =
+  | 'search_library'        // Player must pick a card from library
+  | 'confirm_ability'       // Player must confirm before costs are paid
+  | 'choose_target'         // Player must pick a target
+  | 'choose_discard'        // Player must choose card(s) to discard
+  | 'choose_sacrifice';     // Player must choose permanent(s) to sacrifice
+
+export interface PendingChoice {
+  type: PendingChoiceType;
+  playerId: string;           // Who needs to make the choice
+  prompt: string;             // Display text for the player
+  cardInstanceIds?: string[]; // Cards to choose from (for search/discard/sacrifice)
+  minChoices: number;         // Minimum number of choices
+  maxChoices: number;         // Maximum number of choices
+  sourceCardId?: string;      // The card that created this choice
+  // Context for resuming after choice is made
+  resumeAction?: GameAction;  // The original action to resume
+  effectIndex?: number;       // Which effect we were resolving
+  metadata?: Record<string, unknown>; // Extra data for resolution
+}
+
 // --- Game State (top-level) ---
 
 export interface GameState {
@@ -291,6 +315,7 @@ export interface GameState {
   turn: TurnState;
   priority: PriorityState;
   combat: CombatState | null;
+  pendingChoice: PendingChoice | null;
   events: GameEvent[];
   winner: string | null;
   isGameOver: boolean;

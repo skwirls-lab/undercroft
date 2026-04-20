@@ -2,7 +2,7 @@
 // Effect Resolver — Applies parsed spell effects to game state
 // ============================================================
 
-import type { GameState, GameEvent, StackItem, CardData, CardInstance, ManaColor } from './types';
+import type { GameState, GameEvent, StackItem, CardData, CardInstance, ManaColor, PendingChoice } from './types';
 import { moveCard, shuffleZone } from './ZoneManager';
 import { drawCards } from './TurnManager';
 import { parseSpellEffects, type SpellEffect } from './SpellEffectParser';
@@ -29,8 +29,9 @@ function createEvent(
 export function resolveSpellEffects(
   state: GameState,
   stackItem: StackItem,
-  effectsOverride?: SpellEffect[]
-): { state: GameState; events: GameEvent[] } {
+  effectsOverride?: SpellEffect[],
+  startFromEffect?: number
+): { state: GameState; events: GameEvent[]; pendingChoice?: PendingChoice } {
   const events: GameEvent[] = [];
   const card = state.cardInstances.get(stackItem.sourceInstanceId);
   const cardData = stackItem.cardData || card?.cardData;
@@ -44,14 +45,46 @@ export function resolveSpellEffects(
 
   let newState = state;
   const targets = stackItem.targets;
+  const startIdx = startFromEffect || 0;
 
-  for (const effect of effects) {
+  for (let i = startIdx; i < effects.length; i++) {
+    const effect = effects[i];
     // Validate targets are still legal before applying
     if (effect.requiresTarget && targets.length === 0) continue;
 
-    const result = applyEffect(newState, effect, stackItem.controllerId, targets);
-    newState = result.state;
-    events.push(...result.events);
+    // Search effects require player choice — create a PendingChoice
+    if (effect.type === 'search_library' || effect.type === 'put_land_onto_battlefield') {
+      const filter = (effect.searchFilter || 'any').toLowerCase();
+      const library = getCardsInZone(newState, stackItem.controllerId, 'library');
+      const matchingCards = library.filter(c => matchesSearchFilter(c, filter));
+
+      if (matchingCards.length > 0) {
+        const destination = effect.type === 'put_land_onto_battlefield' ? 'battlefield' : (effect.destination || 'hand');
+        const pendingChoice: PendingChoice = {
+          type: 'search_library',
+          playerId: stackItem.controllerId,
+          prompt: `Search your library for a ${effect.searchFilter || 'card'}`,
+          cardInstanceIds: matchingCards.map(c => c.instanceId),
+          minChoices: 0,
+          maxChoices: 1,
+          sourceCardId: stackItem.sourceInstanceId,
+          effectIndex: i,
+          metadata: {
+            destination,
+            filter: effect.searchFilter || 'any',
+            stackItemId: stackItem.id,
+            remainingEffects: effects.slice(i + 1),
+            stackItem: { ...stackItem },
+            entersTapped: effect.type === 'put_land_onto_battlefield',
+          },
+        };
+        return { state: newState, events, pendingChoice };
+      }
+    } else {
+      const result = applyEffect(newState, effect, stackItem.controllerId, targets);
+      newState = result.state;
+      events.push(...result.events);
+    }
   }
 
   return { state: newState, events };
@@ -909,11 +942,17 @@ function applyMill(
 }
 
 // --- Card search filter matching ---
-function matchesSearchFilter(card: CardInstance, filter: string): boolean {
+export function matchesSearchFilter(card: CardInstance, filter: string): boolean {
   const typeLine = card.cardData.typeLine.toLowerCase();
 
   // Universal matches
   if (filter === 'any' || filter === 'card') return true;
+
+  // Forge dot-notation: "Land.Basic" means type includes both "Land" AND "Basic"
+  if (filter.includes('.')) {
+    const parts = filter.split('.').map(s => s.trim().toLowerCase());
+    return parts.every(part => typeLine.includes(part));
+  }
 
   // Exact type checks
   if (filter === 'basic land') return typeLine.includes('basic') && typeLine.includes('land');
