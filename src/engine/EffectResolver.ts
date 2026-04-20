@@ -2,7 +2,7 @@
 // Effect Resolver — Applies parsed spell effects to game state
 // ============================================================
 
-import type { GameState, GameEvent, StackItem, CardData, ManaColor } from './types';
+import type { GameState, GameEvent, StackItem, CardData, CardInstance, ManaColor } from './types';
 import { moveCard, shuffleZone } from './ZoneManager';
 import { drawCards } from './TurnManager';
 import { parseSpellEffects, type SpellEffect } from './SpellEffectParser';
@@ -908,6 +908,28 @@ function applyMill(
   return { state: newState, events };
 }
 
+// --- Card search filter matching ---
+function matchesSearchFilter(card: CardInstance, filter: string): boolean {
+  const typeLine = card.cardData.typeLine.toLowerCase();
+
+  // Universal matches
+  if (filter === 'any' || filter === 'card') return true;
+
+  // Exact type checks
+  if (filter === 'basic land') return typeLine.includes('basic') && typeLine.includes('land');
+
+  // Comma-separated filters (e.g. 'Instant,Sorcery') — match ANY
+  if (filter.includes(',')) {
+    const parts = filter.split(',').map(s => s.trim().toLowerCase());
+    return parts.some(part => matchesSearchFilter(card, part));
+  }
+
+  // Single type checks — check type line
+  if (typeLine.includes(filter)) return true;
+
+  return false;
+}
+
 // --- Search library for a card and put into hand ---
 function applySearchLibrary(
   state: GameState,
@@ -920,16 +942,7 @@ function applySearchLibrary(
 
   // Find the first matching card in library
   const found = library.find((card) => {
-    const typeLine = card.cardData.typeLine.toLowerCase();
-    if (filter === 'any') return true;
-    if (filter === 'basic land') return typeLine.includes('basic') && typeLine.includes('land');
-    if (filter === 'land') return typeLine.includes('land');
-    if (filter === 'forest') return typeLine.includes('forest');
-    if (filter === 'island') return typeLine.includes('island');
-    if (filter === 'mountain') return typeLine.includes('mountain');
-    if (filter === 'plains') return typeLine.includes('plains');
-    if (filter === 'swamp') return typeLine.includes('swamp');
-    return false;
+    return matchesSearchFilter(card, filter);
   });
 
   let newState = state;
@@ -964,17 +977,7 @@ function applyPutLandOntoBattlefield(
   const filter = (effect.searchFilter || 'basic land').toLowerCase();
 
   // Find first matching land
-  const found = library.find((card) => {
-    const typeLine = card.cardData.typeLine.toLowerCase();
-    if (filter === 'basic land') return typeLine.includes('basic') && typeLine.includes('land');
-    if (filter === 'land') return typeLine.includes('land');
-    if (filter === 'forest') return typeLine.includes('forest');
-    if (filter === 'island') return typeLine.includes('island');
-    if (filter === 'mountain') return typeLine.includes('mountain');
-    if (filter === 'plains') return typeLine.includes('plains');
-    if (filter === 'swamp') return typeLine.includes('swamp');
-    return false;
-  });
+  const found = library.find((card) => matchesSearchFilter(card, filter));
 
   let newState = state;
   if (found) {
