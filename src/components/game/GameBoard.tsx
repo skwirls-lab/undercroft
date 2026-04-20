@@ -185,6 +185,38 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
     [filteredLegalActions]
   );
 
+  // Forge-powered activated ability handling
+  const handleActivateAbility = useCallback(
+    (card: CardInstance) => {
+      const abilityActions = filteredLegalActions.filter(
+        (a) =>
+          a.type === 'ACTIVATE_ABILITY' &&
+          a.payload.ability === 'forge_activated' &&
+          a.payload.cardInstanceId === card.instanceId
+      );
+      if (abilityActions.length === 0) return;
+
+      // Check if any ability needs a target
+      const hasTarget = abilityActions.some((a) => a.payload.targetId);
+      if (hasTarget) {
+        // Enter targeting mode
+        const validTargetIds = new Set(
+          abilityActions.map((a) => a.payload.targetId as string).filter(Boolean)
+        );
+        setTargeting({
+          cardInstanceId: card.instanceId,
+          cardName: `Activate ${card.cardData.name}`,
+          actions: abilityActions,
+          validTargetIds,
+        });
+      } else {
+        // Non-targeted ability — just perform the first one
+        performAction(abilityActions[0]);
+      }
+    },
+    [filteredLegalActions, performAction]
+  );
+
   const handlePassPriority = useCallback(() => {
     const action = legalActions.find((a) => a.type === 'PASS_PRIORITY');
     if (action) performAction(action);
@@ -495,6 +527,7 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
           onUntapLand={handleUntapLand}
           onCastCommander={handleCastCommander}
           onEquipClick={handleEquipClick}
+          onActivateAbility={handleActivateAbility}
           pendingManaChoice={pendingManaChoice}
           onManaColorPicked={handleManaColorPicked}
           onCancelManaChoice={() => setPendingManaChoice(null)}

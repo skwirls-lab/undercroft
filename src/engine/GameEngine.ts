@@ -36,7 +36,8 @@ import {
 } from './ActionValidator';
 import { entersTapped, getLandProducibleColors, getEffectiveLandCardData } from './OracleTextParser';
 import { resolveSpellEffects, areTargetsValid } from './EffectResolver';
-import { parseSpellEffects } from './SpellEffectParser';
+import { parseSpellEffects, type SpellEffect } from './SpellEffectParser';
+import type { ActivatedAbilityCost } from './ForgeLookup';
 import { checkETBTriggers, checkDeathTriggers, getTriggeredEffects, parseTriggers } from './TriggerSystem';
 
 function createEvent(
@@ -405,11 +406,140 @@ export class GameEngine {
       return this.processEquip(action);
     }
 
+    if (ability === 'forge_activated') {
+      return this.processForgeActivatedAbility(action);
+    }
+
     return {
       newState: this.state,
       events,
       legalActions: this.getLegalActionsForPlayer(action.playerId),
       error: `Unknown ability: ${ability}`,
+    };
+  }
+
+  private processForgeActivatedAbility(action: GameAction): ActionResult {
+    const events: GameEvent[] = [];
+    const cardId = action.payload.cardInstanceId as string;
+    const targetId = action.payload.targetId as string | undefined;
+    const forgeCost = action.payload.forgeCost as ActivatedAbilityCost;
+    const forgeEffects = action.payload.forgeEffects as SpellEffect[];
+
+    const card = this.state.cardInstances.get(cardId);
+    const player = this.state.players.find((p) => p.id === action.playerId);
+    if (!card || !player) return this.errorResult('Invalid activated ability');
+
+    // --- Pay costs ---
+
+    // 1. Tap cost
+    if (forgeCost.tap) {
+      const newInstances = new Map(this.state.cardInstances);
+      newInstances.set(cardId, { ...card, tapped: true });
+      this.state = { ...this.state, cardInstances: newInstances };
+    }
+
+    // 2. Mana cost
+    const manaCostTotal = forgeCost.manaCost.W + forgeCost.manaCost.U + forgeCost.manaCost.B +
+      forgeCost.manaCost.R + forgeCost.manaCost.G + forgeCost.manaCost.C + forgeCost.manaCost.generic;
+    if (manaCostTotal > 0) {
+      const payResult = payManaCost(player.manaPool, forgeCost.manaCost);
+      if (!payResult) return this.errorResult('Cannot pay mana cost');
+      this.state = {
+        ...this.state,
+        players: this.state.players.map((p) =>
+          p.id === action.playerId ? { ...p, manaPool: payResult } : p
+        ),
+      };
+    }
+
+    // 3. Life payment
+    if (forgeCost.lifePayment > 0) {
+      this.state = {
+        ...this.state,
+        players: this.state.players.map((p) =>
+          p.id === action.playerId
+            ? { ...p, life: p.life - forgeCost.lifePayment }
+            : p
+        ),
+      };
+      events.push(
+        createEvent('LIFE_CHANGED', action.playerId, {
+          amount: -forgeCost.lifePayment,
+          reason: 'ability_cost',
+        })
+      );
+    }
+
+    // 4. Sacrifice self
+    if (forgeCost.sacrificeSelf) {
+      const moveResult = moveCard(this.state, cardId, 'graveyard');
+      this.state = moveResult.state;
+      events.push(...moveResult.events);
+      events.push(
+        createEvent('CARD_DESTROYED', action.playerId, {
+          cardInstanceId: cardId,
+          cardName: card.cardData.name,
+        })
+      );
+    }
+
+    // 5. Sacrifice other (MVP: auto-pick first valid candidate)
+    if (forgeCost.sacrificeType && forgeCost.sacrificeCount > 0) {
+      const sacType = forgeCost.sacrificeType.toLowerCase();
+      const bf = getCardsInZone(this.state, action.playerId, 'battlefield');
+      const candidates = bf.filter(
+        (c) =>
+          c.controllerId === action.playerId &&
+          c.instanceId !== cardId &&
+          c.cardData.typeLine.toLowerCase().includes(sacType)
+      );
+      for (let i = 0; i < forgeCost.sacrificeCount && i < candidates.length; i++) {
+        const sacCard = candidates[i];
+        const sacResult = moveCard(this.state, sacCard.instanceId, 'graveyard');
+        this.state = sacResult.state;
+        events.push(...sacResult.events);
+        events.push(
+          createEvent('CARD_DESTROYED', action.playerId, {
+            cardInstanceId: sacCard.instanceId,
+            cardName: sacCard.cardData.name,
+          })
+        );
+      }
+    }
+
+    // --- Resolve effects ---
+    // Build a synthetic StackItem for the EffectResolver
+    const syntheticStackItem: StackItem = {
+      id: `ability_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      type: 'ability',
+      sourceInstanceId: cardId,
+      controllerId: action.playerId,
+      targets: targetId ? [targetId] : [],
+      cardData: card.cardData,
+    };
+
+    const resolution = resolveSpellEffects(this.state, syntheticStackItem, forgeEffects);
+    this.state = resolution.state;
+    events.push(...resolution.events);
+
+    // Emit ability activated event
+    events.push(
+      createEvent('ABILITY_ACTIVATED', action.playerId, {
+        cardInstanceId: cardId,
+        cardName: card.cardData.name,
+        ability: 'activated',
+        targetId,
+      })
+    );
+
+    // Check SBAs after ability resolution
+    this.checkStateBasedActions(events);
+
+    this.state.events.push(...events);
+    return {
+      newState: this.state,
+      events,
+      legalActions: this.getLegalActionsForPlayer(action.playerId),
     };
   }
 

@@ -173,7 +173,29 @@ export function makeFallbackDecision(
     };
   }
 
-  // 3b. Equip equipment to best creature
+  // 3b. Use forge-powered activated abilities (non-targeted first, then targeted)
+  const forgeAbilityActions = legalActions.filter(
+    (a) => a.type === 'ACTIVATE_ABILITY' && a.payload.ability === 'forge_activated'
+  );
+  if (forgeAbilityActions.length > 0) {
+    // Prefer non-targeted abilities (like Fabled Passage search)
+    const nonTargeted = forgeAbilityActions.filter((a) => !a.payload.targetId);
+    if (nonTargeted.length > 0) {
+      const card = state.cardInstances.get(nonTargeted[0].payload.cardInstanceId as string);
+      return {
+        action: nonTargeted[0],
+        reasoning: `Activating ${card?.cardData.name || 'permanent'} ability`,
+      };
+    }
+    // For targeted abilities, pick the first one (simple heuristic)
+    const card = state.cardInstances.get(forgeAbilityActions[0].payload.cardInstanceId as string);
+    return {
+      action: forgeAbilityActions[0],
+      reasoning: `Activating ${card?.cardData.name || 'permanent'} targeted ability`,
+    };
+  }
+
+  // 3c. Equip equipment to best creature
   const equipActions = legalActions.filter((a) => a.type === 'ACTIVATE_ABILITY' && a.payload.ability === 'equip');
   if (equipActions.length > 0) {
     // Pick equip action targeting creature with highest power

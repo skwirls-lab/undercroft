@@ -31,6 +31,7 @@ interface PlayerFieldProps {
   onCastCommander?: (card: CardInstance) => void;
   onCardClick?: (card: CardInstance) => void;
   onEquipClick?: (card: CardInstance) => void;
+  onActivateAbility?: (card: CardInstance) => void;
   pendingManaChoice?: { cardInstanceId: string; actions: GameAction[] } | null;
   onManaColorPicked?: (color: ManaColor | 'C') => void;
   onCancelManaChoice?: () => void;
@@ -62,6 +63,7 @@ export function PlayerField({
   onCastCommander,
   onCardClick,
   onEquipClick,
+  onActivateAbility,
   pendingManaChoice,
   onManaColorPicked,
   onCancelManaChoice,
@@ -102,6 +104,12 @@ export function PlayerField({
   const equippableIds = new Set(
     legalActions
       .filter((a) => a.type === 'ACTIVATE_ABILITY' && a.payload.ability === 'equip')
+      .map((a) => a.payload.cardInstanceId as string)
+  );
+
+  const activatableIds = new Set(
+    legalActions
+      .filter((a) => a.type === 'ACTIVATE_ABILITY' && a.payload.ability === 'forge_activated')
       .map((a) => a.payload.cardInstanceId as string)
   );
 
@@ -286,6 +294,7 @@ export function PlayerField({
               <AnimatePresence>
               {creatures.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
+                const canActivate = activatableIds.has(card.instanceId);
                 return (
                   <motion.div
                     key={card.instanceId}
@@ -298,12 +307,16 @@ export function PlayerField({
                     <CardView
                       card={card}
                       mode={cardMode}
-                      onClick={(c) => isTarget ? onSelectTarget?.(c.instanceId) : undefined}
+                      onClick={(c) => {
+                        if (isTarget) onSelectTarget?.(c.instanceId);
+                        else if (canActivate) onActivateAbility?.(c);
+                      }}
                       combatRole={getCardCombatRole(card.instanceId, combat)}
-                      highlighted={isTarget}
+                      highlighted={isTarget || canActivate}
                       interactive
                       className={cn(
-                        isTarget && 'ring-2 ring-cyan-500/60 cursor-crosshair'
+                        isTarget && 'ring-2 ring-cyan-500/60 cursor-crosshair',
+                        canActivate && !isTarget && 'ring-2 ring-emerald-500/60 cursor-pointer'
                       )}
                     />
                   </motion.div>
@@ -326,6 +339,7 @@ export function PlayerField({
               {otherPermanents.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
                 const canEquip = equippableIds.has(card.instanceId);
+                const canActivate = activatableIds.has(card.instanceId);
                 return (
                   <motion.div
                     key={card.instanceId}
@@ -341,13 +355,14 @@ export function PlayerField({
                       onClick={(c) => {
                         if (isTarget) onSelectTarget?.(c.instanceId);
                         else if (canEquip) onEquipClick?.(c);
-                        else undefined;
+                        else if (canActivate) onActivateAbility?.(c);
                       }}
-                      highlighted={isTarget || canEquip}
+                      highlighted={isTarget || canEquip || canActivate}
                       interactive
                       className={cn(
                         isTarget && 'ring-2 ring-cyan-500/60 cursor-crosshair',
-                        canEquip && !isTarget && 'ring-2 ring-amber-500/60 cursor-pointer'
+                        canEquip && !isTarget && 'ring-2 ring-amber-500/60 cursor-pointer',
+                        canActivate && !isTarget && !canEquip && 'ring-2 ring-emerald-500/60 cursor-pointer'
                       )}
                     />
                   </motion.div>
@@ -370,6 +385,7 @@ export function PlayerField({
               {lands.map((card) => {
                 const canTap = tappableLandIds.has(card.instanceId);
                 const canUntap = untappableLandIds.has(card.instanceId);
+                const canActivate = activatableIds.has(card.instanceId);
                 const hasPendingChoice = pendingManaChoice?.cardInstanceId === card.instanceId;
                 return (
                   <motion.div
@@ -379,24 +395,25 @@ export function PlayerField({
                     exit={{ opacity: 0, scale: 0.7 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     layout
-                    className={cn('relative', (canTap || canUntap) && 'cursor-pointer')}
+                    className={cn('relative', (canTap || canUntap || canActivate) && 'cursor-pointer')}
                   >
                     <div
                       onClick={() => {
                         if (hasPendingChoice) return; // picker is open
                         if (canTap) onTapLand(card);
+                        else if (canActivate) onActivateAbility?.(card);
                         else if (canUntap && onUntapLand) onUntapLand(card);
-                        // preview handled by context hover
                       }}
-                      title={canUntap ? 'Click to untap' : canTap ? 'Click to tap for mana' : undefined}
+                      title={canActivate ? 'Click to activate ability' : canUntap ? 'Click to untap' : canTap ? 'Click to tap for mana' : undefined}
                     >
                       <CardView
                         card={card}
                         mode="pip"
-                        highlighted={canTap || hasPendingChoice}
+                        highlighted={canTap || canActivate || hasPendingChoice}
                         interactive
                         className={cn(
-                          canUntap && !canTap && 'ring-1 ring-amber-500/50',
+                          canActivate && !canTap && 'ring-2 ring-emerald-500/60',
+                          canUntap && !canTap && !canActivate && 'ring-1 ring-amber-500/50',
                           hasPendingChoice && 'ring-2 ring-primary'
                         )}
                       />

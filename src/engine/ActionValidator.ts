@@ -1,9 +1,10 @@
 import type { GameState, GameAction, CardInstance } from './types';
 import { getCardsInZone, getActivePlayer } from './GameState';
 import { isMainPhase, isActivePlayer, hasPriority } from './TurnManager';
-import { parseManaCost, canPayManaCost } from './ManaSystem';
+import { parseManaCost, canPayManaCost, totalMana, convertedManaCost } from './ManaSystem';
 import { getLandProducibleColors, getEffectiveLandCardData, hasManaAbility } from './OracleTextParser';
 import { parseSpellEffects, spellRequiresTarget, type TargetType } from './SpellEffectParser';
+import { getForgeActivatedAbilities, type ActivatedAbilityCost } from './ForgeLookup';
 
 export function isLand(card: CardInstance): boolean {
   return card.cardData.typeLine.toLowerCase().includes('land');
@@ -420,6 +421,113 @@ export function getLegalActions(state: GameState, playerId: string): GameAction[
             ability: 'equip',
             targetId: target.instanceId,
             equipCost,
+          },
+          timestamp: now,
+        });
+      }
+    }
+  }
+
+  // Forge-powered activated abilities (non-mana, non-equip)
+  // These are available at instant speed unless they require tap on a summoning-sick creature
+  for (const card of battlefield) {
+    if (card.controllerId !== playerId) continue;
+    const forgeAbilities = getForgeActivatedAbilities(card.cardData.name);
+    if (!forgeAbilities) continue;
+
+    for (let abilityIdx = 0; abilityIdx < forgeAbilities.length; abilityIdx++) {
+      const ab = forgeAbilities[abilityIdx];
+      const cost = ab.cost;
+
+      // Skip abilities with no effects (we can't execute them yet)
+      if (ab.effects.length === 0) continue;
+
+      // Check tap cost: card must be untapped + not summoning-sick for creatures
+      if (cost.tap && card.tapped) continue;
+      if (cost.tap && isCreature(card) && card.summoningSick) continue;
+
+      // Check mana affordability
+      if (!canPayManaCost(player.manaPool, cost.manaCost)) continue;
+
+      // Check life payment
+      if (cost.lifePayment > 0 && player.life <= cost.lifePayment) continue;
+
+      // Check sacrifice self: card must still be on battlefield (always true here)
+      // Check sacrifice other: must have a valid permanent to sacrifice
+      if (cost.sacrificeType && cost.sacrificeCount > 0) {
+        const sacType = cost.sacrificeType.toLowerCase();
+        const sacCandidates = battlefield.filter(c =>
+          c.controllerId === playerId &&
+          c.instanceId !== card.instanceId &&
+          c.cardData.typeLine.toLowerCase().includes(sacType)
+        );
+        if (sacCandidates.length < cost.sacrificeCount) continue;
+      }
+
+      // Check discard cost
+      if (cost.discardCount > 0) {
+        const hand = getCardsInZone(state, playerId, 'hand');
+        if (hand.length < cost.discardCount) continue;
+      }
+
+      // Generate action(s)
+      if (ab.requiresTarget) {
+        // For targeted abilities, generate one action per valid target
+        // MVP: target creatures on battlefield
+        const validTargets = battlefield.filter(c => {
+          if (ab.effects[0]?.targetType === 'creature') return isCreature(c);
+          if (ab.effects[0]?.targetType === 'permanent') return true;
+          if (ab.effects[0]?.targetType === 'player') return false;
+          return true;
+        });
+        // Also add player targets for damage abilities
+        const playerTargets: string[] = [];
+        if (ab.effects.some(e => e.type === 'damage' && (e.targetType === 'any' || e.targetType === 'player'))) {
+          for (const p of state.players) {
+            if (!p.hasLost && !p.hasConceded) playerTargets.push(p.id);
+          }
+        }
+        for (const target of validTargets) {
+          actions.push({
+            type: 'ACTIVATE_ABILITY',
+            playerId,
+            payload: {
+              cardInstanceId: card.instanceId,
+              ability: 'forge_activated',
+              abilityIndex: abilityIdx,
+              targetId: target.instanceId,
+              forgeCost: cost,
+              forgeEffects: ab.effects,
+            },
+            timestamp: now,
+          });
+        }
+        for (const targetPlayerId of playerTargets) {
+          actions.push({
+            type: 'ACTIVATE_ABILITY',
+            playerId,
+            payload: {
+              cardInstanceId: card.instanceId,
+              ability: 'forge_activated',
+              abilityIndex: abilityIdx,
+              targetId: targetPlayerId,
+              forgeCost: cost,
+              forgeEffects: ab.effects,
+            },
+            timestamp: now,
+          });
+        }
+      } else {
+        // Non-targeted ability
+        actions.push({
+          type: 'ACTIVATE_ABILITY',
+          playerId,
+          payload: {
+            cardInstanceId: card.instanceId,
+            ability: 'forge_activated',
+            abilityIndex: abilityIdx,
+            forgeCost: cost,
+            forgeEffects: ab.effects,
           },
           timestamp: now,
         });
