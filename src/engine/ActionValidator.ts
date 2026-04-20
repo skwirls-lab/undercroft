@@ -2,7 +2,7 @@ import type { GameState, GameAction, CardInstance } from './types';
 import { getCardsInZone, getActivePlayer } from './GameState';
 import { isMainPhase, isActivePlayer, hasPriority } from './TurnManager';
 import { parseManaCost, canPayManaCost } from './ManaSystem';
-import { getLandProducibleColors, getEffectiveLandCardData } from './OracleTextParser';
+import { getLandProducibleColors, getEffectiveLandCardData, hasManaAbility } from './OracleTextParser';
 import { parseSpellEffects, spellRequiresTarget, type TargetType } from './SpellEffectParser';
 
 export function isLand(card: CardInstance): boolean {
@@ -365,11 +365,14 @@ export function getLegalActions(state: GameState, playerId: string): GameAction[
   }
 
   // Tap lands for mana (mana abilities don't use the stack — always available)
+  // Only lands with actual mana abilities (e.g. NOT Fabled Passage, fetch lands, etc.)
   const battlefield = getCardsInZone(state, playerId, 'battlefield');
   for (const card of battlefield) {
     if (isLand(card) && !card.tapped) {
       const effectiveData = getEffectiveLandCardData(card);
+      if (!hasManaAbility(effectiveData)) continue;
       const producible = getLandProducibleColors(effectiveData);
+      if (producible.length === 0) continue;
       for (const color of producible) {
         actions.push({
           type: 'TAP_FOR_MANA',

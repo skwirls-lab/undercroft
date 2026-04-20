@@ -1,4 +1,5 @@
 import type { CardData, CardInstance, ManaColor } from './types';
+import { lookupForgeCard } from './ForgeLookup';
 
 // ============================================================
 // Oracle Text Parser — extracts game-relevant abilities from
@@ -45,8 +46,12 @@ export function getLandProducibleColors(cardData: CardData): (ManaColor | 'C')[]
   const nameColors = getColorsFromLandName(cardData.name);
   if (nameColors.length > 0) return nameColors;
 
-  // Fallback: colorless
-  return ['C'];
+  // Fallback: only return colorless if oracle text suggests mana production
+  // Lands like Fabled Passage that sacrifice for effects are NOT mana producers
+  if (hasManaAbility(cardData)) {
+    return ['C'];
+  }
+  return [];
 }
 
 /**
@@ -116,6 +121,42 @@ function getColorsFromLandName(name: string): (ManaColor | 'C')[] {
   if (n === 'forest') return ['G'];
   if (n === 'wastes') return ['C'];
   return [];
+}
+
+/**
+ * Check if a land actually has a mana ability (taps to produce mana).
+ * Lands like Fabled Passage that tap+sacrifice to search are NOT mana producers.
+ * Uses Forge data if available, otherwise analyzes oracle text.
+ */
+export function hasManaAbility(cardData: CardData): boolean {
+  // 1. Check Forge data first
+  const forgeEntry = lookupForgeCard(cardData.name);
+  if (forgeEntry) {
+    return forgeEntry.manaAbilities.length > 0;
+  }
+
+  // 2. Check Scryfall producedMana — but only trust it if oracle text confirms
+  //    Scryfall lists producedMana for fetch lands too (since they can get lands that produce)
+  const oracle = (cardData.oracleText || '').toLowerCase();
+
+  // If oracle has "{t}: add" it's a mana ability
+  if (/\{t\}\s*:\s*add\b/.test(oracle)) return true;
+
+  // If oracle has "{t}," followed by sacrifice/pay/discard, it's NOT a simple mana ability
+  if (/\{t\}\s*,\s*(sacrifice|pay|discard|remove|exile)/.test(oracle)) return false;
+
+  // Basic land types in the type line always have intrinsic mana abilities
+  const typeLine = cardData.typeLine.toLowerCase();
+  if (/\b(plains|island|swamp|mountain|forest)\b/.test(typeLine)) return true;
+
+  // If the card has producedMana from Scryfall AND no complex activated abilities, trust it
+  if (cardData.producedMana && cardData.producedMana.length > 0) {
+    // But filter out fetch-land patterns
+    if (oracle.includes('search your library') || oracle.includes('sacrifice')) return false;
+    return true;
+  }
+
+  return false;
 }
 
 // --- DFC Face Helpers ---
