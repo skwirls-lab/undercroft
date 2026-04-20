@@ -1,11 +1,55 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { CardInstance } from '@/engine/types';
-import { getLandProducibleColors } from '@/engine/OracleTextParser';
+import { getLandProducibleColors, getEffectiveLandCardData } from '@/engine/OracleTextParser';
+import { useCardPreview } from './CardPreviewContext';
+
+// Resolve the active face for DFC cards on the battlefield
+function getActiveFace(card: CardInstance) {
+  const { cardData } = card;
+  if (!cardData.cardFaces || cardData.cardFaces.length < 2) {
+    return {
+      name: cardData.name,
+      typeLine: cardData.typeLine,
+      oracleText: cardData.oracleText,
+      manaCost: cardData.manaCost,
+      power: cardData.power,
+      toughness: cardData.toughness,
+      artCrop: cardData.imageUris?.artCrop,
+      normal: cardData.imageUris?.normal,
+    };
+  }
+  const face = card.flipped ? cardData.cardFaces[1] : cardData.cardFaces[0];
+  return {
+    name: face.name,
+    typeLine: face.typeLine,
+    oracleText: face.oracleText,
+    manaCost: face.manaCost,
+    power: face.power,
+    toughness: face.toughness,
+    artCrop: face.imageUris?.artCrop || cardData.imageUris?.artCrop,
+    normal: face.imageUris?.normal || cardData.imageUris?.normal,
+  };
+}
+
+// Calculate effective P/T including counters, pump, and equipment
+function getDisplayPT(card: CardInstance): { power: string; toughness: string; boosted: boolean } {
+  const basePower = parseInt(card.cardData.power || '0', 10);
+  const baseToughness = parseInt(card.cardData.toughness || '0', 10);
+  const counterBonus = card.counters['+1/+1'] || 0;
+  const pumpPower = card.modifiedPower || 0;
+  const pumpToughness = card.modifiedToughness || 0;
+  const effectivePower = basePower + counterBonus + pumpPower;
+  const effectiveToughness = baseToughness + counterBonus + pumpToughness;
+  const boosted = counterBonus > 0 || pumpPower !== 0 || pumpToughness !== 0;
+  return { power: String(effectivePower), toughness: String(effectiveToughness), boosted };
+}
+
+function isToken(card: CardInstance): boolean {
+  return card.cardData.layout === 'token' || card.cardData.typeLine.toLowerCase().startsWith('token');
+}
 
 export type CardViewMode = 'pip' | 'art' | 'full';
 
@@ -24,12 +68,12 @@ interface CardViewProps {
 }
 
 const MANA_COLORS: Record<string, string> = {
-  W: 'bg-amber-50 text-amber-900',
-  U: 'bg-blue-600 text-white',
-  B: 'bg-zinc-900 text-zinc-300',
-  R: 'bg-red-600 text-white',
-  G: 'bg-green-700 text-white',
-  C: 'bg-zinc-400 text-zinc-800',
+  W: 'bg-gradient-to-br from-amber-50 to-amber-200 text-amber-900 border border-amber-300',
+  U: 'bg-gradient-to-br from-blue-400 to-blue-600 text-white border border-blue-300',
+  B: 'bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-100 border border-zinc-600',
+  R: 'bg-gradient-to-br from-red-500 to-red-700 text-white border border-red-400',
+  G: 'bg-gradient-to-br from-green-500 to-green-700 text-white border border-green-400',
+  C: 'bg-gradient-to-br from-zinc-300 to-zinc-500 text-zinc-900 border border-zinc-400',
 };
 
 function getManaSymbols(manaCost: string): string[] {
@@ -45,169 +89,211 @@ function getManaSymbols(manaCost: string): string[] {
 function getCardColorClass(card: CardInstance): string {
   const colors = card.cardData.colors;
   if (!colors || colors.length === 0) {
-    if (card.cardData.typeLine.toLowerCase().includes('land')) return 'border-amber-800/60';
-    return 'border-zinc-500/60';
+    if (card.cardData.typeLine.toLowerCase().includes('land')) return 'border-amber-700/80 shadow-[0_0_8px_rgba(180,83,9,0.2)]';
+    return 'border-zinc-500/80 shadow-[0_0_8px_rgba(113,113,122,0.2)]';
   }
-  if (colors.length > 1) return 'border-amber-400/60';
+  if (colors.length > 1) return 'border-amber-400/80 shadow-[0_0_8px_rgba(251,191,36,0.2)]';
   const colorMap: Record<string, string> = {
-    W: 'border-amber-100/60',
-    U: 'border-blue-500/60',
-    B: 'border-zinc-600/60',
-    R: 'border-red-500/60',
-    G: 'border-green-500/60',
+    W: 'border-amber-200/80 shadow-[0_0_8px_rgba(253,230,138,0.2)]',
+    U: 'border-blue-500/80 shadow-[0_0_8px_rgba(59,130,246,0.2)]',
+    B: 'border-zinc-700/80 shadow-[0_0_8px_rgba(63,63,70,0.2)]',
+    R: 'border-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.2)]',
+    G: 'border-green-500/80 shadow-[0_0_8px_rgba(34,197,94,0.2)]',
   };
-  return colorMap[colors[0]] || 'border-zinc-500/60';
+  return colorMap[colors[0]] || 'border-zinc-500/80';
 }
 
 // ==================== PIP VIEW ====================
-// Tiny compact view — colored bar + name + P/T
+// Compact view for opponents — mini art + name + P/T
 function PipView({ card, className }: { card: CardInstance; className?: string }) {
-  const isCreature = card.cardData.typeLine.toLowerCase().includes('creature');
-  const isLand = card.cardData.typeLine.toLowerCase().includes('land');
+  const face = getActiveFace(card);
+  const isCreature = face.typeLine.toLowerCase().includes('creature');
+  const isLand = face.typeLine.toLowerCase().includes('land');
   const isTapped = card.tapped;
+  const artCropUrl = face.artCrop;
 
   // For lands, show producible mana dots instead of mana cost pips
-  const landColors = isLand ? getLandProducibleColors(card.cardData) : [];
+  const effectiveData = getEffectiveLandCardData(card);
+  const landColors = isLand ? getLandProducibleColors(effectiveData) : [];
 
   return (
     <div
       className={cn(
-        'flex h-6 items-center gap-1 rounded border px-1.5 text-[10px] font-medium leading-none transition-all',
+        'flex h-8 items-center gap-1.5 rounded-md border px-1 text-[10px] font-medium leading-none transition-all',
         getCardColorClass(card),
-        isTapped ? 'rotate-12 opacity-70' : '',
-        'bg-card/80 backdrop-blur-sm',
+        isTapped ? 'rotate-3 opacity-60' : '',
+        'bg-card/90 backdrop-blur-sm',
         className
       )}
     >
-      {/* Mana cost pips (non-lands) or producible mana dots (lands) */}
-      <div className="flex gap-0.5">
-        {isLand ? (
-          landColors.slice(0, 5).map((color) => {
-            const colorClass = MANA_COLORS[color] || 'bg-zinc-500 text-white';
-            return (
-              <span
-                key={color}
-                className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold', colorClass)}
-              >
-                {color}
-              </span>
-            );
-          })
-        ) : (
-          getManaSymbols(card.cardData.manaCost).slice(0, 4).map((sym, i) => {
-            const colorClass = MANA_COLORS[sym] || 'bg-zinc-500 text-white';
-            return (
-              <span
-                key={i}
-                className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold', colorClass)}
-              >
-                {sym.length <= 2 ? sym : ''}
-              </span>
-            );
-          })
-        )}
-      </div>
+      {/* Mini art thumbnail */}
+      {artCropUrl && !isLand ? (
+        <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded">
+          <Image src={artCropUrl} alt="" fill sizes="24px" className="object-cover" unoptimized />
+        </div>
+      ) : (
+        <div className="flex shrink-0 gap-0.5">
+          {isLand ? (
+            landColors.slice(0, 3).map((color) => {
+              const colorClass = MANA_COLORS[color] || 'bg-zinc-500 text-white';
+              return (
+                <span key={color} className={cn('flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-bold', colorClass)}>
+                  {color}
+                </span>
+              );
+            })
+          ) : (
+            getManaSymbols(card.cardData.manaCost).slice(0, 3).map((sym, i) => {
+              const colorClass = MANA_COLORS[sym] || 'bg-zinc-500 text-white';
+              return (
+                <span key={i} className={cn('flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-bold', colorClass)}>
+                  {sym.length <= 2 ? sym : ''}
+                </span>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {/* Name */}
-      <span className="truncate text-foreground/90">
-        {card.cardData.name.length > 16 ? card.cardData.name.slice(0, 14) + '…' : card.cardData.name}
+      <span className="truncate text-foreground/90 min-w-0">
+        {face.name.length > 18 ? face.name.slice(0, 16) + '…' : face.name}
       </span>
 
-      {/* P/T */}
-      {isCreature && card.cardData.power && (
-        <span className="ml-auto shrink-0 text-[9px] text-muted-foreground">
-          {card.modifiedPower ?? card.cardData.power}/{card.modifiedToughness ?? card.cardData.toughness}
-        </span>
-      )}
-
-      {/* Damage indicator */}
-      {card.damage > 0 && (
-        <span className="shrink-0 text-[9px] font-bold text-red-400">
-          -{card.damage}
-        </span>
-      )}
+      {/* Right side badges */}
+      <div className="ml-auto flex items-center gap-1 shrink-0">
+        {/* Counters */}
+        {(card.counters['+1/+1'] || 0) > 0 && (
+          <span className="text-[8px] font-bold text-green-400">+{card.counters['+1/+1']}</span>
+        )}
+        {/* Equipment */}
+        {card.attachments.length > 0 && (
+          <span className="text-[7px] font-bold text-amber-400">EQ</span>
+        )}
+        {/* Token */}
+        {isToken(card) && (
+          <span className="text-[7px] font-bold text-purple-400">TKN</span>
+        )}
+        {/* Damage */}
+        {card.damage > 0 && (
+          <span className="text-[9px] font-bold text-red-400">-{card.damage}</span>
+        )}
+        {/* P/T */}
+        {isCreature && card.cardData.power && (() => {
+          const pt = getDisplayPT(card);
+          return (
+            <span className={cn(
+              'rounded px-1 py-0.5 text-[9px] font-bold',
+              pt.boosted ? 'bg-green-900/60 text-green-300' : 'bg-black/40 text-white'
+            )}>
+              {pt.power}/{pt.toughness}
+            </span>
+          );
+        })()}
+      </div>
     </div>
   );
 }
 
 // ==================== ART CROP VIEW ====================
-// Medium size — art crop image + name overlay + P/T badge
+// Battlefield card — art crop with name/P/T frame overlay
 function ArtView({ card, className }: { card: CardInstance; className?: string }) {
-  const isCreature = card.cardData.typeLine.toLowerCase().includes('creature');
+  const face = getActiveFace(card);
+  const isCreature = face.typeLine.toLowerCase().includes('creature');
   const isTapped = card.tapped;
-  const artCropUrl = card.cardData.imageUris?.artCrop || card.cardData.cardFaces?.[0]?.imageUris?.artCrop;
+  const artCropUrl = face.artCrop;
 
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-lg border-2 transition-all',
+        'relative overflow-hidden rounded-lg border-2 transition-all group',
         getCardColorClass(card),
-        isTapped ? 'rotate-6 opacity-80' : '',
-        'h-[72px] w-[100px]',
+        isTapped ? 'rotate-[4deg] brightness-75' : '',
+        'h-[132px] w-[96px]',
         className
       )}
     >
       {artCropUrl ? (
         <Image
           src={artCropUrl}
-          alt={card.cardData.name}
+          alt={face.name}
           fill
-          sizes="100px"
+          sizes="96px"
           className="object-cover"
           unoptimized
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-card text-[10px] text-muted-foreground">
-          {card.cardData.name}
+        <div className="flex h-full w-full items-center justify-center bg-card px-1 text-center text-[10px] text-muted-foreground">
+          {face.name}
         </div>
       )}
 
+      {/* Top dark strip for mana cost */}
+      <div className="absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 bg-gradient-to-b from-black/60 to-transparent px-1 pt-0.5 pb-3">
+        {getManaSymbols(face.manaCost).slice(0, 5).map((sym, i) => {
+          const colorClass = MANA_COLORS[sym] || 'bg-zinc-500 text-white';
+          return (
+            <span key={i} className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-bold shadow-sm', colorClass)}>
+              {sym.length <= 2 ? sym : ''}
+            </span>
+          );
+        })}
+      </div>
+
       {/* Name overlay at bottom */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 pb-1 pt-3">
-        <p className="truncate text-[10px] font-semibold leading-tight text-white">
-          {card.cardData.name}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent px-1.5 pb-1 pt-5">
+        <p className="truncate text-[10px] font-semibold leading-tight text-white drop-shadow-md">
+          {face.name}
         </p>
       </div>
 
-      {/* P/T badge */}
-      {isCreature && card.cardData.power && (
-        <div className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 py-0.5 text-[9px] font-bold text-white">
-          {card.modifiedPower ?? card.cardData.power}/{card.modifiedToughness ?? card.cardData.toughness}
+      {/* P/T badge — bottom right corner, larger */}
+      {isCreature && card.cardData.power && (() => {
+        const pt = getDisplayPT(card);
+        return (
+          <div className={cn(
+            'absolute right-0 bottom-0 rounded-tl-md px-1.5 py-0.5 text-[11px] font-black shadow-lg',
+            pt.boosted ? 'bg-green-800 text-green-200' : 'bg-black/80 text-white'
+          )}>
+            {pt.power}/{pt.toughness}
+          </div>
+        );
+      })()}
+
+      {/* Token badge */}
+      {isToken(card) && (
+        <div className="absolute left-0 bottom-3.5 rounded-r bg-purple-600/90 px-1 py-0.5 text-[7px] font-bold text-purple-100 shadow">
+          TOKEN
         </div>
       )}
 
-      {/* Damage indicator (creatures without keywords — keywords section handles it otherwise) */}
-      {isCreature && card.cardData.keywords.length === 0 && card.damage > 0 && (
-        <div className="absolute left-0.5 top-0.5 rounded bg-red-600/90 px-1 py-0.5 text-[9px] font-bold text-white">
-          -{card.damage}
+      {/* Equipment attached indicator */}
+      {card.attachments.length > 0 && (
+        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 px-1 py-0.5 text-[7px] font-bold text-amber-100 shadow">
+          EQ
         </div>
       )}
-      {!isCreature && card.damage > 0 && (
-        <div className="absolute left-0.5 top-0.5 rounded bg-red-600/90 px-1 py-0.5 text-[9px] font-bold text-white">
+
+      {/* Damage indicator */}
+      {card.damage > 0 && (
+        <div className="absolute left-0 top-0.5 rounded-r bg-red-600/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
           -{card.damage}
         </div>
       )}
 
-      {/* Tapped indicator */}
+      {/* Tapped overlay */}
       {isTapped && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-          <span className="text-[10px] font-bold text-white/70">TAPPED</span>
-        </div>
+        <div className="absolute inset-0 bg-black/20" />
       )}
 
       {/* Keyword badges (combat-relevant) */}
       {isCreature && card.cardData.keywords.length > 0 && (
-        <div className="absolute left-0.5 top-0.5 flex flex-col gap-0.5">
-          {card.damage > 0 && (
-            <span className="rounded bg-red-600/90 px-1 py-0.5 text-[8px] font-bold text-white">
-              -{card.damage}
-            </span>
-          )}
+        <div className="absolute left-0.5 top-5 flex flex-col gap-0.5">
           {card.cardData.keywords
             .filter((k) => ['Flying', 'Deathtouch', 'Lifelink', 'Trample', 'First Strike', 'Double Strike', 'Vigilance', 'Reach', 'Defender', 'Haste', 'Flash', 'Hexproof', 'Indestructible', 'Menace'].includes(k))
             .slice(0, 3)
             .map((kw) => (
-              <span key={kw} className="rounded bg-black/70 px-1 text-[7px] font-semibold text-amber-300 leading-tight">
+              <span key={kw} className="rounded bg-black/70 px-1 text-[7px] font-semibold text-amber-300 leading-tight shadow-sm">
                 {kw}
               </span>
             ))}
@@ -216,10 +302,12 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
 
       {/* Counter badges */}
       {Object.entries(card.counters).length > 0 && (
-        <div className="absolute left-0.5 bottom-5 flex gap-0.5">
+        <div className="absolute left-0.5 bottom-4 flex gap-0.5">
           {Object.entries(card.counters).map(([type, count]) => (
-            <span key={type} className="rounded bg-purple-600/80 px-1 text-[8px] font-bold text-white">
-              {count} {type.slice(0, 3)}
+            <span key={type} className={cn('rounded px-1 text-[8px] font-bold text-white shadow-sm',
+              type === '+1/+1' ? 'bg-green-600/90' : 'bg-purple-600/90'
+            )}>
+              {count > 1 ? `${count}x` : ''}{type}
             </span>
           ))}
         </div>
@@ -231,7 +319,8 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
 // ==================== FULL CARD VIEW ====================
 // Full card image — used for hand cards and hover/click previews
 function FullView({ card, className }: { card: CardInstance; className?: string }) {
-  const imageUrl = card.cardData.imageUris?.normal || card.cardData.cardFaces?.[0]?.imageUris?.normal;
+  const face = getActiveFace(card);
+  const imageUrl = face.normal;
 
   return (
     <div
@@ -245,7 +334,7 @@ function FullView({ card, className }: { card: CardInstance; className?: string 
       {imageUrl ? (
         <Image
           src={imageUrl}
-          alt={card.cardData.name}
+          alt={face.name}
           fill
           sizes="190px"
           className="object-cover"
@@ -253,11 +342,11 @@ function FullView({ card, className }: { card: CardInstance; className?: string 
         />
       ) : (
         <div className="flex h-full w-full flex-col gap-2 bg-card p-3">
-          <p className="text-sm font-bold">{card.cardData.name}</p>
-          <p className="text-[10px] text-muted-foreground">{card.cardData.manaCost}</p>
-          <p className="text-xs text-muted-foreground">{card.cardData.typeLine}</p>
+          <p className="text-sm font-bold">{face.name}</p>
+          <p className="text-[10px] text-muted-foreground">{face.manaCost}</p>
+          <p className="text-xs text-muted-foreground">{face.typeLine}</p>
           <p className="flex-1 text-[10px] leading-tight text-foreground/80">
-            {card.cardData.oracleText}
+            {face.oracleText}
           </p>
           {card.cardData.power && (
             <p className="self-end text-sm font-bold">
@@ -267,47 +356,6 @@ function FullView({ card, className }: { card: CardInstance; className?: string 
         </div>
       )}
     </div>
-  );
-}
-
-// ==================== CARD HOVER PREVIEW ====================
-function CardHoverPreview({ card }: { card: CardInstance }) {
-  const imageUrl = card.cardData.imageUris?.large || card.cardData.imageUris?.normal || card.cardData.cardFaces?.[0]?.imageUris?.large;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.15 }}
-      className="pointer-events-none fixed z-50 rounded-xl border border-border/50 shadow-2xl"
-      style={{ width: 250, height: 349 }}
-    >
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={card.cardData.name}
-          width={250}
-          height={349}
-          className="rounded-xl"
-          unoptimized
-        />
-      ) : (
-        <div className="flex h-full w-full flex-col gap-2 rounded-xl bg-card p-4">
-          <p className="text-base font-bold">{card.cardData.name}</p>
-          <p className="text-xs text-muted-foreground">{card.cardData.manaCost}</p>
-          <p className="text-sm text-muted-foreground">{card.cardData.typeLine}</p>
-          <p className="flex-1 text-xs leading-relaxed text-foreground/80">
-            {card.cardData.oracleText}
-          </p>
-          {card.cardData.power && (
-            <p className="self-end text-lg font-bold">
-              {card.cardData.power}/{card.cardData.toughness}
-            </p>
-          )}
-        </div>
-      )}
-    </motion.div>
   );
 }
 
@@ -323,34 +371,23 @@ export function CardView({
   combatRole = 'none',
   className,
 }: CardViewProps) {
-  const [hovered, setHovered] = useState(false);
-  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
-
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    if (!interactive) return;
-    setHovered(true);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setHoverPosition({
-      x: rect.right + 12,
-      y: Math.max(8, rect.top - 50),
-    });
-  };
+  const { setPreviewCard } = useCardPreview();
 
   return (
     <div
       className={cn(
-        'relative inline-block transition-transform',
-        interactive && 'cursor-pointer',
+        'relative inline-block transition-all duration-150',
+        interactive && 'cursor-pointer hover:brightness-110',
         selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg',
         highlighted && 'card-glow-strong',
-        combatRole === 'attacking' && 'ring-2 ring-red-500 ring-offset-1 ring-offset-background rounded-lg',
-        combatRole === 'blocking' && 'ring-2 ring-blue-500 ring-offset-1 ring-offset-background rounded-lg',
+        combatRole === 'attacking' && 'ring-2 ring-red-500/80 ring-offset-1 ring-offset-background rounded-lg shadow-[0_0_12px_rgba(239,68,68,0.4)]',
+        combatRole === 'blocking' && 'ring-2 ring-blue-500/80 ring-offset-1 ring-offset-background rounded-lg shadow-[0_0_12px_rgba(59,130,246,0.4)]',
         className
       )}
       onClick={() => onClick?.(card)}
       onDoubleClick={() => onDoubleClick?.(card)}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => interactive && setPreviewCard(card)}
+      onMouseLeave={() => interactive && setPreviewCard(null)}
     >
       {mode === 'pip' && <PipView card={card} />}
       {mode === 'art' && <ArtView card={card} />}
@@ -368,23 +405,8 @@ export function CardView({
         </div>
       )}
 
-      {/* Hover preview (only for pip and art modes) */}
-      <AnimatePresence>
-        {hovered && mode !== 'full' && (
-          <div
-            style={{
-              position: 'fixed',
-              left: hoverPosition.x,
-              top: hoverPosition.y,
-              zIndex: 100,
-            }}
-          >
-            <CardHoverPreview card={card} />
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
-export { PipView, ArtView, FullView, CardHoverPreview };
+export { PipView, ArtView, FullView };

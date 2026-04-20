@@ -48,6 +48,27 @@ export function moveCard(
     });
   }
 
+  // When leaving battlefield, update attachment relationships
+  if (fromZone === 'battlefield' && toZone !== 'battlefield') {
+    // If this card was attached to something, remove it from host's attachments
+    if (cardInstance.attachedTo) {
+      const host = newCardInstances.get(cardInstance.attachedTo);
+      if (host) {
+        newCardInstances.set(cardInstance.attachedTo, {
+          ...host,
+          attachments: host.attachments.filter((a) => a !== cardInstanceId),
+        });
+      }
+    }
+    // If this card had things attached (e.g. equipped creature dies), unattach them
+    for (const attachId of cardInstance.attachments) {
+      const attached = newCardInstances.get(attachId);
+      if (attached) {
+        newCardInstances.set(attachId, { ...attached, attachedTo: undefined });
+      }
+    }
+  }
+
   // Update card instance
   const updatedCard: CardInstance = {
     ...cardInstance,

@@ -41,6 +41,8 @@ export function createPlayer(
     hasConceded: false,
     poisonCounters: 0,
     landPlayedThisTurn: false,
+    mulliganCount: 0,
+    hasKeptHand: false,
   };
 }
 
@@ -87,6 +89,7 @@ export function createInitialGameState(
     'graveyard',
     'exile',
     'command',
+    'stack',
   ];
   for (const player of playerStates) {
     for (const zoneType of zoneTypes) {
@@ -94,8 +97,6 @@ export function createInitialGameState(
       zones.set(key, createZone(zoneType, player.id));
     }
   }
-  // shared stack zone
-  zones.set(getZoneKey('stack', 'shared'), createZone('stack', 'shared'));
 
   // Randomize who goes first
   const startingPlayerIndex = Math.floor(Math.random() * playerStates.length);

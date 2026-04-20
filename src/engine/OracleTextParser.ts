@@ -1,4 +1,4 @@
-import type { CardData, ManaColor } from './types';
+import type { CardData, CardInstance, ManaColor } from './types';
 
 // ============================================================
 // Oracle Text Parser — extracts game-relevant abilities from
@@ -116,6 +116,32 @@ function getColorsFromLandName(name: string): (ManaColor | 'C')[] {
   if (n === 'forest') return ['G'];
   if (n === 'wastes') return ['C'];
   return [];
+}
+
+// --- DFC Face Helpers ---
+
+/**
+ * For dual-faced cards on the battlefield, return CardData reflecting
+ * only the active face.  Uses the `flipped` flag — false = front, true = back.
+ * Single-faced cards are returned as-is.
+ */
+export function getEffectiveLandCardData(card: CardInstance): CardData {
+  const { cardData } = card;
+  if (!cardData.cardFaces || cardData.cardFaces.length < 2) return cardData;
+
+  const face = card.flipped ? cardData.cardFaces[1] : cardData.cardFaces[0];
+  return {
+    ...cardData,
+    name: face.name,
+    manaCost: face.manaCost,
+    typeLine: face.typeLine,
+    oracleText: face.oracleText,
+    power: face.power,
+    toughness: face.toughness,
+    imageUris: face.imageUris || cardData.imageUris,
+    // Clear aggregated producedMana so parser uses face-specific oracle text
+    producedMana: undefined,
+  };
 }
 
 // --- ETB Effects ---

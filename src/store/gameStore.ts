@@ -3,6 +3,10 @@ import type { GameState, GameAction, GameEvent, CardData } from '@/engine/types'
 import { GameEngine } from '@/engine/GameEngine';
 import { AIPlayerController } from '@/ai/AIPlayerController';
 import type { AIPlayerConfig } from '@/ai/types';
+import {
+  sfxTapLand, sfxCastSpell, sfxPlayCard, sfxDamage,
+  sfxLifeGain, sfxTurnStart, sfxGameOver, sfxPassPriority
+} from '@/lib/audio';
 
 interface GameStore {
   engine: GameEngine | null;
@@ -59,9 +63,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { engine, gameState: prevState } = get();
     if (!engine) return;
 
-    // If passing priority, lock all currently tapped lands for this player
+    // Lock tapped lands when mana is consumed (casting a spell) or passing priority
+    // This prevents the exploit: tap land → cast spell → untap land → re-tap
     let newLockedIds = get().lockedTappedIds;
-    if (action.type === 'PASS_PRIORITY' && prevState) {
+    if ((action.type === 'PASS_PRIORITY' || action.type === 'CAST_SPELL') && prevState) {
       const newLocked = new Set(newLockedIds);
       for (const [id, card] of prevState.cardInstances) {
         if (card.tapped && card.controllerId === action.playerId) {
@@ -72,6 +77,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const result = engine.processAction(action);
+
+    // Play SFX based on action type (only for human actions)
+    if (!prevState?.players.find(p => p.id === action.playerId)?.isAI) {
+      switch (action.type) {
+        case 'TAP_FOR_MANA': sfxTapLand(); break;
+        case 'CAST_SPELL': sfxCastSpell(); break;
+        case 'PLAY_LAND': sfxPlayCard(); break;
+        case 'PASS_PRIORITY': sfxPassPriority(); break;
+      }
+    }
+
+    // Play SFX for notable events
+    for (const evt of result.events) {
+      if (evt.type === 'DAMAGE_DEALT') sfxDamage();
+      else if (evt.type === 'LIFE_CHANGED' && (evt.data?.amount as number) > 0) sfxLifeGain();
+      else if (evt.type === 'TURN_STARTED' && evt.data?.playerId === 'player-human') sfxTurnStart();
+      else if (evt.type === 'PLAYER_WON' || evt.type === 'GAME_OVER') sfxGameOver();
+    }
+
+    // Lock lands that ETB tapped — they must not be untappable via undo
+    if (action.type === 'PLAY_LAND') {
+      const cardId = action.payload.cardInstanceId as string;
+      const card = result.newState.cardInstances.get(cardId);
+      if (card?.tapped) {
+        const newLocked = new Set(newLockedIds);
+        newLocked.add(cardId);
+        newLockedIds = newLocked;
+      }
+    }
 
     // Clear locks if the step/phase changed (fresh priority window)
     const stepChanged = prevState && (

@@ -45,23 +45,26 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border/50 bg-card card-glow">
-            <Swords className="h-10 w-10 text-gold" />
+      <main className="flex flex-1 flex-col items-center justify-center gap-10 px-6">
+        <div className="flex flex-col items-center gap-5 text-center">
+          {/* Logo placeholder — replace with actual logo */}
+          <div className="relative flex h-24 w-24 items-center justify-center rounded-2xl border border-gold/30 bg-card/80 glow-gold">
+            <Swords className="h-12 w-12 text-gold" />
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-gold/10 to-transparent pointer-events-none" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            <span className="text-gold">Under</span>croft
+            <span className="text-gold">Under</span><span className="text-foreground">croft</span>
           </h1>
-          <p className="max-w-md text-lg text-muted-foreground">
+          <p className="max-w-lg text-lg leading-relaxed text-muted-foreground">
             Play Magic: The Gathering Commander against AI opponents.
+            <br className="hidden sm:block" />
             Modern, fast, in your browser.
           </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link href="/game">
-            <Button size="lg" className="w-full sm:w-auto gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button size="lg" className="w-full sm:w-auto gap-2 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[0_0_20px_rgba(212,169,68,0.2)] font-semibold">
               <Swords className="h-5 w-5" />
               New Game
             </Button>
@@ -73,14 +76,14 @@ export default function Home() {
             </Button>
           </Link>
           <Link href="/settings">
-            <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2">
+            <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2 border-border/40">
               <Settings className="h-5 w-5" />
               Settings
             </Button>
           </Link>
         </div>
 
-        <div className="mt-8 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
           <FeatureCard
             title="AI Opponents"
             description="Play Commander against LLM-powered AI that makes strategic decisions."
@@ -105,9 +108,9 @@ export default function Home() {
 
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-xl border border-border/50 bg-card p-5">
-      <h3 className="mb-1 font-semibold text-card-foreground">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <div className="rounded-xl border border-border/30 bg-card/60 p-5 transition-colors hover:border-gold/20 hover:bg-card/80">
+      <h3 className="mb-1.5 font-semibold text-foreground">{title}</h3>
+      <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
     </div>
   );
 }

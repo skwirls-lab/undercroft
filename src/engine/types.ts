@@ -206,6 +206,8 @@ export interface PlayerState {
   hasConceded: boolean;
   poisonCounters: number;
   landPlayedThisTurn: boolean;
+  mulliganCount: number;    // How many mulligans taken (London mulligan)
+  hasKeptHand: boolean;     // Whether this player has finalized their hand
 }
 
 // --- Game Actions ---
