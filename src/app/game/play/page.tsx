@@ -24,7 +24,11 @@ export default function GamePlayPage() {
       (p) => p.id === gameState.priority.playerWithPriority
     );
 
-    if (currentPriorityPlayer?.isAI) {
+    // Handle AI pending choices (e.g., sacrifice confirm, search library)
+    const aiHasPendingChoice = gameState.pendingChoice &&
+      gameState.players.find(p => p.id === gameState.pendingChoice!.playerId)?.isAI;
+
+    if (currentPriorityPlayer?.isAI || aiHasPendingChoice) {
       aiLoopRef.current = setTimeout(() => {
         processAITurn();
       }, 600);
@@ -32,7 +36,8 @@ export default function GamePlayPage() {
       autoPassUntilNextTurn &&
       currentPriorityPlayer &&
       !currentPriorityPlayer.isAI &&
-      currentPriorityPlayer.id === HUMAN_PLAYER_ID
+      currentPriorityPlayer.id === HUMAN_PLAYER_ID &&
+      !gameState.pendingChoice
     ) {
       if (gameState.turn.activePlayerId === HUMAN_PLAYER_ID && gameState.turn.step === 'untap') {
         setAutoPass(false);
