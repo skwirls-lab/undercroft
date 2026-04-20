@@ -140,14 +140,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ isProcessing: true });
         await new Promise((resolve) => setTimeout(resolve, 300));
         const pending = gameState.pendingChoice;
-        // AI auto-picks the first matching card for search
-        const chosenCardIds = pending.cardInstanceIds && pending.cardInstanceIds.length > 0
-          ? [pending.cardInstanceIds[0]]
-          : [];
+        let payload: Record<string, unknown> = {};
+        if (pending.type === 'confirm_ability') {
+          payload = { confirmed: true };
+        } else {
+          // AI auto-picks the first matching card for search
+          const chosenCardIds = pending.cardInstanceIds && pending.cardInstanceIds.length > 0
+            ? [pending.cardInstanceIds[0]]
+            : [];
+          payload = { chosenCardIds };
+        }
         const result = engine.processAction({
           type: 'RESOLVE_CHOICE',
           playerId: pending.playerId,
-          payload: { chosenCardIds },
+          payload,
           timestamp: Date.now(),
         });
         set({

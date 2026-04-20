@@ -431,27 +431,92 @@ export class GameEngine {
     const player = this.state.players.find((p) => p.id === action.playerId);
     if (!card || !player) return this.errorResult('Invalid activated ability');
 
+    // --- If ability requires sacrifice, first tap (if needed) then confirm ---
+    if (forgeCost.sacrificeSelf || (forgeCost.sacrificeType && forgeCost.sacrificeCount > 0)) {
+      // 1. Tap cost first (visual feedback before sacrifice confirmation)
+      if (forgeCost.tap) {
+        const newInstances = new Map(this.state.cardInstances);
+        newInstances.set(cardId, { ...card, tapped: true });
+        this.state = { ...this.state, cardInstances: newInstances };
+      }
+
+      // 2. Pay mana cost immediately (non-destructive)
+      const manaCostTotal = forgeCost.manaCost.W + forgeCost.manaCost.U + forgeCost.manaCost.B +
+        forgeCost.manaCost.R + forgeCost.manaCost.G + forgeCost.manaCost.C + forgeCost.manaCost.generic;
+      if (manaCostTotal > 0) {
+        const payResult = payManaCost(player.manaPool, forgeCost.manaCost);
+        if (!payResult) return this.errorResult('Cannot pay mana cost');
+        this.state = {
+          ...this.state,
+          players: this.state.players.map((p) =>
+            p.id === action.playerId ? { ...p, manaPool: payResult } : p
+          ),
+        };
+      }
+
+      // 3. Create confirm_ability pending choice
+      const pendingChoice: import('./types').PendingChoice = {
+        type: 'confirm_ability',
+        playerId: action.playerId,
+        prompt: `Sacrifice ${card.cardData.name}?`,
+        minChoices: 0,
+        maxChoices: 0,
+        sourceCardId: cardId,
+        metadata: {
+          action: { ...action },
+          forgeCost: { ...forgeCost, tap: false }, // tap already paid
+          forgeEffects,
+          targetId,
+          cardName: card.cardData.name,
+        },
+      };
+      this.state = { ...this.state, pendingChoice };
+      this.state.events.push(...events);
+      return {
+        newState: this.state,
+        events,
+        legalActions: [], // Blocked until choice resolved
+      };
+    }
+
+    // --- No sacrifice: pay all costs immediately ---
+    return this.payRemainingCostsAndResolve(action, forgeCost, forgeEffects, events);
+  }
+
+  private payRemainingCostsAndResolve(
+    action: GameAction,
+    forgeCost: ActivatedAbilityCost,
+    forgeEffects: SpellEffect[],
+    events: GameEvent[]
+  ): ActionResult {
+    const cardId = action.payload.cardInstanceId as string;
+    const targetId = action.payload.targetId as string | undefined;
+    const card = this.state.cardInstances.get(cardId);
+    const player = this.state.players.find((p) => p.id === action.playerId);
+
     // --- Pay costs ---
 
     // 1. Tap cost
-    if (forgeCost.tap) {
+    if (forgeCost.tap && card) {
       const newInstances = new Map(this.state.cardInstances);
       newInstances.set(cardId, { ...card, tapped: true });
       this.state = { ...this.state, cardInstances: newInstances };
     }
 
     // 2. Mana cost
-    const manaCostTotal = forgeCost.manaCost.W + forgeCost.manaCost.U + forgeCost.manaCost.B +
-      forgeCost.manaCost.R + forgeCost.manaCost.G + forgeCost.manaCost.C + forgeCost.manaCost.generic;
-    if (manaCostTotal > 0) {
-      const payResult = payManaCost(player.manaPool, forgeCost.manaCost);
-      if (!payResult) return this.errorResult('Cannot pay mana cost');
-      this.state = {
-        ...this.state,
-        players: this.state.players.map((p) =>
-          p.id === action.playerId ? { ...p, manaPool: payResult } : p
-        ),
-      };
+    if (player) {
+      const manaCostTotal = forgeCost.manaCost.W + forgeCost.manaCost.U + forgeCost.manaCost.B +
+        forgeCost.manaCost.R + forgeCost.manaCost.G + forgeCost.manaCost.C + forgeCost.manaCost.generic;
+      if (manaCostTotal > 0) {
+        const payResult = payManaCost(player.manaPool, forgeCost.manaCost);
+        if (!payResult) return this.errorResult('Cannot pay mana cost');
+        this.state = {
+          ...this.state,
+          players: this.state.players.map((p) =>
+            p.id === action.playerId ? { ...p, manaPool: payResult } : p
+          ),
+        };
+      }
     }
 
     // 3. Life payment
@@ -474,15 +539,18 @@ export class GameEngine {
 
     // 4. Sacrifice self
     if (forgeCost.sacrificeSelf) {
-      const moveResult = moveCard(this.state, cardId, 'graveyard');
-      this.state = moveResult.state;
-      events.push(...moveResult.events);
-      events.push(
-        createEvent('CARD_DESTROYED', action.playerId, {
-          cardInstanceId: cardId,
-          cardName: card.cardData.name,
-        })
-      );
+      const currentCard = this.state.cardInstances.get(cardId);
+      if (currentCard) {
+        const moveResult = moveCard(this.state, cardId, 'graveyard');
+        this.state = moveResult.state;
+        events.push(...moveResult.events);
+        events.push(
+          createEvent('CARD_DESTROYED', action.playerId, {
+            cardInstanceId: cardId,
+            cardName: currentCard.cardData.name,
+          })
+        );
+      }
     }
 
     // 5. Sacrifice other (MVP: auto-pick first valid candidate)
@@ -511,13 +579,18 @@ export class GameEngine {
 
     // --- Resolve effects ---
     // Build a synthetic StackItem for the EffectResolver
+    // Note: card may have been sacrificed, so re-fetch or use stored data
+    const resolveCard = this.state.cardInstances.get(cardId);
+    const resolveCardData = resolveCard?.cardData || card?.cardData;
+    if (!resolveCardData) return this.errorResult('Card data not found for ability resolution');
+
     const syntheticStackItem: StackItem = {
       id: `ability_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       type: 'ability',
       sourceInstanceId: cardId,
       controllerId: action.playerId,
       targets: targetId ? [targetId] : [],
-      cardData: card.cardData,
+      cardData: resolveCardData,
     };
 
     const resolution = resolveSpellEffects(this.state, syntheticStackItem, forgeEffects);
@@ -528,7 +601,7 @@ export class GameEngine {
     events.push(
       createEvent('ABILITY_ACTIVATED', action.playerId, {
         cardInstanceId: cardId,
-        cardName: card.cardData.name,
+        cardName: resolveCardData.name,
         ability: 'activated',
         targetId,
       })
@@ -563,6 +636,39 @@ export class GameEngine {
 
     // Clear the pending choice
     this.state = { ...this.state, pendingChoice: null };
+
+    if (pending.type === 'confirm_ability') {
+      const confirmed = action.payload.confirmed as boolean;
+      const meta = pending.metadata || {};
+
+      if (confirmed) {
+        // Pay remaining costs (sacrifice) and resolve effects
+        const origAction = meta.action as GameAction;
+        const forgeCost = meta.forgeCost as ActivatedAbilityCost;
+        const forgeEffects = meta.forgeEffects as SpellEffect[];
+
+        const result = this.payRemainingCostsAndResolve(origAction, forgeCost, forgeEffects, events);
+        return result;
+      } else {
+        // Cancelled — untap the card if it was tapped
+        const sourceId = pending.sourceCardId;
+        if (sourceId) {
+          const card = this.state.cardInstances.get(sourceId);
+          if (card && card.tapped) {
+            const newInstances = new Map(this.state.cardInstances);
+            newInstances.set(sourceId, { ...card, tapped: false });
+            this.state = { ...this.state, cardInstances: newInstances };
+          }
+        }
+        // TODO: Refund mana if it was paid
+        this.state.events.push(...events);
+        return {
+          newState: this.state,
+          events,
+          legalActions: this.getLegalActionsForPlayer(action.playerId),
+        };
+      }
+    }
 
     if (pending.type === 'search_library') {
       const chosenCardIds = action.payload.chosenCardIds as string[] | undefined;

@@ -628,6 +628,56 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Confirm ability dialog (sacrifice confirmation) */}
+      <AnimatePresence>
+        {gameState.pendingChoice &&
+          gameState.pendingChoice.type === 'confirm_ability' &&
+          gameState.pendingChoice.playerId === currentPlayerId && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="flex flex-col items-center gap-4 rounded-xl border border-amber-500/30 bg-card/95 px-8 py-6 shadow-2xl"
+              >
+                <h3 className="text-sm font-semibold text-foreground">{gameState.pendingChoice.prompt}</h3>
+                <div className="flex gap-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => performAction({
+                      type: 'RESOLVE_CHOICE',
+                      playerId: currentPlayerId,
+                      payload: { confirmed: false },
+                      timestamp: Date.now(),
+                    })}
+                    className="border-border/30 text-muted-foreground hover:bg-muted/20"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => performAction({
+                      type: 'RESOLVE_CHOICE',
+                      playerId: currentPlayerId,
+                      payload: { confirmed: true },
+                      timestamp: Date.now(),
+                    })}
+                    className="bg-amber-600 text-white hover:bg-amber-700"
+                  >
+                    Sacrifice
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+      </AnimatePresence>
+
       {/* Search Picker overlay for library search choices */}
       <AnimatePresence>
         {gameState.pendingChoice &&
