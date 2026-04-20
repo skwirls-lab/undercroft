@@ -32,7 +32,17 @@ export type EffectType =
   | 'tap'
   | 'untap'
   | 'create_token'
-  | 'add_counter';
+  | 'add_counter'
+  | 'scry'
+  | 'mill'
+  | 'search_library'
+  | 'return_from_graveyard'
+  | 'create_treasure'
+  | 'fight'
+  | 'sacrifice'
+  | 'put_land_onto_battlefield'
+  | 'each_draw'
+  | 'surveil';
 
 export interface SpellEffect {
   type: EffectType;
@@ -47,6 +57,8 @@ export interface SpellEffect {
   tokenColors?: string[];   // For create_token: colors of the token
   tokenKeywords?: string[]; // For create_token: keywords like flying, haste
   counterType?: string;     // For add_counter: e.g. '+1/+1'
+  searchFilter?: string;    // For search_library: what to find
+  destination?: string;     // For search/return: where the card goes
 }
 
 const WORD_TO_NUM: Record<string, number> = {
@@ -248,6 +260,116 @@ export function parseSpellEffects(oracleText: string): SpellEffect[] {
       amount: parseNumberWord(counterSelfMatch[1]),
       counterType: '+1/+1',
       targetType: 'self',
+      requiresTarget: false,
+    });
+  }
+
+  // --- Scry ---
+  const scryRe = /scry (\d+|a|one|two|three)/;
+  const scryMatch = text.match(scryRe);
+  if (scryMatch) {
+    effects.push({ type: 'scry', amount: parseNumberWord(scryMatch[1]), requiresTarget: false });
+  }
+
+  // --- Surveil ---
+  const surveilRe = /surveil (\d+|a|one|two|three)/;
+  const surveilMatch = text.match(surveilRe);
+  if (surveilMatch && !scryMatch) {
+    effects.push({ type: 'surveil', amount: parseNumberWord(surveilMatch[1]), requiresTarget: false });
+  }
+
+  // --- Mill ---
+  // "mill N cards" or "target player mills N cards" or "put the top N cards of your library into your graveyard"
+  const millSelfRe = /(?:you )?mill (\d+|a|one|two|three|four|five) cards?/;
+  const millSelfMatch = text.match(millSelfRe);
+  if (millSelfMatch) {
+    effects.push({ type: 'mill', amount: parseNumberWord(millSelfMatch[1]), targetType: 'self', requiresTarget: false });
+  }
+  const millTargetRe = /target (?:player|opponent) mills (\d+|a|one|two|three|four|five) cards?/;
+  const millTargetMatch = text.match(millTargetRe);
+  if (millTargetMatch) {
+    effects.push({ type: 'mill', amount: parseNumberWord(millTargetMatch[1]), targetType: 'player', requiresTarget: true });
+  }
+  const putTopRe = /put the top (\d+|a|one|two|three) cards? of your library into your graveyard/;
+  const putTopMatch = text.match(putTopRe);
+  if (putTopMatch && !millSelfMatch) {
+    effects.push({ type: 'mill', amount: parseNumberWord(putTopMatch[1]), targetType: 'self', requiresTarget: false });
+  }
+
+  // --- Search library for a land (ramp) ---
+  // "search your library for a basic land card, put it onto the battlefield tapped"
+  const searchLandBfRe = /search your library for (?:a|up to (?:one|two|three|\d+)) (basic land|land|forest|island|mountain|plains|swamp) cards?,.*?(?:put (?:it|them) onto the battlefield|enter(?:s)? the battlefield)/;
+  const searchLandBfMatch = text.match(searchLandBfRe);
+  if (searchLandBfMatch) {
+    effects.push({ type: 'put_land_onto_battlefield', searchFilter: searchLandBfMatch[1], requiresTarget: false });
+  }
+
+  // "search your library for a basic land card and put that card into your hand"
+  const searchLandHandRe = /search your library for (?:a|up to (?:one|two|three|\d+)) (basic land|land|forest|island|mountain|plains|swamp) cards?.*?(?:put (?:it|that card|them) into your hand|reveal it.*?put it into your hand)/;
+  const searchLandHandMatch = text.match(searchLandHandRe);
+  if (searchLandHandMatch && !searchLandBfMatch) {
+    effects.push({ type: 'search_library', searchFilter: searchLandHandMatch[1], destination: 'hand', requiresTarget: false });
+  }
+
+  // Generic "search your library for a card"
+  const searchGenericRe = /search your library for a card/;
+  const searchGenericMatch = text.match(searchGenericRe);
+  if (searchGenericMatch && !searchLandBfMatch && !searchLandHandMatch) {
+    effects.push({ type: 'search_library', searchFilter: 'any', destination: 'hand', requiresTarget: false });
+  }
+
+  // --- Return from graveyard ---
+  const returnGYRe = /return target (creature|permanent|artifact|enchantment) card from your graveyard to (your hand|the battlefield)/;
+  const returnGYMatch = text.match(returnGYRe);
+  if (returnGYMatch) {
+    effects.push({
+      type: 'return_from_graveyard',
+      targetType: mapTargetType(returnGYMatch[1]),
+      destination: returnGYMatch[2] === 'your hand' ? 'hand' : 'battlefield',
+      requiresTarget: true,
+    });
+  }
+  // Also match "return ... from a graveyard" / "return ... from your graveyard to your hand"
+  const returnGY2Re = /return (?:a |target )?(creature|permanent) card from (?:a|your) graveyard to (your hand|the battlefield)/;
+  const returnGY2Match = text.match(returnGY2Re);
+  if (returnGY2Match && !returnGYMatch) {
+    effects.push({
+      type: 'return_from_graveyard',
+      targetType: mapTargetType(returnGY2Match[1]),
+      destination: returnGY2Match[2] === 'your hand' ? 'hand' : 'battlefield',
+      requiresTarget: false, // "a creature" is often self-selecting
+    });
+  }
+
+  // --- Create Treasure tokens ---
+  const treasureRe = /creates? (\d+|a|an|one|two|three|four|five) treasure tokens?/;
+  const treasureMatch = text.match(treasureRe);
+  if (treasureMatch) {
+    effects.push({ type: 'create_treasure', amount: parseNumberWord(treasureMatch[1]), requiresTarget: false });
+  }
+
+  // --- Fight ---
+  const fightRe = /(?:target creature you control )?fights? target creature/;
+  if (fightRe.test(text)) {
+    effects.push({ type: 'fight', targetType: 'creature', requiresTarget: true });
+  }
+
+  // --- Sacrifice ---
+  const sacrificeRe = /sacrifice (?:a|an) (creature|permanent|artifact|enchantment)/;
+  const sacrificeMatch = text.match(sacrificeRe);
+  if (sacrificeMatch) {
+    effects.push({ type: 'sacrifice', filter: sacrificeMatch[1], requiresTarget: false });
+  }
+
+  // --- Each player draws / each opponent draws ---
+  const eachDrawRe = /each (?:player|opponent) draws (\d+|a|one|two|three) cards?/;
+  const eachDrawMatch = text.match(eachDrawRe);
+  if (eachDrawMatch) {
+    const isOpponent = text.includes('each opponent draws');
+    effects.push({
+      type: 'each_draw',
+      amount: parseNumberWord(eachDrawMatch[1]),
+      targetType: isOpponent ? 'each_opponent' : 'each_player',
       requiresTarget: false,
     });
   }

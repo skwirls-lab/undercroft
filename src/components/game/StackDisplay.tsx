@@ -1,9 +1,34 @@
 'use client';
 
+import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import type { StackItem } from '@/engine/types';
+import type { StackItem, CardInstance } from '@/engine/types';
 import { Layers } from 'lucide-react';
+import { useCardPreview } from './CardPreviewContext';
+
+// Build a lightweight CardInstance-like object from stack item data for preview
+function stackItemToPreviewCard(item: StackItem): CardInstance | null {
+  if (!item.cardData) return null;
+  return {
+    instanceId: item.sourceInstanceId || item.id,
+    cardData: item.cardData,
+    ownerId: item.controllerId,
+    controllerId: item.controllerId,
+    zone: 'stack' as const,
+    tapped: false,
+    flipped: false,
+    faceDown: false,
+    counters: {},
+    attachments: [],
+    attachedTo: undefined,
+    abilities: [],
+    summoningSick: false,
+    damage: 0,
+    modifiedPower: 0,
+    modifiedToughness: 0,
+  };
+}
 
 interface StackDisplayProps {
   stack: StackItem[];
@@ -11,6 +36,17 @@ interface StackDisplayProps {
 }
 
 export function StackDisplay({ stack, className }: StackDisplayProps) {
+  const { setPreviewCard } = useCardPreview();
+
+  const handleHover = useCallback((item: StackItem) => {
+    const preview = stackItemToPreviewCard(item);
+    if (preview) setPreviewCard(preview);
+  }, [setPreviewCard]);
+
+  const handleLeave = useCallback(() => {
+    setPreviewCard(null);
+  }, [setPreviewCard]);
+
   if (stack.length === 0) return null;
 
   return (
@@ -42,11 +78,13 @@ export function StackDisplay({ stack, className }: StackDisplayProps) {
               transition={{ type: 'spring', stiffness: 500, damping: 30, delay: i * 0.05 }}
               layout
               className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-semibold',
+                'rounded-md px-2.5 py-1 text-xs font-semibold cursor-pointer',
                 i === 0
                   ? 'bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
                   : 'bg-muted/20 text-muted-foreground/80'
               )}
+              onMouseEnter={() => handleHover(item)}
+              onMouseLeave={handleLeave}
             >
               {item.cardData?.name || 'Unknown'}
               {item.targets.length > 0 && (
