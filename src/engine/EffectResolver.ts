@@ -6,6 +6,7 @@ import type { GameState, GameEvent, StackItem, CardData, ManaColor } from './typ
 import { moveCard, shuffleZone } from './ZoneManager';
 import { drawCards } from './TurnManager';
 import { parseSpellEffects, type SpellEffect } from './SpellEffectParser';
+import { getForgeEffects } from './ForgeLookup';
 import { getCardsInZone, createCardInstance, getZoneKey } from './GameState';
 import { hasIndestructible, getEffectivePower, getEffectiveToughness } from './ActionValidator';
 
@@ -35,7 +36,10 @@ export function resolveSpellEffects(
   const cardData = stackItem.cardData || card?.cardData;
   if (!cardData) return { state, events };
 
-  const effects = effectsOverride || parseSpellEffects(cardData.oracleText);
+  // Priority: 1) explicit override, 2) Forge script data, 3) regex fallback
+  const effects = effectsOverride
+    || getForgeEffects(cardData.name)
+    || parseSpellEffects(cardData.oracleText);
   if (effects.length === 0) return { state, events };
 
   let newState = state;
@@ -61,7 +65,7 @@ export function areTargetsValid(
   const card = state.cardInstances.get(stackItem.sourceInstanceId);
   if (!card) return false;
 
-  const effects = parseSpellEffects(card.cardData.oracleText);
+  const effects = getForgeEffects(card.cardData.name) || parseSpellEffects(card.cardData.oracleText);
   const targetedEffects = effects.filter((e) => e.requiresTarget);
 
   // If spell has no targeted effects, it doesn't fizzle

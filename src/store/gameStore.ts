@@ -7,6 +7,7 @@ import {
   sfxTapLand, sfxCastSpell, sfxPlayCard, sfxDamage,
   sfxLifeGain, sfxTurnStart, sfxGameOver, sfxPassPriority
 } from '@/lib/audio';
+import { initForgeData } from '@/engine/ForgeLookup';
 
 interface GameStore {
   engine: GameEngine | null;
@@ -40,6 +41,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lockedTappedIds: new Set(),
 
   initGame: (players, decks, aiConfigs) => {
+    // Load Forge card data (fire-and-forget; lookups before load return null → regex fallback)
+    initForgeData();
+
     const engine = new GameEngine(players, decks);
     const result = engine.startGame();
 
