@@ -278,13 +278,286 @@ These are **must-have** features for alpha testing. Without these, games feel br
 
 ---
 
-## Summary
+## Part 5: Forge Wrapper Architecture Analysis
 
-**Engine completeness: ~15% of Forge, ~30% of minimum viable Commander**
-The engine handles the "skeleton" of a game (turns, mana, creatures, combat) but cards have no effects. Without the stack and spell resolution, it's essentially a game of "play vanilla creatures and swing."
+*Added: April 20, 2026*
 
-**UI/UX polish: Functional prototype, not alpha-ready**
-The architecture is solid (Next.js + Zustand + Tailwind is a good stack), the component structure is clean, and the dark theme base is appropriate. But it needs 3-4 sessions of dedicated visual work to reach the fidelity of a credible alpha. The biggest gaps are: card rendering size, battlefield spatial design, animations, and branding.
+### Why Wrap Forge Instead of Building From Scratch?
 
-**Recommended priority for next session: Phase 1 (Stack + Targeting + Spell Effects)**
-This is the single biggest bang-for-buck improvement. Once spells actually do things, the game transforms from "swing with bodies" to "play Magic."
+Our TypeScript engine now covers Phase 1 and Phase 2 of the roadmap — stack, targeting, spell effects, triggers, tokens, counters, equipment, keywords, and activated abilities. But even with all this work, we cover maybe **200-300 cards** correctly out of **25,000+** Commander-legal cards. The remaining 95% requires:
+
+- **Layer system** (7 layers of continuous effect ordering)
+- **Replacement effects** ("instead" effects, damage prevention)
+- **Thousands of individual card scripts** (each with unique logic)
+- **Cost modifications** (kicker, overload, flashback, escape, alternative costs)
+- **Modal spells, X spells, copy effects, mana filtering**
+- **Planeswalker loyalty abilities**
+- **Multiplayer-specific rules** (APNAP ordering, political mechanics)
+
+Forge has all of this, battle-tested over **15+ years** by hundreds of contributors. The `forge-game` + `forge-core` + `forge-ai` modules are ~500K+ lines of Java implementing the complete MTG rules engine.
+
+### Forge's Architecture (Key Insight)
+
+Forge was designed with a clean separation between engine and UI:
+
+```
+forge-core        → Card definitions, data types, utilities
+forge-game        → Rules engine, game state, phases, stack, combat
+forge-ai          → AI player logic (PlayerControllerAi)
+forge-gui         → Abstract GUI interface (IGuiGame, PlayerControllerHuman)
+forge-gui-desktop → Swing desktop implementation
+forge-gui-mobile  → LibGDX mobile implementation (Android/iOS)
+```
+
+The critical abstraction is **`PlayerController`** (355 lines, ~60 abstract methods):
+- Every player choice goes through this interface
+- `chooseSingleEntityForEffect()`, `chooseCardsForEffect()`, `confirmAction()`
+- `declareAttackers()`, `declareBlockers()`, `chooseSpellAbilityToPlay()`
+- `assignCombatDamage()`, `chooseManaFromPool()`, `mulliganKeepHand()`
+- The AI implements `PlayerControllerAi`; the human GUI implements `PlayerControllerHuman`
+
+The second key abstraction is **`IGuiGame`** (297 lines):
+- The engine calls these methods to update the UI
+- `showPromptMessage()`, `updatePhase()`, `updateStack()`, `showCombat()`
+- `getChoices()`, `confirm()`, `one()`, `many()` — generic choice dialogs
+- `chooseSingleEntityForEffect()` — card/entity selection UI
+
+**This means we can replace the GUI without touching the engine.** We implement our own `PlayerController` and `IGuiGame` that bridges to our UI.
+
+---
+
+### Three Viable Wrapper Architectures
+
+#### Path A: Desktop App — Electron/Tauri + Embedded JVM
+
+```
+┌──────────────────────────────────┐
+│          Electron / Tauri         │
+│  ┌───────────────┬──────────────┐ │
+│  │  Chromium      │  Embedded   │ │
+│  │  (Our React UI)│  JVM        │ │
+│  │               │  (Forge JAR) │ │
+│  │  Next.js app  │             │ │
+│  │  Firebase Auth│  forge-core │ │
+│  │  Firestore    │  forge-game │ │
+│  │  Card art     │  forge-ai   │ │
+│  │  Animations   │             │ │
+│  └───────┬───────┴──────┬──────┘ │
+│          │  JSON / IPC  │        │
+│          └──────────────┘        │
+└──────────────────────────────────┘
+```
+
+**How it works:**
+1. App bundles a minimal JRE (~40-50MB) + Forge engine JARs (~20MB)
+2. On launch, spawns a Java process running a thin JSON-RPC/WebSocket bridge
+3. Bridge implements `PlayerController` → serializes choices as JSON → waits for UI response
+4. Bridge implements `IGuiGame` → serializes game state updates → pushes to UI
+5. React frontend renders everything, sends player decisions back via IPC
+
+**Pros:**
+- Keeps 100% of our React/TypeScript UI
+- Offline play works (no server needed)
+- Single installable package
+- Firebase Auth + Firestore works normally (Chromium has full web APIs)
+
+**Cons:**
+- Large download (~120-200MB with JRE + Chromium + card data)
+- Two runtimes (Node/Chromium + JVM) — ~300-500MB RAM
+- Mobile: Electron doesn't support mobile. Tauri has experimental mobile support but unstable
+- Building/packaging requires tooling for each platform
+
+**Best for:** Desktop-first app where offline play matters.
+
+---
+
+#### Path B: Server-Hosted Forge + Web/PWA Frontend
+
+```
+┌─────────────────────┐     WebSocket      ┌──────────────────────┐
+│   Browser / PWA      │◄─────────────────►│   Java Server         │
+│                      │                    │                       │
+│  Our Next.js App     │   Game state JSON  │  Forge Engine         │
+│  Firebase Auth       │   Player choices   │  forge-core           │
+│  Firestore           │   Game events      │  forge-game           │
+│  Card art rendering  │                    │  forge-ai             │
+│  All UI components   │                    │  Bridge layer         │
+│                      │                    │  (Spring Boot / Ktor) │
+└──────────────────────┘                    └──────────────────────┘
+     PC + Mobile                              Cloud VM ($5-20/mo)
+```
+
+**How it works:**
+1. Java server (Spring Boot or Ktor) hosts Forge engine
+2. Thin bridge layer implements `PlayerController` as a WebSocket responder
+3. When Forge needs a player choice, bridge sends JSON prompt to client, blocks until response
+4. Client renders our UI, collects player input, sends back via WebSocket
+5. Game state updates streamed to client as events
+
+**Pros:**
+- Works on ANY device with a browser (PC, phone, tablet)
+- No install required — just a URL
+- Smallest client (just a web app)
+- Multiplayer is natural (server holds authoritative state)
+- Can be a PWA (installable, home screen icon, push notifications)
+- Firebase Auth + Firestore fully supported
+- Easy to update (server-side changes, no client update needed)
+
+**Cons:**
+- Requires server hosting ($5-20/month for small scale, more for many users)
+- Latency per action (50-200ms depending on hosting region)
+- No offline play
+- Server is a single point of failure
+
+**Best for:** Universal access, multiplayer, mobile-first.
+
+---
+
+#### Path C: Kotlin Multiplatform + Compose UI (Clean Room)
+
+```
+┌───────────────────────────────────────────────┐
+│            Kotlin Multiplatform                 │
+│  ┌──────────────────────────────────────────┐  │
+│  │         Shared Kotlin Code                │  │
+│  │  • Forge engine (Java, interops directly) │  │
+│  │  • Bridge layer (Kotlin)                  │  │
+│  │  • Firebase SDK                           │  │
+│  │  • Game state management                  │  │
+│  └──────────────────────────────────────────┘  │
+│                      │                          │
+│  ┌──────────┐  ┌─────────┐  ┌──────────────┐  │
+│  │  Desktop  │  │ Android │  │     iOS      │  │
+│  │  (JVM)    │  │ (JVM)   │  │ (KMP/Native) │  │
+│  │  Compose  │  │ Compose │  │ Compose/Swift│  │
+│  └──────────┘  └─────────┘  └──────────────┘  │
+└───────────────────────────────────────────────┘
+```
+
+**How it works:**
+1. Kotlin runs on JVM — seamless Java interop with Forge classes
+2. Forge engine runs in the same process (no IPC, no serialization)
+3. `PlayerController` implementation is Kotlin code that talks directly to Compose UI
+4. Compose Multiplatform renders UI on Desktop (Windows/Mac/Linux) and Android natively
+5. iOS support via Compose Multiplatform (maturing) or SwiftUI bridge
+
+**Pros:**
+- **Zero-overhead engine integration** — Kotlin calls Forge Java directly, same JVM process
+- Single codebase for Desktop + Android
+- Native performance on all platforms
+- No serialization layer, no IPC, no WebSocket overhead
+- Firebase SDK available for all platforms (KMP Firebase libraries)
+- Forge's AI runs locally with no latency
+
+**Cons:**
+- **Lose all our React/TypeScript UI work** — complete UI rewrite in Compose
+- Learning curve for Compose Multiplatform
+- iOS support is still maturing (Compose for iOS is beta)
+- Compose UI ecosystem is smaller than React's
+- No web/browser version without additional work
+
+**Best for:** Maximum performance, cleanest engine integration, native feel.
+
+---
+
+### Comparison Matrix
+
+| Factor | Path A (Electron+JVM) | Path B (Server+Web) | Path C (Kotlin/Compose) |
+|---|---|---|---|
+| **Keep our React UI** | ✅ Yes | ✅ Yes | ❌ Full rewrite |
+| **Mobile support** | ⚠️ Tauri experimental | ✅ Browser/PWA | ✅ Native Android+iOS |
+| **Offline play** | ✅ Yes | ❌ No | ✅ Yes |
+| **Install friction** | Medium (~150MB download) | None (URL) | Medium (app store/download) |
+| **Multiplayer path** | Hard (need server anyway) | ✅ Natural | Medium (need server) |
+| **Engine integration** | Medium (JSON IPC) | Medium (WebSocket) | ✅ Direct JVM calls |
+| **Development effort** | 3-5 weeks | 2-4 weeks | 6-10 weeks (UI rewrite) |
+| **Firebase/Firestore** | ✅ Yes | ✅ Yes | ✅ Yes (KMP libs) |
+| **Hosting cost** | None (local) | $5-20/mo | None (local) |
+| **RAM usage** | High (~500MB) | Low (browser only) | Medium (~200-300MB) |
+| **Latency** | Zero (local) | 50-200ms | Zero (local) |
+| **Update mechanism** | App update | Server deploy | App update |
+
+---
+
+### Recommended Path: **B (Server) as primary, with A (Electron) as optional desktop client**
+
+**Rationale:**
+
+1. **Path B ships fastest** (2-4 weeks) and preserves all our existing UI work
+2. **Universal access** — works on every device with a browser, no install
+3. **Multiplayer-ready** from day one (server holds authoritative state)
+4. **Mobile works immediately** — just a responsive web app
+5. **Firebase Auth + Firestore** unchanged — already integrated
+6. **LLM AI layer** can augment Forge's built-in AI server-side
+7. **Optionally add Path A later** for desktop users who want offline play
+
+The server cost ($5-20/mo on Railway/Fly.io/Render) is negligible for development. For scale, the server can be containerized and auto-scaled.
+
+### Implementation Plan (Path B)
+
+#### Phase 1: Forge Bridge Server (Java side)
+1. Create a new Maven module `forge-server` depending on `forge-core`, `forge-game`, `forge-ai`
+2. Implement `BridgePlayerController extends PlayerController` — every abstract method serializes the choice as JSON and blocks on a `CompletableFuture` until the client responds
+3. Implement `BridgeGuiGame implements IGuiGame` — every method pushes a JSON event to the client
+4. WebSocket server (Ktor or Spring Boot) that:
+   - Accepts connections from authenticated clients
+   - Creates a `Game` instance with the player's deck
+   - Routes player decisions from WebSocket to `BridgePlayerController`
+   - Streams game state updates from `BridgeGuiGame` to WebSocket
+
+#### Phase 2: Frontend Adapter (TypeScript side)
+5. Replace `GameEngine.ts` usage with a `ForgeGameClient` class that:
+   - Connects via WebSocket to the Forge server
+   - Receives game state updates and maps them to our `GameState` type
+   - Sends player decisions when the server requests them
+6. Update `gameStore.ts` to use `ForgeGameClient` instead of local `GameEngine`
+7. Map Forge's `PlayerController` choice types to our existing UI:
+   - `chooseSpellAbilityToPlay` → existing Hand/PlayerField click handlers
+   - `chooseSingleEntityForEffect` → existing targeting mode
+   - `chooseCardsForEffect` → existing SearchPicker
+   - `confirmAction` → existing confirm dialog
+   - `declareAttackers/Blockers` → existing CombatControls
+
+#### Phase 3: Testing & Polish
+8. Test with real Commander decks
+9. Handle edge cases (disconnection, reconnection, timeout)
+10. Performance optimization (batch state updates, delta compression)
+
+### What We Keep vs. What Changes
+
+**Keep (all our existing work):**
+- `src/components/game/*` — All UI components
+- `src/app/*` — All pages and routing
+- `src/store/deckStore.ts` — Deck management
+- `src/store/settingsStore.ts` — Settings
+- `src/cards/CardDatabase.ts` — Scryfall data
+- `src/lib/firebase/*` — Auth and future Firestore
+- `src/ai/AIPlayerController.ts` — LLM AI layer (optional enhancement)
+- All styling, animations, theme
+
+**Replace:**
+- `src/engine/*` — Our TypeScript engine → Forge server calls
+- `src/store/gameStore.ts` — Refactored to use WebSocket client
+- `src/ai/FallbackAI.ts` — Forge's AI is much stronger
+
+**Add:**
+- `forge-server/` — New Java project (Maven module)
+- `src/lib/forgeClient.ts` — WebSocket client for Forge server
+- Docker/deployment config for the Java server
+
+---
+
+## Updated Summary
+
+**Engine completeness: ~15% of Forge → 100% via wrapper**
+Wrapping Forge gives us the complete MTG rules engine immediately — all 25,000+ cards, full stack, replacement effects, the layer system, and battle-tested AI.
+
+**UI/UX: Preserved and enhanced**
+All our existing React components, animations, theme, and Firebase integration carry over unchanged. The Forge wrapper is purely a backend swap.
+
+**Recommended path: Server-hosted Forge (Path B)**
+Ships in 2-4 weeks, works everywhere, multiplayer-ready, keeps all our UI work. Add an optional Electron desktop client (Path A) later for offline play.
+
+**Key risk: Forge's `PlayerController` has ~60 abstract methods.** Each one needs a corresponding JSON message type and UI handler. The most common 20-30 methods cover 95% of gameplay; the rest can be stubbed initially.
+
+**License note:** Forge is GPL v3. Our wrapper can use a different license for the UI/frontend since it communicates via network protocol (WebSocket), not linked code. The server component that includes Forge would need to be GPL-compatible.
