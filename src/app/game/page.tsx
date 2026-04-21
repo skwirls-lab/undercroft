@@ -11,7 +11,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { CardDatabase, scryfallToCardData } from '@/cards/CardDatabase';
 import type { CardData } from '@/engine/types';
 import type { AIPlayerConfig } from '@/ai/types';
-import { ArrowLeft, Swords, Bot, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, Server } from 'lucide-react';
 
 const AI_NAMES = ['Archmage Niv', 'Elara the Wise', 'Grothak Ironscale'];
 
@@ -267,7 +267,29 @@ export default function GameSetupPage() {
           </CardContent>
         </Card>
 
-        {/* Start */}
+        {/* Forge Server Mode */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5 text-gold" />
+              Forge Engine (Server)
+            </CardTitle>
+            <CardDescription>
+              Play against AI using the full Forge MTG rules engine running on a dedicated server.
+              94K+ real cards with accurate rules enforcement.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/game/forge">
+              <Button variant="secondary" className="w-full gap-2">
+                <Swords className="h-4 w-4" />
+                Play with Forge Server
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Start (local engine) */}
         <Button
           size="lg"
           disabled={!canStart || starting}
