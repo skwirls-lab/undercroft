@@ -21,6 +21,8 @@ interface GameStore {
 
   // Forge server mode
   forgeMode: boolean;
+  forgePendingRequestId: string | null;
+  forgeRespondFn: ((requestId: string, payload: Record<string, unknown>) => void) | null;
 
   initGame: (
     players: Array<{ id: string; name: string; isAI: boolean }>,
@@ -35,6 +37,12 @@ interface GameStore {
   // Forge state injection
   setForgeState: (gameState: GameState, events?: GameEvent[]) => void;
   enterForgeMode: () => void;
+  setForgeLegalActions: (
+    actions: GameAction[],
+    requestId: string,
+    respondFn: (requestId: string, payload: Record<string, unknown>) => void
+  ) => void;
+  clearForgeLegalActions: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -47,6 +55,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   autoPassUntilNextTurn: false,
   lockedTappedIds: new Set(),
   forgeMode: false,
+  forgePendingRequestId: null,
+  forgeRespondFn: null,
 
   enterForgeMode: () => {
     set({
@@ -59,6 +69,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       aiControllers: new Map(),
       autoPassUntilNextTurn: false,
       lockedTappedIds: new Set(),
+      forgePendingRequestId: null,
+      forgeRespondFn: null,
     });
   },
 
@@ -66,7 +78,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       gameState,
       events: events ?? get().events,
-      legalActions: [], // Forge uses choice_request, not legalActions
+      // Don't clear legalActions here — they're managed by setForgeLegalActions
       isProcessing: false,
     });
   },
@@ -95,8 +107,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   performAction: (action) => {
-    const { engine, gameState: prevState, forgeMode } = get();
-    if (forgeMode) return; // In forge mode, actions go through WebSocket
+    const { engine, gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn } = get();
+    if (forgeMode) {
+      // In forge mode, map game actions to WebSocket choice responses
+      if (!forgePendingRequestId || !forgeRespondFn) return;
+      if (action.type === 'PASS_PRIORITY') {
+        forgeRespondFn(forgePendingRequestId, { pass: true });
+      } else {
+        const forgeIdx = action.payload?.forgeAbilityIndex as number | undefined;
+        if (forgeIdx != null) {
+          forgeRespondFn(forgePendingRequestId, { abilityIndex: forgeIdx });
+        } else {
+          return;
+        }
+      }
+      set({ forgePendingRequestId: null, forgeRespondFn: null, legalActions: [] });
+      return;
+    }
     if (!engine) return;
 
     // Lock tapped lands when mana is consumed (casting a spell) or passing priority
@@ -240,8 +267,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
       autoPassUntilNextTurn: false,
       lockedTappedIds: new Set(),
       forgeMode: false,
+      forgePendingRequestId: null,
+      forgeRespondFn: null,
     });
   },
 
   setAutoPass: (enabled) => set({ autoPassUntilNextTurn: enabled }),
+
+  setForgeLegalActions: (actions, requestId, respondFn) => {
+    set({
+      legalActions: actions,
+      forgePendingRequestId: requestId,
+      forgeRespondFn: respondFn,
+    });
+  },
+
+  clearForgeLegalActions: () => {
+    set({
+      legalActions: [],
+      forgePendingRequestId: null,
+      forgeRespondFn: null,
+    });
+  },
 }));

@@ -102,7 +102,7 @@ export default function ForgeGamePage() {
         {/* Two-column layout: game board + sidebar */}
         <div className="flex flex-1 min-h-0">
           {/* Main game area */}
-          <main className="flex-1 overflow-auto p-3">
+          <main className="flex-1 overflow-auto p-3 flex flex-col">
             {/* Game Over overlay */}
             {isGameOver && (
               <div className="mb-4 rounded-xl border border-gold/30 bg-gold/10 p-6 text-center">
@@ -114,13 +114,16 @@ export default function ForgeGamePage() {
               </div>
             )}
 
-            {/* Choice prompt from Forge server */}
-            {pendingChoice && (
-              <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
-            )}
-
             {/* The existing GameBoard reads from useGameStore (populated by adapter) */}
-            <GameBoard currentPlayerId={HUMAN_PLAYER_ID} />
+            {/* choose_action is integrated into GameBoard via synthetic legalActions */}
+            <GameBoard currentPlayerId={HUMAN_PLAYER_ID} className="flex-1" />
+
+            {/* Non-action choice overlays (mulligan, sacrifice, targets, etc.) positioned near bottom */}
+            {pendingChoice && pendingChoice.choiceType !== 'choose_action' && (
+              <div className="mt-2 max-w-3xl self-center w-full">
+                <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
+              </div>
+            )}
           </main>
 
           {/* Right sidebar — card preview + game log */}

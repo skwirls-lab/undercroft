@@ -108,6 +108,7 @@ export class ForgeGameClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private sessionId: string | null = null;
+  private keepAliveInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(serverUrl: string, handlers: MessageHandler) {
     this.serverUrl = serverUrl;
@@ -125,6 +126,8 @@ export class ForgeGameClient {
         this.ws.onopen = () => {
           this.reconnectAttempts = 0;
           this.handlers.onConnectionChange?.('connected');
+          // Start keepalive pings to prevent idle timeout
+          this.startKeepAlive();
           resolve();
         };
 
@@ -138,6 +141,7 @@ export class ForgeGameClient {
         };
 
         this.ws.onclose = (event) => {
+          this.stopKeepAlive();
           this.handlers.onConnectionChange?.('disconnected');
           if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
@@ -162,9 +166,26 @@ export class ForgeGameClient {
   /** Disconnect from server */
   disconnect() {
     this.maxReconnectAttempts = 0; // Prevent auto-reconnect
+    this.stopKeepAlive();
     if (this.ws) {
       this.ws.close();
       this.ws = null;
+    }
+  }
+
+  private startKeepAlive() {
+    this.stopKeepAlive();
+    this.keepAliveInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping', payload: {} }));
+      }
+    }, 30_000);
+  }
+
+  private stopKeepAlive() {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
     }
   }
 

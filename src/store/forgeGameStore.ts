@@ -19,6 +19,7 @@ import {
 } from '@/lib/forgeClient';
 import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { useGameStore } from '@/store/gameStore';
+import type { GameAction } from '@/engine/types';
 
 // Re-use existing UI types where possible
 export interface ForgeGameStoreState {
@@ -69,7 +70,86 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       },
 
       onChoiceRequest: (choice) => {
-        set({ pendingChoice: choice });
+        if (choice.choiceType === 'choose_action') {
+          // Convert Forge legalPlays → synthetic GameActions for GameBoard
+          const gs = useGameStore.getState();
+          const gameState = gs.gameState;
+          const data = choice.data as Record<string, unknown>;
+          const legalPlays = (data.legalPlays || []) as Array<{
+            index: number; description: string; cardName?: string;
+            cardId?: number; isSpell?: boolean; isAbility?: boolean;
+          }>;
+          const canPass = data.canPassPriority as boolean;
+          const isMainPhase = data.isMainPhase as boolean;
+
+          // Auto-pass: skip non-main phases / opponent turns when enabled
+          if (gs.autoPassUntilNextTurn && canPass) {
+            const isMyTurn = gameState?.turn.activePlayerId === 'player-human';
+            if (isMainPhase && isMyTurn) {
+              useGameStore.getState().setAutoPass(false);
+            } else {
+              get().client?.sendChoiceResponse(choice.requestId, { pass: true });
+              return;
+            }
+          }
+
+          const actions: GameAction[] = [];
+          for (const play of legalPlays) {
+            if (play.cardId == null) continue;
+            const instanceId = `forge-${play.cardId}`;
+            const card = gameState?.cardInstances.get(instanceId);
+
+            let actionType: string;
+            if (!card) {
+              actionType = play.isSpell ? 'CAST_SPELL' : 'ACTIVATE_ABILITY';
+            } else if (card.zone === 'hand') {
+              actionType = card.cardData.typeLine?.toLowerCase().includes('land')
+                ? 'PLAY_LAND' : 'CAST_SPELL';
+            } else if (card.zone === 'battlefield') {
+              actionType = card.cardData.typeLine?.toLowerCase().includes('land')
+                ? 'TAP_FOR_MANA' : 'ACTIVATE_ABILITY';
+            } else if (card.zone === 'command') {
+              actionType = 'CAST_SPELL';
+            } else {
+              actionType = 'ACTIVATE_ABILITY';
+            }
+
+            const payload: Record<string, unknown> = {
+              cardInstanceId: instanceId,
+              forgeAbilityIndex: play.index,
+            };
+            if (actionType === 'ACTIVATE_ABILITY') payload.ability = 'forge_activated';
+            if (card?.zone === 'command') payload.fromZone = 'command';
+
+            actions.push({
+              type: actionType as GameAction['type'],
+              playerId: 'player-human',
+              payload,
+              timestamp: Date.now(),
+            });
+          }
+
+          // Synthetic PASS_PRIORITY so GameBoard's Pass button works
+          if (canPass) {
+            actions.push({
+              type: 'PASS_PRIORITY',
+              playerId: 'player-human',
+              payload: {},
+              timestamp: Date.now(),
+            });
+          }
+
+          // Push to gameStore — GameBoard will highlight cards & wire clicks
+          const respondFn = (rid: string, p: Record<string, unknown>) => {
+            get().client?.sendChoiceResponse(rid, p);
+          };
+          useGameStore.getState().setForgeLegalActions(actions, choice.requestId, respondFn);
+          set({ pendingChoice: null });
+        } else {
+          // Non-action choices: show overlay, clear forge legal actions
+          useGameStore.getState().clearForgeLegalActions();
+          set({ pendingChoice: choice });
+        }
       },
 
       onGameEvent: (event) => {
