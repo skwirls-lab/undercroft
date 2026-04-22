@@ -19,6 +19,9 @@ interface GameStore {
   autoPassUntilNextTurn: boolean;
   lockedTappedIds: Set<string>;
 
+  // Forge server mode
+  forgeMode: boolean;
+
   initGame: (
     players: Array<{ id: string; name: string; isAI: boolean }>,
     decks: Map<string, CardData[]>,
@@ -28,6 +31,10 @@ interface GameStore {
   processAITurn: () => Promise<void>;
   resetGame: () => void;
   setAutoPass: (enabled: boolean) => void;
+
+  // Forge state injection
+  setForgeState: (gameState: GameState, events?: GameEvent[]) => void;
+  enterForgeMode: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -39,6 +46,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
   aiControllers: new Map(),
   autoPassUntilNextTurn: false,
   lockedTappedIds: new Set(),
+  forgeMode: false,
+
+  enterForgeMode: () => {
+    set({
+      forgeMode: true,
+      engine: null,
+      gameState: null,
+      legalActions: [],
+      events: [],
+      isProcessing: false,
+      aiControllers: new Map(),
+      autoPassUntilNextTurn: false,
+      lockedTappedIds: new Set(),
+    });
+  },
+
+  setForgeState: (gameState, events) => {
+    set({
+      gameState,
+      events: events ?? get().events,
+      legalActions: [], // Forge uses choice_request, not legalActions
+      isProcessing: false,
+    });
+  },
 
   initGame: (players, decks, aiConfigs) => {
     // Load Forge card data (fire-and-forget; lookups before load return null → regex fallback)
@@ -64,7 +95,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   performAction: (action) => {
-    const { engine, gameState: prevState } = get();
+    const { engine, gameState: prevState, forgeMode } = get();
+    if (forgeMode) return; // In forge mode, actions go through WebSocket
     if (!engine) return;
 
     // Lock tapped lands when mana is consumed (casting a spell) or passing priority
@@ -130,7 +162,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   processAITurn: async () => {
-    const { engine, gameState, aiControllers } = get();
+    const { engine, gameState, aiControllers, forgeMode } = get();
+    if (forgeMode) return; // Server handles AI turns
     if (!engine || !gameState || gameState.isGameOver) return;
 
     // Handle pending choices for AI players first
@@ -206,6 +239,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       aiControllers: new Map(),
       autoPassUntilNextTurn: false,
       lockedTappedIds: new Set(),
+      forgeMode: false,
     });
   },
 

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDeckStore } from '@/store/deckStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { FORGE_SERVER_URL } from '@/lib/forgeConfig';
-import { ArrowLeft, Swords, Loader2, AlertCircle, WifiOff } from 'lucide-react';
+import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 
 /**
  * Convert a user deck from the store into the "N CardName" format the Forge server expects.
@@ -36,6 +36,7 @@ export default function GameSetupPage() {
   const { decks } = useDeckStore();
   const { connect, startGame, connectionStatus } = useForgeGameStore();
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const [aiCount, setAiCount] = useState(1);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
@@ -112,6 +113,39 @@ export default function GameSetupPage() {
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* AI Opponents */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-gold" />
+              AI Opponents
+            </CardTitle>
+            <CardDescription>
+              Choose how many AI opponents to play against.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              {[1, 2, 3].map((count) => (
+                <button
+                  key={count}
+                  onClick={() => setAiCount(count)}
+                  className={`flex h-12 w-12 items-center justify-center rounded-lg border text-lg font-semibold transition-colors ${
+                    aiCount === count
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border/50 text-muted-foreground hover:border-border'
+                  }`}
+                >
+                  {count}
+                </button>
+              ))}
+              <span className="text-sm text-muted-foreground">
+                AI player{aiCount !== 1 ? 's' : ''}
+              </span>
+            </div>
           </CardContent>
         </Card>
 

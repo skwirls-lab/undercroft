@@ -17,6 +17,8 @@ import {
   ForgePlayer,
   ConnectionStatus,
 } from '@/lib/forgeClient';
+import { adaptForgeState } from '@/lib/forgeStateAdapter';
+import { useGameStore } from '@/store/gameStore';
 
 // Re-use existing UI types where possible
 export interface ForgeGameStoreState {
@@ -61,6 +63,9 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
       onGameState: (state) => {
         set({ gameState: state });
+        // Push adapted state into the main gameStore so existing UI components work
+        const adapted = adaptForgeState(state);
+        useGameStore.getState().setForgeState(adapted);
       },
 
       onChoiceRequest: (choice) => {
@@ -114,6 +119,8 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         isGameOver: false,
         winner: null,
       });
+      // Put the main game store into forge mode so existing UI components render correctly
+      useGameStore.getState().enterForgeMode();
       client.startGame(deckList, commander, playerName);
     }
   },
