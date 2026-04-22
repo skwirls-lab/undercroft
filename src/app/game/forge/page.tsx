@@ -1,16 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForgeGameStore, mapChoiceToUI, getChoicePrompt, getChoiceCards } from '@/store/forgeGameStore';
-import { FORGE_SERVER_URL, FORGE_HEALTH_URL } from '@/lib/forgeConfig';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
-  Wifi,
-  WifiOff,
   Loader2,
-  Swords,
   Heart,
   Skull,
   Shield,
@@ -22,10 +19,12 @@ import {
 import type { ForgeCard, ForgePlayer, ForgeChoiceRequest } from '@/lib/forgeClient';
 
 // ============================================================
-// Forge Game Page — connects to the Java Forge server via WS
+// Forge Game Page — the active game view
+// Connection + game start are handled by /game (setup page).
 // ============================================================
 
 export default function ForgeGamePage() {
+  const router = useRouter();
   const {
     connectionStatus,
     gameState,
@@ -33,189 +32,26 @@ export default function ForgeGamePage() {
     gameEvents,
     isGameOver,
     winner,
-    connect,
     disconnect,
-    startGame,
     respondToChoice,
     concede,
   } = useForgeGameStore();
 
-  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
-  const [connectError, setConnectError] = useState<string | null>(null);
   const [eventLogOpen, setEventLogOpen] = useState(false);
 
-  // Check server health on mount
+  // If not connected, redirect back to setup
   useEffect(() => {
-    fetch(FORGE_HEALTH_URL)
-      .then((res) => setServerOnline(res.ok))
-      .catch(() => setServerOnline(false));
-  }, []);
-
-  // Auto-connect when page loads
-  useEffect(() => {
-    if (connectionStatus === 'disconnected' && serverOnline) {
-      setConnectError(null);
-      connect(FORGE_SERVER_URL).catch((e) => {
-        setConnectError(String(e));
-      });
+    if (connectionStatus === 'disconnected' || connectionStatus === 'error') {
+      router.replace('/game');
     }
-    return () => {
-      // Don't disconnect on unmount — let the game keep running
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverOnline]);
+  }, [connectionStatus, router]);
 
-  // --- Render ---
-
-  // Connection screen
-  if (connectionStatus !== 'connected') {
+  // Still connecting or waiting for first game state
+  if (connectionStatus !== 'connected' || (!gameState && !isGameOver && !pendingChoice)) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-        <Link href="/game" className="absolute left-4 top-4">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back
-          </Button>
-        </Link>
-
-        {serverOnline === null && (
-          <>
-            <Loader2 className="h-8 w-8 animate-spin text-gold" />
-            <p className="text-muted-foreground">Checking Forge server...</p>
-          </>
-        )}
-
-        {serverOnline === false && (
-          <>
-            <WifiOff className="h-10 w-10 text-red-500" />
-            <p className="font-semibold text-red-400">Forge server is offline</p>
-            <p className="max-w-md text-center text-sm text-muted-foreground">
-              The server may be starting up (takes ~30s to load 94K cards). Try refreshing in a moment.
-            </p>
-            <Button variant="secondary" onClick={() => window.location.reload()}>
-              Retry
-            </Button>
-          </>
-        )}
-
-        {serverOnline && connectionStatus === 'connecting' && (
-          <>
-            <Loader2 className="h-8 w-8 animate-spin text-gold" />
-            <p className="text-muted-foreground">Connecting to Forge server...</p>
-          </>
-        )}
-
-        {serverOnline && connectionStatus === 'error' && (
-          <>
-            <WifiOff className="h-10 w-10 text-red-500" />
-            <p className="font-semibold text-red-400">Connection failed</p>
-            {connectError && (
-              <p className="max-w-md text-center text-xs text-muted-foreground">{connectError}</p>
-            )}
-            <Button variant="secondary" onClick={() => connect(FORGE_SERVER_URL)}>
-              Retry
-            </Button>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // Connected but no game yet — show start button
-  if (!gameState && !isGameOver) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-        <Link href="/game" className="absolute left-4 top-4">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back
-          </Button>
-        </Link>
-
-        <div className="flex items-center gap-2 text-green-400">
-          <Wifi className="h-5 w-5" />
-          <span className="text-sm font-medium">Connected to Forge Server</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-border/50 bg-card/50 p-8">
-          <Swords className="h-10 w-10 text-gold" />
-          <h2 className="text-xl font-bold">Start a Forge Game</h2>
-          <p className="max-w-sm text-center text-sm text-muted-foreground">
-            This will start a Commander game on the Forge engine server with an AI opponent.
-            The server has 94K+ real MTG cards loaded.
-          </p>
-          <Button
-            size="lg"
-            className="gap-2"
-            onClick={() => {
-              // Test deck: basic mono-red burn
-              const testDeck = [
-                '1 Krenko, Mob Boss',
-                ...Array(38).fill('1 Mountain'),
-                '1 Lightning Bolt',
-                '1 Shock',
-                '1 Goblin Guide',
-                '1 Monastery Swiftspear',
-                '1 Eidolon of the Great Revel',
-                '1 Goblin Rabblemaster',
-                '1 Goblin Chieftain',
-                '1 Siege-Gang Commander',
-                '1 Skirk Prospector',
-                '1 Goblin Warchief',
-                '1 Goblin Matron',
-                '1 Goblin Recruiter',
-                '1 Goblin Ringleader',
-                '1 Mogg War Marshal',
-                '1 Goblin Trashmaster',
-                '1 Goblin Chainwhirler',
-                '1 Purphoros, God of the Forge',
-                '1 Impact Tremors',
-                '1 Shared Animosity',
-                '1 Coat of Arms',
-                '1 Sol Ring',
-                '1 Ruby Medallion',
-                '1 Skullclamp',
-                '1 Lightning Greaves',
-                '1 Swiftfoot Boots',
-                '1 Chaos Warp',
-                '1 Reverberate',
-                '1 Gamble',
-                '1 Wheel of Fortune',
-                '1 Faithless Looting',
-                '1 Mana Vault',
-                '1 Arcane Signet',
-                '1 Fire Diamond',
-                '1 Wayfarer\'s Bauble',
-                '1 Mana Crypt',
-                '1 Throne of the God-Pharaoh',
-                '1 Phyrexian Arena',
-                '1 Vandalblast',
-                '1 Blasphemous Act',
-                '1 Shattering Spree',
-                '1 By Force',
-                '1 Goblin Bushwhacker',
-                '1 Reckless Bushwhacker',
-                '1 Goblin Instigator',
-                '1 Krenko\'s Command',
-                '1 Dragon Fodder',
-                '1 Hordeling Outburst',
-                '1 Empty the Warrens',
-                '1 Muxus, Goblin Grandee',
-                '1 Pashalik Mons',
-                '1 Sling-Gang Lieutenant',
-                '1 Goblin King',
-                '1 Battle Hymn',
-                '1 Brightstone Ritual',
-                '1 Goblin War Strike',
-                '1 Massive Raid',
-                '1 Mob Justice',
-                '1 Goblin Bombardment',
-              ];
-              startGame(testDeck, 'Krenko, Mob Boss', 'Player');
-            }}
-          >
-            <Swords className="h-5 w-5" />
-            Start Test Game (Krenko Goblins)
-          </Button>
-        </div>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-gold" />
+        <p className="text-muted-foreground">Loading game...</p>
       </div>
     );
   }
@@ -232,8 +68,7 @@ export default function ForgeGamePage() {
             </Button>
           </Link>
           <div className="flex items-center gap-2 text-sm">
-            <Wifi className="h-3.5 w-3.5 text-green-400" />
-            <span className="font-semibold text-gold">Forge Game</span>
+            <span className="font-semibold text-gold">Undercroft</span>
             {gameState?.turn && (
               <span className="text-muted-foreground">
                 &middot; Turn {gameState.turn.turnNumber} &middot; {gameState.turn.phase}
@@ -245,9 +80,11 @@ export default function ForgeGamePage() {
           <Button variant="ghost" size="sm" className="gap-1 text-red-400" onClick={concede}>
             <Flag className="h-3.5 w-3.5" /> Concede
           </Button>
-          <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={disconnect}>
-            Disconnect
-          </Button>
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={disconnect}>
+              Leave Game
+            </Button>
+          </Link>
         </div>
       </header>
 

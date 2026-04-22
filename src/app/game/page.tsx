@@ -1,164 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useDeckStore } from '@/store/deckStore';
-import { useGameStore } from '@/store/gameStore';
-import { useSettingsStore } from '@/store/settingsStore';
-import { CardDatabase, scryfallToCardData } from '@/cards/CardDatabase';
-import type { CardData } from '@/engine/types';
-import type { AIPlayerConfig } from '@/ai/types';
-import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, Server } from 'lucide-react';
+import { useForgeGameStore } from '@/store/forgeGameStore';
+import { FORGE_SERVER_URL } from '@/lib/forgeConfig';
+import { ArrowLeft, Swords, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 
-const AI_NAMES = ['Archmage Niv', 'Elara the Wise', 'Grothak Ironscale'];
+/**
+ * Convert a user deck from the store into the "N CardName" format the Forge server expects.
+ * Returns { deckList, commander } ready for the WS start_game message.
+ */
+function buildForgeDeck(deck: ReturnType<typeof useDeckStore.getState>['decks'][0]) {
+  const deckList: string[] = [];
+  let commander: string | undefined;
 
-// Generate a simple test deck of basic lands + vanilla creatures for demo purposes
-// In production this will resolve from the Scryfall IndexedDB cache
-function generateTestDeck(colorIdentity: string): CardData[] {
-  const cards: CardData[] = [];
-  const base: Omit<CardData, 'name' | 'typeLine' | 'manaCost' | 'cmc' | 'colors' | 'colorIdentity' | 'power' | 'toughness' | 'oracleText'> = {
-    scryfallId: '',
-    oracleId: '',
-    keywords: [],
-    layout: 'normal',
-    legalities: { commander: 'legal' },
-    producedMana: undefined,
-    imageUris: undefined,
-    cardFaces: undefined,
-  };
-
-  // Commander
-  cards.push({
-    ...base,
-    scryfallId: `cmd-${colorIdentity}`,
-    name: `Test Commander (${colorIdentity})`,
-    typeLine: 'Legendary Creature — Human Wizard',
-    manaCost: `{${colorIdentity}}{${colorIdentity}}{3}`,
-    cmc: 5,
-    colors: [colorIdentity] as CardData['colors'],
-    colorIdentity: [colorIdentity] as CardData['colorIdentity'],
-    power: '4',
-    toughness: '4',
-    oracleText: 'Vigilance',
-    keywords: ['Vigilance'],
-  });
-
-  // 38 basic lands
-  const landNames: Record<string, string> = { W: 'Plains', U: 'Island', B: 'Swamp', R: 'Mountain', G: 'Forest' };
-  const landName = landNames[colorIdentity] || 'Plains';
-  for (let i = 0; i < 38; i++) {
-    cards.push({
-      ...base,
-      scryfallId: `land-${colorIdentity}-${i}`,
-      name: landName,
-      typeLine: `Basic Land — ${landName}`,
-      manaCost: '',
-      cmc: 0,
-      colors: [],
-      colorIdentity: [colorIdentity] as CardData['colorIdentity'],
-      power: undefined,
-      toughness: undefined,
-      oracleText: `{T}: Add {${colorIdentity}}.`,
-      producedMana: [colorIdentity],
-    });
+  if (deck.commanderName) {
+    commander = deck.commanderName;
   }
 
-  // Fill remaining with simple creatures at various costs
-  const creatureTemplates = [
-    { cost: 1, p: '1', t: '1', count: 8 },
-    { cost: 2, p: '2', t: '2', count: 12 },
-    { cost: 3, p: '3', t: '3', count: 10 },
-    { cost: 4, p: '4', t: '3', count: 8 },
-    { cost: 5, p: '5', t: '5', count: 6 },
-    { cost: 6, p: '6', t: '6', count: 5 },
-    { cost: 7, p: '7', t: '7', count: 4 },
-    { cost: 8, p: '8', t: '8', count: 3 },
-    { cost: 9, p: '10', t: '10', count: 2 },
-    { cost: 10, p: '12', t: '12', count: 3 },
-  ];
-
-  let idx = 0;
-  for (const tmpl of creatureTemplates) {
-    for (let i = 0; i < tmpl.count; i++) {
-      cards.push({
-        ...base,
-        scryfallId: `creature-${colorIdentity}-${idx}`,
-        name: `${landName} ${tmpl.cost === 1 ? 'Scout' : tmpl.cost <= 3 ? 'Warrior' : tmpl.cost <= 5 ? 'Knight' : 'Champion'} (${tmpl.p}/${tmpl.t}) #${idx + 1}`,
-        typeLine: 'Creature — Human Soldier',
-        manaCost: `{${colorIdentity}}${tmpl.cost > 1 ? `{${tmpl.cost - 1}}` : ''}`,
-        cmc: tmpl.cost,
-        colors: [colorIdentity] as CardData['colors'],
-        colorIdentity: [colorIdentity] as CardData['colorIdentity'],
-        power: tmpl.p,
-        toughness: tmpl.t,
-        oracleText: '',
-      });
-      idx++;
-    }
+  for (const entry of deck.cards) {
+    // Skip the commander line if it's also in the main list
+    if (commander && entry.cardName === commander) continue;
+    deckList.push(`${entry.quantity} ${entry.cardName}`);
   }
 
-  return cards.slice(0, 100); // Commander decks are 100 cards
+  return { deckList, commander };
 }
 
 export default function GameSetupPage() {
   const router = useRouter();
   const { decks } = useDeckStore();
-  const { initGame } = useGameStore();
-  const { aiProvider } = useSettingsStore();
+  const { connect, startGame, connectionStatus } = useForgeGameStore();
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
-  const [aiCount, setAiCount] = useState(3);
   const [starting, setStarting] = useState(false);
-
-  const { cardDataLoaded, setCardDataLoaded } = useSettingsStore();
-  const [hasCardData, setHasCardData] = useState(cardDataLoaded);
+  const [startError, setStartError] = useState<string | null>(null);
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
-
-  // Verify IndexedDB has card data on mount (syncs stale persisted flag)
-  useEffect(() => {
-    CardDatabase.getInstance().isLoaded().then((loaded) => {
-      setHasCardData(loaded);
-      if (loaded && !cardDataLoaded) setCardDataLoaded(loaded);
-    });
-  }, [cardDataLoaded, setCardDataLoaded]);
-  const canStart = selectedDeckId !== null || decks.length === 0; // Allow demo mode if no decks
-
-  /**
-   * Resolve a user deck's card entries into CardData[] from IndexedDB.
-   * Falls back to test deck if resolution fails.
-   */
-  async function resolveUserDeck(deckId: string): Promise<CardData[]> {
-    const deck = decks.find((d) => d.id === deckId);
-    if (!deck) return generateTestDeck('W');
-
-    const cardDb = CardDatabase.getInstance();
-    const resolvedMap = await cardDb.resolveCardNames(
-      deck.cards.map((c) => c.cardName)
-    );
-
-    const cardDataList: CardData[] = [];
-    for (const entry of deck.cards) {
-      const scryfall = resolvedMap.get(entry.cardName);
-      if (scryfall) {
-        const data = scryfallToCardData(scryfall);
-        for (let i = 0; i < entry.quantity; i++) {
-          cardDataList.push(data);
-        }
-      }
-    }
-
-    // If we got less than 60 cards, pad with basic lands
-    if (cardDataList.length < 60) {
-      const padding = generateTestDeck('W');
-      while (cardDataList.length < 100 && padding.length > 0) {
-        cardDataList.push(padding.shift()!);
-      }
-    }
-
-    return cardDataList.slice(0, 100);
-  }
+  const canStart = selectedDeckId !== null || decks.length === 0;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -234,126 +115,100 @@ export default function GameSetupPage() {
           </CardContent>
         </Card>
 
-        {/* AI Opponents */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-gold" />
-              AI Opponents
-            </CardTitle>
-            <CardDescription>
-              Commander is a 4-player format. Choose how many AI opponents.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              {[1, 2, 3].map((count) => (
-                <button
-                  key={count}
-                  onClick={() => setAiCount(count)}
-                  className={`flex h-12 w-12 items-center justify-center rounded-lg border text-lg font-semibold transition-colors ${
-                    aiCount === count
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border/50 text-muted-foreground hover:border-border'
-                  }`}
-                >
-                  {count}
-                </button>
-              ))}
-              <span className="text-sm text-muted-foreground">
-                AI player{aiCount !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Forge Server Mode */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="h-5 w-5 text-gold" />
-              Forge Engine (Server)
-            </CardTitle>
-            <CardDescription>
-              Play against AI using the full Forge MTG rules engine running on a dedicated server.
-              94K+ real cards with accurate rules enforcement.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/game/forge">
-              <Button variant="secondary" className="w-full gap-2">
-                <Swords className="h-4 w-4" />
-                Play with Forge Server
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Start (local engine) */}
+        {/* Start Game */}
         <Button
           size="lg"
           disabled={!canStart || starting}
           className="w-full gap-2"
           onClick={async () => {
             setStarting(true);
+            setStartError(null);
 
-            const humanId = 'player-human';
-            const colorPool = ['W', 'U', 'B', 'R', 'G'];
+            try {
+              // Connect to Forge server if not already connected
+              if (connectionStatus !== 'connected') {
+                await connect(FORGE_SERVER_URL);
+              }
 
-            const players = [
-              { id: humanId, name: 'You', isAI: false },
-              ...Array.from({ length: aiCount }, (_, i) => ({
-                id: `ai-${i}`,
-                name: AI_NAMES[i] || `AI ${i + 1}`,
-                isAI: true,
-              })),
-            ];
+              // Build deck list from selected deck, or use a demo deck
+              let deckList: string[];
+              let commander: string | undefined;
 
-            // Build decks map
-            const deckMap = new Map<string, CardData[]>();
+              if (selectedDeck) {
+                const forgeDeck = buildForgeDeck(selectedDeck);
+                deckList = forgeDeck.deckList;
+                commander = forgeDeck.commander;
+              } else {
+                // Demo deck: Krenko Goblins
+                commander = 'Krenko, Mob Boss';
+                deckList = [
+                  ...Array(38).fill('1 Mountain'),
+                  '1 Lightning Bolt', '1 Shock', '1 Goblin Guide',
+                  '1 Monastery Swiftspear', '1 Goblin Rabblemaster',
+                  '1 Goblin Chieftain', '1 Siege-Gang Commander',
+                  '1 Skirk Prospector', '1 Goblin Warchief',
+                  '1 Goblin Matron', '1 Goblin Recruiter',
+                  '1 Goblin Ringleader', '1 Mogg War Marshal',
+                  '1 Goblin Trashmaster', '1 Goblin Chainwhirler',
+                  '1 Purphoros, God of the Forge', '1 Impact Tremors',
+                  '1 Shared Animosity', '1 Coat of Arms',
+                  '1 Sol Ring', '1 Ruby Medallion', '1 Skullclamp',
+                  '1 Lightning Greaves', '1 Swiftfoot Boots',
+                  '1 Chaos Warp', '1 Gamble', '1 Wheel of Fortune',
+                  '1 Faithless Looting', '1 Mana Vault',
+                  '1 Arcane Signet', '1 Fire Diamond',
+                  "1 Wayfarer's Bauble", '1 Mana Crypt',
+                  '1 Throne of the God-Pharaoh', '1 Vandalblast',
+                  '1 Blasphemous Act', '1 Goblin Bushwhacker',
+                  '1 Reckless Bushwhacker', '1 Goblin Instigator',
+                  "1 Krenko's Command", '1 Dragon Fodder',
+                  '1 Hordeling Outburst', '1 Empty the Warrens',
+                  '1 Muxus, Goblin Grandee', '1 Pashalik Mons',
+                  '1 Sling-Gang Lieutenant', '1 Goblin King',
+                  '1 Battle Hymn', '1 Brightstone Ritual',
+                  '1 Goblin War Strike', '1 Massive Raid',
+                  '1 Mob Justice', '1 Goblin Bombardment',
+                  '1 Shattering Spree', '1 By Force',
+                ];
+              }
 
-            // Human deck — resolve from IndexedDB if a real deck is selected, else test deck
-            if (selectedDeckId && hasCardData) {
-              const resolvedDeck = await resolveUserDeck(selectedDeckId);
-              deckMap.set(humanId, resolvedDeck);
-            } else {
-              const humanColor = colorPool[0];
-              deckMap.set(humanId, generateTestDeck(humanColor));
+              // Send start_game to server
+              startGame(deckList, commander, 'Player');
+
+              // Navigate to game view
+              router.push('/game/forge');
+            } catch (e) {
+              setStartError(e instanceof Error ? e.message : 'Failed to connect to game server');
+              setStarting(false);
             }
-
-            // AI decks (always test decks for now)
-            for (let i = 0; i < aiCount; i++) {
-              const color = colorPool[(i + 1) % colorPool.length];
-              deckMap.set(`ai-${i}`, generateTestDeck(color));
-            }
-
-            // AI configs
-            const aiConfigs: AIPlayerConfig[] = Array.from(
-              { length: aiCount },
-              (_, i) => ({
-                playerId: `ai-${i}`,
-                name: AI_NAMES[i] || `AI ${i + 1}`,
-                personality: 'balanced',
-                providerConfig: aiProvider || undefined,
-                useFallback: !aiProvider,
-              })
-            );
-
-            initGame(players, deckMap, aiConfigs);
-            router.push('/game/play');
           }}
         >
           {starting ? (
-            <><Loader2 className="h-5 w-5 animate-spin" /> Starting...</>
+            <><Loader2 className="h-5 w-5 animate-spin" /> Connecting...</>
           ) : (
-            <><Swords className="h-5 w-5" /> Start Game ({aiCount + 1} players)</>
+            <><Swords className="h-5 w-5" /> Start Game</>
           )}
         </Button>
+
+        {startError && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            <WifiOff className="h-4 w-4 shrink-0" />
+            <span>{startError}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto text-xs"
+              onClick={() => { setStartError(null); setStarting(false); }}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
 
         {/* Quick start without a deck */}
         {decks.length === 0 && (
           <p className="text-center text-xs text-muted-foreground">
-            No deck selected — a test deck will be generated for demo purposes.
+            No deck selected — a demo deck will be used.
           </p>
         )}
       </main>
