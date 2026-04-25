@@ -212,7 +212,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     events: [],
     winner: null,
     isGameOver: forgeState.isGameOver ?? false,
-    mulliganPhase: false,
+    mulliganPhase: forgePhase === 'MULLIGAN',
   };
 }
 

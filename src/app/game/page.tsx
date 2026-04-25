@@ -207,7 +207,7 @@ export default function GameSetupPage() {
               }
 
               // Send start_game to server
-              startGame(deckList, commander, 'Player');
+              startGame(deckList, commander, 'Player', aiCount);
 
               // Navigate to game view
               router.push('/game/forge');
