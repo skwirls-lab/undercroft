@@ -421,6 +421,23 @@ function ChoicePanel({ choice, onRespond }: {
     );
   }
 
+  // --- mana_payment: interactive land selection for mana cost ---
+  if (choiceType === 'mana_payment') {
+    const manaCost = (data.manaCost as string) || '?';
+    const sources = (data.sources || []) as CardOption[];
+    const canCancel = data.canCancel as boolean;
+    return (
+      <ManaPaymentPanel
+        prompt={prompt || `Pay mana: ${manaCost}`}
+        manaCost={manaCost}
+        sources={sources}
+        canCancel={canCancel}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
   // --- Fallback for any unhandled type ---
   return (
     <div className="mb-3 rounded-xl border border-border/30 bg-card/30 p-4">
@@ -434,6 +451,83 @@ function ChoicePanel({ choice, onRespond }: {
           {JSON.stringify(choice, null, 2)}
         </pre>
       </details>
+    </div>
+  );
+}
+
+// ============================================================
+// ManaPaymentPanel — interactive land selection for paying mana
+// Matches Forge desktop flow: click spell → pick lands → confirm
+// ============================================================
+
+function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onRespond }: {
+  prompt: string;
+  manaCost: string;
+  sources: CardOption[];
+  canCancel: boolean;
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [selected, setSelected] = React.useState<Set<number>>(new Set());
+
+  const toggle = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirm = () => {
+    onRespond(requestId, { selectedIds: Array.from(selected) });
+  };
+
+  const cancel = () => {
+    onRespond(requestId, { cancel: true });
+  };
+
+  return (
+    <div className="mb-3 rounded-xl border border-cyan-500/40 bg-cyan-500/5 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-semibold text-cyan-400">{prompt}</span>
+        <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-mono text-cyan-300">
+          {manaCost}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        Select lands to tap for mana, then confirm. ({selected.size} selected)
+      </p>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {sources.map((src) => (
+          <button
+            key={src.id}
+            onClick={() => toggle(src.id)}
+            className={`rounded-lg border px-3 py-1.5 text-xs text-left transition-colors ${
+              selected.has(src.id)
+                ? 'border-cyan-400/60 bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-400/40'
+                : 'border-border/40 bg-card/60 hover:border-cyan-500/30 hover:bg-cyan-500/10 text-foreground'
+            }`}
+          >
+            {src.name}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          onClick={confirm}
+          disabled={selected.size === 0}
+          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+        >
+          Tap {selected.size} Land{selected.size !== 1 ? 's' : ''} & Pay
+        </Button>
+        {canCancel && (
+          <Button size="sm" variant="outline" onClick={cancel}>
+            Cancel Spell
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
