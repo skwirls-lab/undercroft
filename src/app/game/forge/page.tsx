@@ -229,30 +229,14 @@ function ChoicePanel({ choice, onRespond }: {
   // --- mulligan: keep / mulligan hand ---
   if (choiceType === 'mulligan') {
     const cardsToReturn = (data.cardsToReturn as number) ?? 0;
-    const handCards = (data.hand || []) as CardOption[];
     return (
       <div className="mb-3 flex flex-col items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-6 py-4">
         <span className="text-sm font-semibold text-primary">Mulligan Phase</span>
         <span className="text-xs text-muted-foreground">
           {cardsToReturn > 0
             ? `Keep hand? You'll put ${cardsToReturn} card(s) on the bottom.`
-            : 'Look at your opening hand. Keep or mulligan?'}
+            : 'Look at your opening hand above. Keep or mulligan?'}
         </span>
-        {handCards.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 justify-center">
-            {handCards.map((card) => (
-              <div
-                key={card.id}
-                className="rounded-lg border border-border/40 bg-card/60 px-3 py-2 text-xs text-center min-w-[80px]"
-              >
-                <span className="font-medium text-foreground">{card.name}</span>
-                {card.type && (
-                  <div className="text-[10px] text-muted-foreground/70 truncate max-w-[120px]">{card.type}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
         <div className="flex gap-3">
           <Button size="sm" onClick={() => onRespond(choice.requestId, { keep: true })} className="px-4">
             <Shield className="mr-1 h-3.5 w-3.5" /> Keep Hand

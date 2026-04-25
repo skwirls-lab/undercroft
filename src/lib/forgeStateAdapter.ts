@@ -212,7 +212,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     events: [],
     winner: null,
     isGameOver: forgeState.isGameOver ?? false,
-    mulliganPhase: forgePhase === 'MULLIGAN',
+    mulliganPhase: false, // Forge mulligan handled by ChoicePanel, not GameBoard's built-in UI
   };
 }
 
