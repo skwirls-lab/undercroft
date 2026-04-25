@@ -66,6 +66,23 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         set({ gameState: state });
         // Push adapted state into the main gameStore so existing UI components work
         const adapted = adaptForgeState(state);
+        // Diagnostic: trace zone contents
+        for (const p of adapted.players) {
+          const hand = adapted.zones.get(`hand:${p.id}`);
+          const bf = adapted.zones.get(`battlefield:${p.id}`);
+          const gy = adapted.zones.get(`graveyard:${p.id}`);
+          const cmd = adapted.zones.get(`command:${p.id}`);
+          console.log(`[Forge] game_state zones for ${p.name} (${p.id}): hand=${hand?.cards.length ?? 0}, bf=${bf?.cards.length ?? 0}, gy=${gy?.cards.length ?? 0}, cmd=${cmd?.cards.length ?? 0}, life=${p.life}`);
+          if (bf && bf.cards.length > 0) {
+            console.log(`[Forge]   battlefield:`, bf.cards.map(id => {
+              const c = adapted.cardInstances.get(id);
+              return c ? `${id}(${c.cardData.name}, tapped=${c.tapped})` : id;
+            }));
+          }
+        }
+        if (adapted.stack.length > 0) {
+          console.log(`[Forge] stack:`, adapted.stack.map(s => s.cardData?.name ?? s.id));
+        }
         useGameStore.getState().setForgeState(adapted);
       },
 
@@ -101,6 +118,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
             let actionType: string;
             if (!card) {
+              console.log(`[Forge] action for ${play.cardName}(${instanceId}): card NOT FOUND in gameState`);
               actionType = play.isSpell ? 'CAST_SPELL' : 'ACTIVATE_ABILITY';
             } else if (card.zone === 'hand') {
               actionType = card.cardData.typeLine?.toLowerCase().includes('land')
