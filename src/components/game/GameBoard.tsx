@@ -51,6 +51,14 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
           a.payload.cardInstanceId === card.instanceId
       );
 
+      console.log('[GameBoard] handlePlayCard', {
+        cardId: card.instanceId,
+        cardName: card.cardData.name,
+        totalLegalActions: legalActions.length,
+        matchingActions: cardActions.length,
+        allActionCardIds: legalActions.filter(a => a.type === 'PLAY_LAND' || a.type === 'CAST_SPELL').map(a => a.payload.cardInstanceId),
+      });
+
       if (cardActions.length === 0) return;
 
       // If there's a PLAY_LAND action, play it immediately

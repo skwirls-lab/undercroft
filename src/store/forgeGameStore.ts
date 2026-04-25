@@ -141,8 +141,14 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
           // Push to gameStore — GameBoard will highlight cards & wire clicks
           const respondFn = (rid: string, p: Record<string, unknown>) => {
+            console.log('[Forge] respondFn called', { rid, payload: p, hasClient: !!get().client });
             get().client?.sendChoiceResponse(rid, p);
           };
+          console.log('[Forge] setForgeLegalActions', {
+            requestId: choice.requestId,
+            actionCount: actions.length,
+            actionTypes: actions.map(a => `${a.type}:${a.payload.cardInstanceId}`),
+          });
           useGameStore.getState().setForgeLegalActions(actions, choice.requestId, respondFn);
           set({ pendingChoice: null });
         } else {

@@ -110,14 +110,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { engine, gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn } = get();
     if (forgeMode) {
       // In forge mode, map game actions to WebSocket choice responses
-      if (!forgePendingRequestId || !forgeRespondFn) return;
+      console.log('[Forge] performAction', {
+        type: action.type,
+        hasPendingRequest: !!forgePendingRequestId,
+        hasRespondFn: !!forgeRespondFn,
+        payload: action.payload,
+      });
+      if (!forgePendingRequestId || !forgeRespondFn) {
+        console.warn('[Forge] No pending request — action dropped');
+        return;
+      }
       if (action.type === 'PASS_PRIORITY') {
+        console.log('[Forge] Sending pass response for request', forgePendingRequestId);
         forgeRespondFn(forgePendingRequestId, { pass: true });
       } else {
         const forgeIdx = action.payload?.forgeAbilityIndex as number | undefined;
         if (forgeIdx != null) {
+          console.log('[Forge] Sending abilityIndex', forgeIdx, 'for request', forgePendingRequestId);
           forgeRespondFn(forgePendingRequestId, { abilityIndex: forgeIdx });
         } else {
+          console.warn('[Forge] No forgeAbilityIndex in payload — action dropped');
           return;
         }
       }
