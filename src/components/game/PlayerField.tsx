@@ -37,6 +37,9 @@ interface PlayerFieldProps {
   onCancelManaChoice?: () => void;
   validTargetIds?: Set<string>;
   onSelectTarget?: (targetId: string) => void;
+  // Forge-style mana payment: highlight these lands, clicking taps for mana
+  manaPaymentSourceIds?: Set<string>;
+  onTapForManaPayment?: (cardInstanceId: string) => void;
   className?: string;
 }
 
@@ -69,6 +72,8 @@ export function PlayerField({
   onCancelManaChoice,
   validTargetIds,
   onSelectTarget,
+  manaPaymentSourceIds,
+  onTapForManaPayment,
   className,
 }: PlayerFieldProps) {
   // Track life changes for animation
@@ -383,6 +388,7 @@ export function PlayerField({
             <div className="flex flex-wrap gap-1">
               <AnimatePresence>
               {lands.map((card) => {
+                const isManaPaymentSource = manaPaymentSourceIds?.has(card.instanceId);
                 const canTap = tappableLandIds.has(card.instanceId);
                 const canUntap = untappableLandIds.has(card.instanceId);
                 const canActivate = activatableIds.has(card.instanceId);
@@ -395,25 +401,31 @@ export function PlayerField({
                     exit={{ opacity: 0, scale: 0.7 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     layout
-                    className={cn('relative', (canTap || canUntap || canActivate) && 'cursor-pointer')}
+                    className={cn('relative', (isManaPaymentSource || canTap || canUntap || canActivate) && 'cursor-pointer')}
                   >
                     <div
                       onClick={() => {
+                        // Forge-style: during mana payment, clicking a source taps it
+                        if (isManaPaymentSource && onTapForManaPayment) {
+                          onTapForManaPayment(card.instanceId);
+                          return;
+                        }
                         if (hasPendingChoice) return; // picker is open
                         if (canTap) onTapLand(card);
                         else if (canActivate) onActivateAbility?.(card);
                         else if (canUntap && onUntapLand) onUntapLand(card);
                       }}
-                      title={canActivate ? 'Click to activate ability' : canUntap ? 'Click to untap' : canTap ? 'Click to tap for mana' : undefined}
+                      title={isManaPaymentSource ? 'Click to tap for mana payment' : canActivate ? 'Click to activate ability' : canUntap ? 'Click to untap' : canTap ? 'Click to tap for mana' : undefined}
                     >
                       <CardView
                         card={card}
                         mode="pip"
-                        highlighted={canTap || canActivate || hasPendingChoice}
+                        highlighted={isManaPaymentSource || canTap || canActivate || hasPendingChoice}
                         interactive
                         className={cn(
-                          canActivate && !canTap && 'ring-2 ring-emerald-500/60',
-                          canUntap && !canTap && !canActivate && 'ring-1 ring-amber-500/50',
+                          isManaPaymentSource && 'ring-2 ring-emerald-400/70 shadow-[0_0_8px_rgba(16,185,129,0.3)]',
+                          !isManaPaymentSource && canActivate && !canTap && 'ring-2 ring-emerald-500/60',
+                          !isManaPaymentSource && canUntap && !canTap && !canActivate && 'ring-1 ring-amber-500/50',
                           hasPendingChoice && 'ring-2 ring-primary'
                         )}
                       />

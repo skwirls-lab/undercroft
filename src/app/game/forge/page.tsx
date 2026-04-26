@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForgeGameStore } from '@/store/forgeGameStore';
@@ -42,6 +42,32 @@ export default function ForgeGamePage() {
   } = useForgeGameStore();
 
   const { gameState, events } = useGameStore();
+
+  // Forge-style mana payment: detect mana_payment choice and extract source IDs
+  const isManaPayment = pendingChoice?.choiceType === 'mana_payment';
+  const manaPaymentData = useMemo(() => {
+    if (!isManaPayment || !pendingChoice) return null;
+    const data = pendingChoice.data as Record<string, unknown>;
+    const sourceIds = (data.sourceIds || []) as number[];
+    return {
+      sourceIdSet: new Set(sourceIds.map((id: number) => `forge-${id}`)),
+      manaCost: (data.manaCost as string) || '?',
+      spellName: (data.spellName as string) || 'spell',
+      requestId: pendingChoice.requestId,
+    };
+  }, [isManaPayment, pendingChoice]);
+
+  const handleTapForManaPayment = useCallback((cardInstanceId: string) => {
+    if (!manaPaymentData) return;
+    // Convert forge-{id} back to numeric id
+    const numId = parseInt(cardInstanceId.replace('forge-', ''), 10);
+    respondToChoice(manaPaymentData.requestId, { cardId: numId });
+  }, [manaPaymentData, respondToChoice]);
+
+  const handleCancelManaPayment = useCallback(() => {
+    if (!manaPaymentData) return;
+    respondToChoice(manaPaymentData.requestId, { cancel: true });
+  }, [manaPaymentData, respondToChoice]);
 
   // If not connected, redirect back to setup
   useEffect(() => {
@@ -116,10 +142,17 @@ export default function ForgeGamePage() {
 
             {/* The existing GameBoard reads from useGameStore (populated by adapter) */}
             {/* choose_action is integrated into GameBoard via synthetic legalActions */}
-            <GameBoard currentPlayerId={HUMAN_PLAYER_ID} className="flex-1" />
+            <GameBoard
+              currentPlayerId={HUMAN_PLAYER_ID}
+              className="flex-1"
+              manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
+              manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
+              onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
+              onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
+            />
 
             {/* Non-action choice overlays (mulligan, sacrifice, targets, etc.) positioned near bottom */}
-            {pendingChoice && pendingChoice.choiceType !== 'choose_action' && (
+            {pendingChoice && pendingChoice.choiceType !== 'choose_action' && pendingChoice.choiceType !== 'mana_payment' && (
               <div className="mt-2 max-w-3xl self-center w-full">
                 <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
               </div>

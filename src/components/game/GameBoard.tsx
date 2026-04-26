@@ -19,6 +19,11 @@ import { ArrowRight, Flag, Loader2, FastForward, X } from 'lucide-react';
 interface GameBoardProps {
   currentPlayerId: string;
   className?: string;
+  // Forge-style mana payment: lands the player can tap to pay for a spell
+  manaPaymentSourceIds?: Set<string>;
+  manaPaymentInfo?: { manaCost: string; spellName: string };
+  onTapForManaPayment?: (cardInstanceId: string) => void;
+  onCancelManaPayment?: () => void;
 }
 
 // Targeting mode: player selected a spell that requires a target
@@ -29,7 +34,7 @@ interface TargetingState {
   validTargetIds: Set<string>; // Quick lookup of valid target IDs
 }
 
-export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
+export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds } = useGameStore();
 
   // Filter out UNTAP_PERMANENT for locked cards
@@ -443,6 +448,36 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
         )}
       </AnimatePresence>
 
+      {/* Mana payment banner — Forge-style "tap lands to pay" */}
+      <AnimatePresence>
+        {manaPaymentInfo && onCancelManaPayment && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 backdrop-blur-sm px-4 py-2.5 shadow-[0_0_16px_rgba(16,185,129,0.1)]"
+          >
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+            <span className="text-sm text-emerald-200">
+              Tap lands to pay <strong className="text-emerald-100 font-mono">{manaPaymentInfo.manaCost}</strong> for <strong className="text-emerald-100">{manaPaymentInfo.spellName}</strong>
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onCancelManaPayment}
+              className="ml-auto h-7 px-2 text-emerald-400 hover:text-emerald-200 text-xs"
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              Cancel
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Combat controls (shown during combat phase) */}
       {showCombatControls && (
         <CombatControls
@@ -556,6 +591,8 @@ export function GameBoard({ currentPlayerId, className }: GameBoardProps) {
           onCancelManaChoice={() => setPendingManaChoice(null)}
           validTargetIds={targeting?.validTargetIds}
           onSelectTarget={targeting ? handleSelectTarget : undefined}
+          manaPaymentSourceIds={manaPaymentSourceIds}
+          onTapForManaPayment={onTapForManaPayment}
         />
       )}
 
