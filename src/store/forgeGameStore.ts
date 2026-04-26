@@ -171,6 +171,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
           set({ pendingChoice: null });
         } else {
           // Non-action choices: show overlay, clear forge legal actions
+          console.log('[Forge] non-action choice received', { choiceType: choice.choiceType, requestId: choice.requestId, dataKeys: Object.keys(choice.data || {}) });
           useGameStore.getState().clearForgeLegalActions();
           set({ pendingChoice: choice });
         }
