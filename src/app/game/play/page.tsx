@@ -7,6 +7,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { GameLog } from '@/components/game/GameLog';
 import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
 import { CardPreviewPanel } from '@/components/game/CardPreviewPanel';
+import { ForgeChoiceOverlay } from '@/components/game/ForgeChoiceOverlay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 
@@ -73,6 +74,9 @@ export default function GamePlayPage() {
   return (
     <CardPreviewProvider>
       <div className="flex h-screen flex-col overflow-hidden">
+        {/* Forge choice overlay — handles targeting, mana payment, etc. */}
+        <ForgeChoiceOverlay />
+
         {/* Top bar */}
         <header className="flex items-center justify-between border-b border-border/30 px-4 py-2 shrink-0">
           <div className="flex items-center gap-3">
