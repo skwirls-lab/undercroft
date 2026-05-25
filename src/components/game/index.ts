@@ -5,3 +5,4 @@ export { GameBoard } from './GameBoard';
 export { GameLog } from './GameLog';
 export { PhaseTracker } from './PhaseTracker';
 export { ManaPoolDisplay } from './ManaPoolDisplay';
+export { ForgeChoiceOverlay } from './ForgeChoiceOverlay';
