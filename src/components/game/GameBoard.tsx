@@ -297,11 +297,11 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
   );
 
   const handleSkipCombat = useCallback(() => {
-    // Declare attackers with empty list to skip combat
+    // Skip combat by passing priority when no creatures to attack/declare
     performAction({
-      type: 'DECLARE_ATTACKERS',
+      type: 'PASS_PRIORITY',
       playerId: currentPlayerId,
-      payload: { attackerDeclarations: [] },
+      payload: {},
       timestamp: Date.now(),
     });
   }, [currentPlayerId, performAction]);
