@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { GameState, GameAction, GameEvent, CardData } from '@/lib/gameTypes';
 import { AIPlayerController } from '@/ai/AIPlayerController';
 import type { AIPlayerConfig } from '@/ai/types';
+import { useForgeGameStore } from '@/store/forgeGameStore';
 import {
   sfxTapLand, sfxCastSpell, sfxPlayCard, sfxDamage,
   sfxLifeGain, sfxTurnStart, sfxGameOver, sfxPassPriority
@@ -95,11 +96,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   performAction: (action) => {
-    const { gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn, autoPassUntilNextTurn } = get();
+    const { gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn } = get();
     
     if (forgeMode) {
       // Auto-pass when using auto-pass feature and action is PASS_PRIORITY with no pending request
-      if (action.type === 'PASS_PRIORITY' && !forgePendingRequestId && autoPassUntilNextTurn) {
+      if (action.type === 'PASS_PRIORITY' && !forgePendingRequestId && get().autoPassUntilNextTurn) {
         const client = useForgeGameStore.getState().client;
         if (client) {
           try {
