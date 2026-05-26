@@ -79,7 +79,7 @@ function ChoicePanel({ choice, onRespond }: {
               className="h-7 gap-1.5 px-4 text-xs font-semibold bg-gold text-gold-foreground hover:bg-gold/90 rounded-lg border border-border/40"
             >
               Pass
-            </button>
+            </Button>
           )}
         </div>
 
@@ -95,7 +95,7 @@ function ChoicePanel({ choice, onRespond }: {
                 <span className="font-medium text-foreground">{play.cardName || 'Ability'}</span>
                 <span className="ml-1 text-muted-foreground">{play.isSpell ? '(spell)' : play.isAbility ? '(ability)' : ''}</span>
                 <div className="text-[10px] text-muted-foreground/70 max-w-[200px] truncate">{play.description}</div>
-              </button>
+              </Button>
             ))}
           </div>
         ) : canPass ? (
@@ -226,7 +226,7 @@ function ChoicePanel({ choice, onRespond }: {
               
           <Button key={b.id} className="rounded-lg border border-border/40 bg-card/60 px-3 py-1.5 text-xs hover:border-red-500/40 hover:bg-red-500/10">
                 {b.name} {b.power !== undefined ? `${b.power}/${b.toughness}` : ''}
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -270,7 +270,7 @@ function ChoicePanel({ choice, onRespond }: {
             >
               <span className="font-medium">{a.cardName || 'Ability'}</span>
               <div className="text-[10px] text-muted-foreground/70 max-w-[250px] truncate">{a.description}</div>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -392,7 +392,7 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
             }`}
           >
             {src.name}
-          </button>
+          </Button>
         ))}
       </div>
       <div className="flex gap-2">
@@ -479,7 +479,7 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
             {opt.name}
             {opt.power !== undefined && <span className="ml-1 text-muted-foreground">{opt.power}/{opt.toughness}</span>}
             {opt.type === 'player' && <span className="ml-1 text-muted-foreground">(Life: {opt.life})</span>}
-          </button>
+          </Button>
         ))}
       </div>
       {!isSingle && (
