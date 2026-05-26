@@ -73,7 +73,8 @@ function ChoicePanel({ choice, onRespond }: {
             {isMain ? 'Your Turn — Main Phase' : `Priority — ${phase}`}
           </span>
           {canPass && (
-            <button
+            
+          <Button
               onClick={() => onRespond(choice.requestId, { pass: true })}
               className="h-7 gap-1.5 px-4 text-xs font-semibold bg-gold text-gold-foreground hover:bg-gold/90 rounded-lg border border-border/40"
             >
@@ -85,7 +86,8 @@ function ChoicePanel({ choice, onRespond }: {
         {legalPlays.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {legalPlays.map((play) => (
-              <button
+              
+          <Button
                 key={play.index}
                 onClick={() => onRespond(choice.requestId, { abilityIndex: play.index })}
                 className="rounded-lg border border-border/40 bg-card/60 px-3 py-1.5 text-xs text-left transition-colors hover:border-gold/40 hover:bg-gold/10"
@@ -221,7 +223,8 @@ function ChoicePanel({ choice, onRespond }: {
         {blockers.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {blockers.map((b) => (
-              <button key={b.id} className="rounded-lg border border-border/40 bg-card/60 px-3 py-1.5 text-xs hover:border-red-500/40 hover:bg-red-500/10">
+              
+          <Button key={b.id} className="rounded-lg border border-border/40 bg-card/60 px-3 py-1.5 text-xs hover:border-red-500/40 hover:bg-red-500/10">
                 {b.name} {b.power !== undefined ? `${b.power}/${b.toughness}` : ''}
               </button>
             ))}
@@ -259,7 +262,8 @@ function ChoicePanel({ choice, onRespond }: {
         <h3 className="text-sm font-semibold mb-2">{prompt || 'Choose an ability'}</h3>
         <div className="flex flex-wrap gap-1.5">
           {abilities.map((a) => (
-            <button
+            
+          <Button
               key={a.index}
               onClick={() => onRespond(choice.requestId, { index: a.index })}
               className="rounded-lg border border-border/40 bg-card/60 px-3 py-1.5 text-xs text-left transition-colors hover:border-gold/40 hover:bg-gold/10"
@@ -377,7 +381,8 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
       </p>
       <div className="flex flex-wrap gap-1.5 mb-3">
         {sources.map((src) => (
-          <button
+          
+          <Button
             key={src.id}
             onClick={() => toggle(src.id)}
             className={`rounded-lg border px-3 py-1.5 text-xs text-left transition-colors ${
@@ -391,18 +396,13 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
         ))}
       </div>
       <div className="flex gap-2">
-        <button
-          size="sm"
-          onClick={confirm}
-          disabled={selected.size === 0}
-          className="px-4 h-8 rounded-lg border bg-cyan-600 text-xs font-medium hover:bg-cyan-700 text-white disabled:opacity-50 disabled:hover:bg-cyan-600"
-        >
+        <Button size="sm" onClick={confirm} disabled={selected.size === 0} className="px-4 h-8 rounded-lg border bg-cyan-600 text-xs font-medium hover:bg-cyan-700 text-white disabled:opacity-50 disabled:hover:bg-cyan-600">
           Tap {selected.size} Land{selected.size !== 1 ? 's' : ''} & Pay
-        </button>
+        </Button>
         {canCancel && (
-          <button size="sm" variant="outline" onClick={cancel} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40 hover:bg-red-500/10">
+          <Button size="sm" variant="outline" onClick={cancel} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40 hover:bg-red-500/10">
             Cancel Spell
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -466,7 +466,8 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
       )}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {options.map((opt) => (
-          <button
+          
+          <Button
             key={opt.id}
             onClick={() => toggle(opt.id)}
             className={`rounded-lg border px-3 py-1.5 text-xs text-left transition-colors ${
@@ -483,13 +484,13 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
       </div>
       {!isSingle && (
         <div className="flex gap-2">
-          <button size="sm" disabled={selected.size < min} onClick={confirm} className="px-4 h-8 rounded-lg border bg-gold text-xs font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold">
+          <Button size="sm" disabled={selected.size < min} onClick={confirm} className="px-4 h-8 rounded-lg border bg-gold text-xs font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold">
             Confirm ({selected.size})
-          </button>
+          </Button>
           {min === 0 && (
-            <button size="sm" variant="outline" onClick={() => onRespond(requestId, { [responseKey]: [] })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">
+            <Button size="sm" variant="outline" onClick={() => onRespond(requestId, { [responseKey]: [] })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">
               Skip
-            </button>
+            </Button>
           )}
         </div>
       )}
