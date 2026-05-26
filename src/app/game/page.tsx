@@ -11,8 +11,21 @@ import { FORGE_SERVER_URL } from '@/lib/forgeConfig';
 import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 
 /**
- * Convert a user deck from the store into the "N CardName" format the Forge server expects.
- * Returns { deckList, commander } ready for the WS start_game message.
+ * Forge game client for WebSocket communication.
+ */
+
+/**
+ * Build a simple Goblin demo deck string list - Krenko + lands + goblins
+ */
+function buildGoblinDemo(): string[] {
+  const base = ['1 Goblin Guide', '1 Monastery Swiftspear', '1 Goblin Rabblemaster',
+    '1 Goblin Chieftain', '1 Siege-Gang Commander', '1 Skirk Prospector',
+    '1 Goblin Warchief', '1 Mogg War Marshal', '1 Goblin Chainwhirler'];
+  return [...base, ...Array(38).fill('1 Mountain')];
+}
+
+/**
+ * Convert a user deck from the store into the "N CardName" format.
  */
 function buildForgeDeck(deck: ReturnType<typeof useDeckStore.getState>['decks'][0]) {
   const deckList: string[] = [];
@@ -164,54 +177,35 @@ export default function GameSetupPage() {
                 await connect(FORGE_SERVER_URL);
               }
 
-              // Build deck list from selected deck, or use a demo deck
-              let deckList: string[];
-              let commander: string | undefined;
+      // Build deck list from selected deck, or use a demo deck
+      let allDecks: Array<{ deckList: string[]; commander: string | undefined }>;
 
-              if (selectedDeck) {
-                const forgeDeck = buildForgeDeck(selectedDeck);
-                deckList = forgeDeck.deckList;
-                commander = forgeDeck.commander;
-              } else {
-                // Demo deck: Krenko Goblins
-                commander = 'Krenko, Mob Boss';
-                deckList = [
-                  ...Array(38).fill('1 Mountain'),
-                  '1 Lightning Bolt', '1 Shock', '1 Goblin Guide',
-                  '1 Monastery Swiftspear', '1 Goblin Rabblemaster',
-                  '1 Goblin Chieftain', '1 Siege-Gang Commander',
-                  '1 Skirk Prospector', '1 Goblin Warchief',
-                  '1 Goblin Matron', '1 Goblin Recruiter',
-                  '1 Goblin Ringleader', '1 Mogg War Marshal',
-                  '1 Goblin Trashmaster', '1 Goblin Chainwhirler',
-                  '1 Purphoros, God of the Forge', '1 Impact Tremors',
-                  '1 Shared Animosity', '1 Coat of Arms',
-                  '1 Sol Ring', '1 Ruby Medallion', '1 Skullclamp',
-                  '1 Lightning Greaves', '1 Swiftfoot Boots',
-                  '1 Chaos Warp', '1 Gamble', '1 Wheel of Fortune',
-                  '1 Faithless Looting', '1 Mana Vault',
-                  '1 Arcane Signet', '1 Fire Diamond',
-                  "1 Wayfarer's Bauble", '1 Mana Crypt',
-                  '1 Throne of the God-Pharaoh', '1 Vandalblast',
-                  '1 Blasphemous Act', '1 Goblin Bushwhacker',
-                  '1 Reckless Bushwhacker', '1 Goblin Instigator',
-                  "1 Krenko's Command", '1 Dragon Fodder',
-                  '1 Hordeling Outburst', '1 Empty the Warrens',
-                  '1 Muxus, Goblin Grandee', '1 Pashalik Mons',
-                  '1 Sling-Gang Lieutenant', '1 Goblin King',
-                  '1 Battle Hymn', '1 Brightstone Ritual',
-                  '1 Goblin War Strike', '1 Massive Raid',
-                  '1 Mob Justice', '1 Goblin Bombardment',
-                  '1 Shattering Spree', '1 By Force',
-                ];
-              }
+      if (selectedDeck) {
+        const myForgeDeck = buildForgeDeck(selectedDeck);
 
-              // Send start_game to server
-              startGame(deckList, commander, 'Player', aiCount);
+        allDecks = aiCount === 0 ? [myForgeDeck] : [
+          // Demo decks for AI opponents using red/green goblin theme
+          ...Array(aiCount - 1).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }),
+          myForgeDeck, // Player's deck last
+        ];
+      } else {
+        // Demo deck for player, and dummy decks for AIs
+        const demoDeck = { deckList: buildGoblinDemo(), commander: 'Krenko, Mob Boss' };
 
-              // Navigate to game view
-              router.push('/game/forge');
-            } catch (e) {
+        allDecks = aiCount === 0 ? [demoDeck] : [
+          // Dummy red-green decks for AI opponents  
+          ...Array(aiCount - 1).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }),
+          demoDeck, // Player's demo deck last
+        ];
+      }
+
+      console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, '- commanders:', allDecks.map(d => d.commander || 'Goblin Gullet'));
+
+      // Send start_game to server - always sends first deck as player's
+      startGame(allDecks[0].deckList, allDecks[0].commander, 'Player', aiCount);
+
+      setTimeout(() => router.push('/game/forge'), 500);
+    } catch (e) {
               setStartError(e instanceof Error ? e.message : 'Failed to connect to game server');
               setStarting(false);
             }
