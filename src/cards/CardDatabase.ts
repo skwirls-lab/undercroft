@@ -284,6 +284,8 @@ function mapScryfallCard(raw: Record<string, unknown>): ScryfallCardRecord {
           normal: imageUris.normal || '',
           large: imageUris.large || '',
           art_crop: imageUris.art_crop || '',
+          border_crop: imageUris.border_crop || '',
+          png: imageUris.png || '',
         }
       : undefined,
     card_faces: cardFaces?.map((face) => {
@@ -301,6 +303,8 @@ function mapScryfallCard(raw: Record<string, unknown>): ScryfallCardRecord {
               normal: faceImages.normal || '',
               large: faceImages.large || '',
               art_crop: faceImages.art_crop || '',
+              border_crop: faceImages.border_crop || '',
+              png: faceImages.png || '',
             }
           : undefined,
       };
