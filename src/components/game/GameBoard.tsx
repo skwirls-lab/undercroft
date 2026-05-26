@@ -37,6 +37,18 @@ interface TargetingState {
 export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds } = useGameStore();
 
+  console.log('[GameBoard] init:', { currentPlayerId, hasGameState: !!gameState });
+
+  // Debug: show all zone card counts for current player
+  if (currentPlayerId) {
+    console.log('[GameBoard] adapter zone contents for', currentPlayerId, ':', 
+      Array.from(gameState?.zones.keys() ?? []).filter(k => k.includes(currentPlayerId)).map((z: string) => ({
+        key: z,
+        cardsLen: gameState?.zones.get(z)?.cards.length ?? 0,
+        cardIds: gameState?.zones.get(z)?.cards || [],
+      })));
+  }
+
   // Filter out UNTAP_PERMANENT for locked cards
   const filteredLegalActions = legalActions.filter(
     (a) => !(a.type === 'UNTAP_PERMANENT' && lockedTappedIds.has(a.payload.cardInstanceId as string))
@@ -310,6 +322,7 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
   const hasPriority = gameState.priority.playerWithPriority === currentPlayerId;
   const isMyTurn = gameState.turn.activePlayerId === currentPlayerId;
   const handCards = getCardsInZone(gameState, currentPlayerId, 'hand');
+  console.log("[GameBoard] player", currentPlayerId, "has", handCards.length, "cards in hand");
   console.log("[GameBoard] hand from adapter zones:", { player: currentPlayerId, zoneKey: `${currentPlayerId}:hand`, cardsCount: gameState.zones.get(`${currentPlayerId}:hand`)?.cards.length ?? "no-zone", cardInstancesCount: gameState.cardInstances.size });
   const combat = gameState.combat;
   const inCombatPhase = gameState.turn.phase === 'combat';
@@ -590,16 +603,6 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
           pendingManaChoice={pendingManaChoice}
           onManaColorPicked={handleManaColorPicked}
       // Debug: show all zone card counts for current player
-      console.log("[GameBoard] adapter zone contents for", currentPlayerId, ":", 
-        Array.from(gameState.zones.keys()).filter(k => k.includes(currentPlayerId)).map(z => ({
-          key: z,
-          cardsLen: gameState.zones.get(z)?.cards.length ?? 0,
-          cardIds: gameState.zones.get(z)?.cards ?? [],
-        })));
-
-          onCancelManaChoice={() => setPendingManaChoice(null)}
-          validTargetIds={targeting?.validTargetIds}
-          onSelectTarget={targeting ? handleSelectTarget : undefined}
           manaPaymentSourceIds={manaPaymentSourceIds}
           onTapForManaPayment={onTapForManaPayment}
         />
