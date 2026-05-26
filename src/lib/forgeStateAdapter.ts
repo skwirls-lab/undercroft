@@ -142,7 +142,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
         cardInstances.set(instanceId, cardInstance);
       }
 
-      zones.set(`${zoneType}:${pid}`, {
+      zones.set(`${pid}:${zoneType}`, {
         type: zoneType,
         ownerId: pid,
         cards: cardIds,
@@ -155,7 +155,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
       const libId = `forge-lib-${fp.id}-${i}`;
       libCards.push(libId);
     }
-    zones.set(`library:${pid}`, {
+    zones.set(`${pid}:library`, {
       type: 'library',
       ownerId: pid,
       cards: libCards,
