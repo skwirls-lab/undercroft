@@ -210,7 +210,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     combat: undefined, // TODO: map combat state from Forge
     pendingChoice: undefined, // Handled separately by forgeGameStore
     events: [],
-    winner: null,
+    winner: '',
     isGameOver: forgeState.isGameOver ?? false,
     mulliganPhase: false, // Forge mulligan handled by ChoicePanel, not GameBoard's built-in UI
   };
