@@ -12,11 +12,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  parseForgeScript,
-  forgeScriptToEntry,
-  type ForgeCardEntry,
-} from '../src/engine/ForgeCardData';
+
+// NOTE: This script references deleted engine modules (ForgeCardData).
+// The forge-cards.json file is already generated and included in the repo.
+// If you need to regenerate this file, restore the ForgeCardData module first.
 
 const FORGE_CARDSFOLDER = path.resolve(
   __dirname,
@@ -29,7 +28,7 @@ interface ForgeCardsLookup {
   version: string;
   generatedAt: string;
   cardCount: number;
-  cards: Record<string, ForgeCardEntry>;
+  cards: Record<string, unknown>;
 }
 
 function collectTxtFiles(dir: string): string[] {
@@ -71,69 +70,14 @@ function main() {
   const files = collectTxtFiles(FORGE_CARDSFOLDER);
   console.log(`Found ${files.length} card script files`);
 
-  // Parse each file
-  const cards: Record<string, ForgeCardEntry> = {};
-  let parsed = 0;
-  let skipped = 0;
-  let errors = 0;
-
-  for (const filePath of files) {
-    try {
-      const contents = fs.readFileSync(filePath, 'utf-8');
-      const script = parseForgeScript(contents);
-
-      if (!script.name) {
-        skipped++;
-        continue;
-      }
-
-      const entry = forgeScriptToEntry(script);
-
-      // Only include cards that have at least some useful data
-      const hasUsefulData =
-        entry.effects.length > 0 ||
-        entry.keywords.length > 0 ||
-        entry.triggers.length > 0 ||
-        entry.activatedAbilities.length > 0 ||
-        entry.manaAbilities.length > 0;
-
-      if (hasUsefulData) {
-        // Normalize name to lowercase for lookup
-        const key = script.name.toLowerCase();
-        cards[key] = entry;
-        parsed++;
-      } else {
-        skipped++;
-      }
-    } catch (err) {
-      errors++;
-      if (errors <= 5) {
-        console.warn(`  Error parsing ${path.basename(filePath)}: ${err}`);
-      }
-    }
-  }
-
-  // Write output
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-
-  const lookup: ForgeCardsLookup = {
-    version: '1.0.0',
-    generatedAt: new Date().toISOString(),
-    cardCount: parsed,
-    cards,
-  };
-
-  const json = JSON.stringify(lookup);
-  fs.writeFileSync(OUTPUT_FILE, json, 'utf-8');
-
-  const sizeMB = (Buffer.byteLength(json) / 1024 / 1024).toFixed(2);
-
+  // NOTE: ForgeCardData module has been deleted as part of the engine migration.
+  // The forge-cards.json file is already generated and included in the repo.
+  // Skipping parsing step — using existing pre-generated data.
+  
   console.log('');
   console.log('=== Results ===');
-  console.log(`  Parsed:  ${parsed} cards with useful data`);
-  console.log(`  Skipped: ${skipped} cards (no useful data or no name)`);
-  console.log(`  Errors:  ${errors}`);
-  console.log(`  Output:  ${OUTPUT_FILE} (${sizeMB} MB)`);
+  console.log(`  Using pre-generated forge-cards.json`);
+  console.log(`  Output: ${OUTPUT_FILE}`);
   console.log('Done!');
 }
 

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ScrollText, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
-import type { GameEvent } from '@/engine/types';
+import type { GameEvent } from '@/lib/gameTypes';
 
 interface GameLogProps {
   events: GameEvent[];

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { CardInstance, PendingChoice } from '@/engine/types';
+import type { CardInstance, PendingChoice } from '@/lib/gameTypes';
 import { CardView } from './CardView';
 import { cn } from '@/lib/utils';
 import { Search, X, Check } from 'lucide-react';
@@ -40,8 +40,10 @@ export function SearchPicker({ pendingChoice, cards, onConfirm, onCancel }: Sear
     setSelectedIds(next);
   };
 
-  const canConfirm = selectedIds.size >= pendingChoice.minChoices && selectedIds.size <= pendingChoice.maxChoices;
-  const canSkip = pendingChoice.minChoices === 0;
+  const minChoices = pendingChoice.minChoices ?? 1;
+  const maxChoices = pendingChoice.maxChoices ?? cards.length;
+  const canConfirm = selectedIds.size >= minChoices && selectedIds.size <= maxChoices;
+  const canSkip = minChoices === 0;
 
   return (
     <motion.div

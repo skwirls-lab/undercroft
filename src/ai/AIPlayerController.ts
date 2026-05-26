@@ -1,4 +1,4 @@
-import type { GameState, GameAction } from '@/engine/types';
+import type { GameState, GameAction } from '@/lib/gameTypes';
 import type { AIDecision, AIPlayerConfig } from './types';
 import { buildAIPrompt, parseAIResponse } from './PromptBuilder';
 import { makeFallbackDecision } from './FallbackAI';

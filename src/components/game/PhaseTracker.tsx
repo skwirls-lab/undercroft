@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import type { TurnState } from '@/engine/types';
+import type { TurnState } from '@/lib/gameTypes';
 
 interface PhaseTrackerProps {
   turn: TurnState;

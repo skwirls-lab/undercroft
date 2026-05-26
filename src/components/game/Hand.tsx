@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CardView } from './CardView';
-import type { CardInstance, GameAction } from '@/engine/types';
+import type { CardInstance, GameAction } from '@/lib/gameTypes';
 
 interface HandProps {
   cards: CardInstance[];

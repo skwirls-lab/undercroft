@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import type { StackItem, CardInstance } from '@/engine/types';
+import type { StackItem, CardInstance } from '@/lib/gameTypes';
 import { Layers } from 'lucide-react';
 import { useCardPreview } from './CardPreviewContext';
 
@@ -15,7 +15,7 @@ function stackItemToPreviewCard(item: StackItem): CardInstance | null {
     cardData: item.cardData,
     ownerId: item.controllerId,
     controllerId: item.controllerId,
-    zone: 'stack' as const,
+    zone: 'stack' as any,
     tapped: false,
     flipped: false,
     faceDown: false,

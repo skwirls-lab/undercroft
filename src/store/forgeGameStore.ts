@@ -19,7 +19,7 @@ import {
 } from '@/lib/forgeClient';
 import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { useGameStore } from '@/store/gameStore';
-import type { GameAction } from '@/engine/types';
+import type { GameAction } from '@/lib/gameTypes';
 
 // Re-use existing UI types where possible
 export interface ForgeGameStoreState {

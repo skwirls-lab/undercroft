@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { ManaColor } from '@/engine/types';
+import type { ManaColor } from '@/lib/gameTypes';
 
 interface ManaColorPickerProps {
   colors: (ManaColor | 'C')[];

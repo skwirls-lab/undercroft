@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
-import type { CardInstance } from '@/engine/types';
+import type { CardInstance } from '@/lib/gameTypes';
 
 interface CardPreviewContextType {
   previewCard: CardInstance | null;

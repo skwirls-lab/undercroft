@@ -1,5 +1,5 @@
-import type { GameState, GameAction, CardInstance } from '@/engine/types';
-import { getCardsInZone } from '@/engine/GameState';
+import type { GameState, GameAction, CardInstance } from '@/lib/gameTypes';
+import { getCardsInZone } from '@/lib/ZoneManager';
 
 export function buildAIPrompt(
   state: GameState,
@@ -9,9 +9,10 @@ export function buildAIPrompt(
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return '';
 
-  const hand = getCardsInZone(state, playerId, 'hand');
-  const battlefield = getCardsInZone(state, playerId, 'battlefield');
-  const commanders = getCardsInZone(state, playerId, 'command');
+  // Get card instances instead of just IDs
+  const hand = getCardsInZone(state, playerId, 'hand' as any).map(id => state.cardInstances.get(id)).filter((c): c is CardInstance => !!c);
+  const battlefield = getCardsInZone(state, playerId, 'battlefield' as any).map(id => state.cardInstances.get(id)).filter((c): c is CardInstance => !!c);
+  const commanders = getCardsInZone(state, playerId, 'command' as any).map(id => state.cardInstances.get(id)).filter((c): c is CardInstance => !!c);
 
   let prompt = `You are an AI playing a Magic: The Gathering Commander game.\n`;
   prompt += `Your name: ${player.name}\n\n`;
@@ -72,7 +73,7 @@ export function buildAIPrompt(
   // Opponents' battlefields
   for (const opp of state.players.filter((p) => p.id !== playerId)) {
     if (opp.hasLost || opp.hasConceded) continue;
-    const oppBattlefield = getCardsInZone(state, opp.id, 'battlefield');
+    const oppBattlefield = getCardsInZone(state, opp.id, 'battlefield' as any).map(id => state.cardInstances.get(id)).filter((c): c is CardInstance => !!c);
     prompt += `=== ${opp.name.toUpperCase()}'S BATTLEFIELD ===\n`;
     if (oppBattlefield.length === 0) {
       prompt += `(empty)\n`;

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CardView, type CombatRole } from './CardView';
 import { ManaPoolDisplay } from './ManaPoolDisplay';
-import type { CardInstance, PlayerState, GameAction, CombatState, ManaColor } from '@/engine/types';
+import type { CardInstance, PlayerState, GameAction, CombatState, ManaColor } from '@/lib/gameTypes';
 import { ManaColorPicker } from './ManaColorPicker';
 import { Heart, Skull, Droplets, Crown, Library, ArchiveX, ZapOff, Sword, Gem } from 'lucide-react';
 
@@ -45,8 +45,8 @@ interface PlayerFieldProps {
 
 function getCardCombatRole(cardId: string, combat?: CombatState | null): CombatRole {
   if (!combat) return 'none';
-  if (combat.attackers.some((a) => a.attackerInstanceId === cardId)) return 'attacking';
-  if (combat.blockers.some((b) => b.blockerInstanceId === cardId)) return 'blocking';
+  if (combat.attackers.some((a) => a.instanceId === cardId)) return 'attacking';
+  if (combat.blockers.some((b) => b.instanceId === cardId)) return 'blocking';
   return 'none';
 }
 

@@ -1,4 +1,4 @@
-import type { GameAction } from '@/engine/types';
+import type { GameAction } from '@/lib/gameTypes';
 
 export interface AIProvider {
   name: string;

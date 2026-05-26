@@ -1,8 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { CardInstance } from '@/engine/types';
-import { getLandProducibleColors, getManaColorName, getETBTappedStatus } from '@/engine/OracleTextParser';
+import type { CardInstance } from '@/lib/gameTypes';
+import { getLandProducibleColors, getManaColorName, getETBTappedStatus } from '@/lib/OracleTextParser';
 import { X } from 'lucide-react';
 
 interface CardDetailPanelProps {
@@ -36,7 +36,7 @@ export function CardDetailPanel({ card, onClose, className }: CardDetailPanelPro
   const isLand = cardData.typeLine.toLowerCase().includes('land');
   const symbols = getManaSymbols(cardData.manaCost);
   const producibleColors = isLand ? getLandProducibleColors(cardData) : [];
-  const etbStatus = isLand ? getETBTappedStatus(cardData) : 'untapped';
+  const etbStatus = isLand ? getETBTappedStatus({ tapped: card.tapped, summoningSick: card.summoningSick }) : 'untapped';
 
   return (
     <div

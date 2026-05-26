@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCardPreview } from './CardPreviewContext';
-import type { CardInstance } from '@/engine/types';
+import type { CardInstance } from '@/lib/gameTypes';
 
 function getActiveFace(card: CardInstance) {
   const { cardData } = card;

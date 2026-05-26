@@ -284,8 +284,6 @@ function mapScryfallCard(raw: Record<string, unknown>): ScryfallCardRecord {
           normal: imageUris.normal || '',
           large: imageUris.large || '',
           art_crop: imageUris.art_crop || '',
-          border_crop: imageUris.border_crop || '',
-          png: imageUris.png || '',
         }
       : undefined,
     card_faces: cardFaces?.map((face) => {
@@ -303,8 +301,6 @@ function mapScryfallCard(raw: Record<string, unknown>): ScryfallCardRecord {
               normal: faceImages.normal || '',
               large: faceImages.large || '',
               art_crop: faceImages.art_crop || '',
-              border_crop: faceImages.border_crop || '',
-              png: faceImages.png || '',
             }
           : undefined,
       };
@@ -314,53 +310,4 @@ function mapScryfallCard(raw: Record<string, unknown>): ScryfallCardRecord {
     set_name: (raw.set_name as string) || '',
     rarity: (raw.rarity as string) || '',
   };
-}
-
-export function scryfallToCardData(card: ScryfallCardRecord): import('@/engine/types').CardData {
-  return {
-    scryfallId: card.id,
-    oracleId: card.oracle_id,
-    name: card.name,
-    manaCost: card.mana_cost,
-    cmc: card.cmc,
-    typeLine: card.type_line,
-    oracleText: card.oracle_text,
-    colors: card.colors as import('@/engine/types').ManaColor[],
-    colorIdentity: card.color_identity as import('@/engine/types').ManaColor[],
-    keywords: card.keywords,
-    power: card.power,
-    toughness: card.toughness,
-    loyalty: card.loyalty,
-    producedMana: card.produced_mana,
-    layout: card.layout,
-    imageUris: card.image_uris
-      ? {
-          small: card.image_uris.small,
-          normal: card.image_uris.normal,
-          large: card.image_uris.large,
-          artCrop: card.image_uris.art_crop,
-          borderCrop: card.image_uris.border_crop,
-          png: card.image_uris.png,
-        }
-      : undefined,
-    cardFaces: card.card_faces?.map((face) => ({
-      name: face.name,
-      manaCost: face.mana_cost,
-      typeLine: face.type_line,
-      oracleText: face.oracle_text,
-      power: face.power,
-      toughness: face.toughness,
-      imageUris: face.image_uris
-        ? {
-            small: face.image_uris.small,
-            normal: face.image_uris.normal,
-            large: face.image_uris.large,
-            artCrop: face.image_uris.art_crop,
-            borderCrop: face.image_uris.border_crop,
-            png: face.image_uris.png,
-          }
-        : undefined,
-    })),
-    legalities: card.legalities,
-  } satisfies import('@/engine/types').CardData;
 }

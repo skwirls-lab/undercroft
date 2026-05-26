@@ -2,8 +2,8 @@
 
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import type { CardInstance } from '@/engine/types';
-import { getLandProducibleColors, getEffectiveLandCardData } from '@/engine/OracleTextParser';
+import type { CardInstance } from '@/lib/gameTypes';
+import { getLandProducibleColors, getEffectiveLandCardData } from '@/lib/OracleTextParser';
 import { useCardPreview } from './CardPreviewContext';
 
 // Resolve the active face for DFC cards on the battlefield
@@ -48,7 +48,10 @@ function getDisplayPT(card: CardInstance): { power: string; toughness: string; b
 }
 
 function isToken(card: CardInstance): boolean {
-  return card.cardData.layout === 'token' || card.cardData.typeLine.toLowerCase().startsWith('token');
+  // Token check based on type line or name
+  const typeLine = card.cardData.typeLine.toLowerCase();
+  const name = card.cardData.name.toLowerCase();
+  return typeLine.includes('token') || name.includes('token');
 }
 
 export type CardViewMode = 'pip' | 'art' | 'full';
@@ -113,8 +116,8 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
   const artCropUrl = face.artCrop;
 
   // For lands, show producible mana dots instead of mana cost pips
-  const effectiveData = getEffectiveLandCardData(card);
-  const landColors = isLand ? getLandProducibleColors(effectiveData) : [];
+  const effectiveData = getEffectiveLandCardData(card.cardData);
+  const landColors = isLand ? getLandProducibleColors(card.cardData) : [];
 
   return (
     <div

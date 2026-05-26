@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { ManaPool } from '@/engine/types';
+import type { ManaPool } from '@/lib/gameTypes';
 
 interface ManaPoolDisplayProps {
   manaPool: ManaPool;

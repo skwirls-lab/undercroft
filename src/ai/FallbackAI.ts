@@ -1,4 +1,4 @@
-import type { GameState, GameAction, CardInstance } from '@/engine/types';
+import type { GameState, GameAction, CardInstance } from '@/lib/gameTypes';
 import type { AIDecision } from './types';
 
 // Get a card's CMC from its card data
@@ -262,7 +262,7 @@ export function makeFallbackDecision(
         .filter((a) => a.defendingPlayerId === playerId)
         .map((a) => ({
           declaration: a,
-          card: state.cardInstances.get(a.attackerInstanceId),
+          card: state.cardInstances.get(a.instanceId),
         }))
         .filter((a) => a.card)
         .sort((a, b) => {
@@ -286,7 +286,7 @@ export function makeFallbackDecision(
           const blockerId = availableBlockers.shift()!;
           assignments.push({
             blockerId,
-            attackerId: attacker.declaration.attackerInstanceId,
+            attackerId: attacker.declaration.instanceId,
           });
         }
       }

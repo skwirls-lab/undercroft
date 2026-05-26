@@ -11,9 +11,9 @@ import { StackDisplay } from './StackDisplay';
 import { SearchPicker } from './SearchPicker';
 import { Button } from '@/components/ui/button';
 import { useGameStore } from '@/store/gameStore';
-import { getCardsInZone } from '@/engine/GameState';
-import { getZoneCardCount } from '@/engine/ZoneManager';
-import type { CardInstance, GameAction, ManaColor } from '@/engine/types';
+import { getCardsInZone } from '@/lib/ZoneManager';
+import { getZoneCardCount } from '@/lib/ZoneManager';
+import type { CardInstance, GameAction, ManaColor } from '@/lib/gameTypes';
 import { ArrowRight, Flag, Loader2, FastForward, X } from 'lucide-react';
 
 interface GameBoardProps {
@@ -348,8 +348,8 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
           <PlayerField
             key={opp.id}
             player={opp}
-            battlefield={getCardsInZone(gameState, opp.id, 'battlefield')}
-            commandZone={getCardsInZone(gameState, opp.id, 'command')}
+            battlefield={getCardsInZone(gameState, opp.id, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
+            commandZone={getCardsInZone(gameState, opp.id, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
             graveyardCount={getZoneCardCount(gameState, opp.id, 'graveyard')}
             exileCount={getZoneCardCount(gameState, opp.id, 'exile')}
             libraryCount={getZoneCardCount(gameState, opp.id, 'library')}
@@ -572,8 +572,8 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
       {currentPlayer && (
         <PlayerField
           player={currentPlayer}
-          battlefield={getCardsInZone(gameState, currentPlayerId, 'battlefield')}
-          commandZone={getCardsInZone(gameState, currentPlayerId, 'command')}
+          battlefield={getCardsInZone(gameState, currentPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
+          commandZone={getCardsInZone(gameState, currentPlayerId, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
           graveyardCount={getZoneCardCount(gameState, currentPlayerId, 'graveyard')}
           exileCount={getZoneCardCount(gameState, currentPlayerId, 'exile')}
           libraryCount={getZoneCardCount(gameState, currentPlayerId, 'library')}
@@ -604,7 +604,7 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
           </span>
         </div>
         <Hand
-          cards={handCards}
+          cards={handCards.map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
           legalActions={hasPriority ? filteredLegalActions : []}
           onPlayCard={handlePlayCard}
           isActive={hasPriority}
