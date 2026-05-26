@@ -266,7 +266,7 @@ function forgeCardToCardData(fc: ForgeCard): CardData {
     cmc,
     typeLine,
     oracleText: fc.oracleText ?? '',
-    colors: ((fc.colors as ManaColor[]) || []) as ManaColor[],
+    colors: [] as ManaColor[],
     colorIdentity: undefined as ManaColor[],
     keywords: (fc.keywords || []) as string[],
     power: fc.basePower != null ? String(fc.basePower) : (fc.power != null ? String(fc.power) : undefined),
