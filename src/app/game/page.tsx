@@ -178,31 +178,29 @@ export default function GameSetupPage() {
               }
 
       // Build deck list from selected deck, or use a demo deck
-      let allDecks: Array<{ deckList: string[]; commander: string | undefined }>;
+      let allDecks: Array<{ deckList: string[]; commander?: string }>;
 
       if (selectedDeck) {
         const myForgeDeck = buildForgeDeck(selectedDeck);
 
         allDecks = aiCount === 0 ? [myForgeDeck] : [
-          // Demo decks for AI opponents using red/green goblin theme
-          ...Array(aiCount - 1).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }),
-          myForgeDeck, // Player's deck last
+          myForgeDeck, // Player's deck FIRST in array
+          ...Array(aiCount).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }), // AI opponents
         ];
       } else {
         // Demo deck for player, and dummy decks for AIs
         const demoDeck = { deckList: buildGoblinDemo(), commander: 'Krenko, Mob Boss' };
 
         allDecks = aiCount === 0 ? [demoDeck] : [
-          // Dummy red-green decks for AI opponents  
-          ...Array(aiCount - 1).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }),
-          demoDeck, // Player's demo deck last
+          demoDeck, // Player's deck FIRST in array
+          ...Array(aiCount).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }), // AI opponents
         ];
       }
 
-      console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, '- commanders:', allDecks.map(d => d.commander || 'Goblin Gullet'));
+      console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, `- commanders:`, allDecks.map(d => d.commander || 'Goblin Gullet'));
 
-      // Send start_game to server - always sends first deck as player's
-      startGame(allDecks[0].deckList, allDecks[0].commander, 'Player', aiCount);
+      // Send start_game to server - player's deck is first in allDecks array
+      startGame(allDecks[0].deckList, allDecks[0].commander ?? undefined, 'Player', aiCount);
 
       setTimeout(() => router.push('/game/forge'), 500);
     } catch (e) {
