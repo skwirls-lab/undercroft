@@ -7,6 +7,7 @@
 import type {
   GameState, PlayerState, CardInstance, CardData, Zone, ZoneType,
   StackItem, TurnState, PriorityState, ManaPool, Phase, Step,
+  ManaColor,
 } from '@/lib/gameTypes';
 import type { ForgeGameState, ForgePlayer, ForgeCard, ForgeStackItem } from '@/lib/forgeClient';
 
