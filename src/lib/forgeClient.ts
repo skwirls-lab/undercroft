@@ -205,7 +205,10 @@ export class ForgeGameClient {
     this.send('choice_response', { requestId, ...payload });
   }
 
-  /** Concede the game */
+  handlePriorityPass(pass: boolean) {
+    this.send('priority_response', { pass });
+  }
+
   concede() {
     this.send('concede', {});
   }

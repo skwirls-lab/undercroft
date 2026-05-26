@@ -99,16 +99,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn } = get();
     
     if (forgeMode) {
-      // Auto-pass when using auto-pass feature and action is PASS_PRIORITY with no pending request
+      // auto-pass: PASS_PRIORITY action when no pending request and feature enabled
       if (action.type === 'PASS_PRIORITY' && !forgePendingRequestId && get().autoPassUntilNextTurn) {
         const client = useForgeGameStore.getState().client;
         if (client) {
-          try {
-            console.log('[Forge] Auto-passing priority via WebSocket');
-            client.send(JSON.stringify({ type: 'priority_response', pass: true, requestId: '' }));
-          } catch (e) {
-            console.error('[Forge] Auto-pass failed:', e);
-          }
+          console.log('[Forge] Auto-passing priority');
+          client.handlePriorityPass(true);
         }
         return; // Don't double-process this action
       }
