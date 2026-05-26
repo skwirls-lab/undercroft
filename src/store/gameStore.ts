@@ -95,7 +95,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   performAction: (action) => {
-    const { gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn } = get();
+    const { gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn, autoPassUntilNextTurn } = get();
     
     if (forgeMode) {
       // Auto-pass when using auto-pass feature and action is PASS_PRIORITY with no pending request
