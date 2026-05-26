@@ -41,41 +41,41 @@ function formatEvent(event: GameEvent, currentPlayerId?: string): string {
 
   switch (event.type) {
     case 'GAME_STARTED':
-      return `${icon} Game started with ${data.playerCount} players`;
+      return `${icon} Game started with ${(data?.playerCount ?? 2)} players`;
     case 'TURN_STARTED':
-      return `${icon} Turn ${data.turnNumber}`;
+      return `${icon} Turn ${(data?.turnNumber ?? 1)}`;
     case 'PHASE_CHANGED':
-      return `${icon} ${String(data.phase).replace(/_/g, ' ')}`;
+      return `${icon} ${String(data?.phase ?? '').replace(/_/g, ' ')}`;
     case 'CARD_DRAWN':
       return isOwnEvent
-        ? `${icon} Drew ${data.cardName}`
+        ? `${icon} Drew ${(data?.cardName ?? 'a card')}`
         : `${icon} Opponent drew a card`;
     case 'CARD_PLAYED':
-      return `${icon} Played ${data.cardName}`;
+      return `${icon} Played ${(data?.cardName ?? '')}`;
     case 'SPELL_CAST':
-      return `${icon} Cast ${data.cardName}`;
+      return `${icon} Cast ${(data?.cardName ?? '')}`;
     case 'SPELL_RESOLVED':
-      return `${icon} ${data.cardName} resolved`;
+      return `${icon} ${(data?.cardName ?? '')} resolved`;
     case 'CREATURE_ATTACKED':
-      return `${icon} ${data.cardName} attacks`;
+      return `${icon} ${(data?.cardName ?? '')} attacks`;
     case 'CREATURE_BLOCKED':
-      return `${icon} ${data.blockerName} blocks`;
+      return `${icon} ${(data?.blockerName ?? '')} blocks`;
     case 'DAMAGE_DEALT':
-      return `${icon} ${data.amount} damage dealt`;
+      return `${icon} ${(data?.amount ?? 0)} damage dealt`;
     case 'LIFE_CHANGED':
-      return `${icon} Life → ${data.newLife}`;
+      return `${icon} Life → ${(data?.newLife ?? data?.oldLife ?? '')}`;
     case 'CARD_DESTROYED':
-      return `${icon} ${data.cardName} destroyed`;
+      return `${icon} ${(data?.cardName ?? '')} destroyed`;
     case 'CARD_TAPPED':
-      return `${icon} Tapped ${data.cardName}`;
+      return `${icon} Tapped ${(data?.cardName ?? '')}`;
     case 'CARD_UNTAPPED':
-      return `${icon} Untapped ${data.cardName}`;
+      return `${icon} Untapped ${(data?.cardName ?? '')}`;
     case 'MANA_ADDED':
-      return `${icon} +${data.amount} {${data.color}} mana`;
+      return `${icon} +${(data?.amount ?? 0)} {${(data?.color ?? '')}} mana`;
     case 'PLAYER_LOST':
-      return `${icon} Player eliminated (${data.reason})`;
+      return `${icon} Player eliminated (${(data?.reason ?? '')})`;
     case 'PLAYER_WON':
-      return `${icon} ${data.playerName} wins!`;
+      return `${icon} ${(data?.playerName ?? '')} wins!`;
     case 'GAME_OVER':
       return `${icon} Game over`;
     default:
