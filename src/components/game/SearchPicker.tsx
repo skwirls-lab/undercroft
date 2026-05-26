@@ -30,9 +30,9 @@ export function SearchPicker({ pendingChoice, cards, onConfirm, onCancel }: Sear
     if (next.has(id)) {
       next.delete(id);
     } else {
-      if (next.size < pendingChoice.maxChoices) {
+      if (next.size < (pendingChoice.maxChoices ?? cards.length)) {
         next.add(id);
-      } else if (pendingChoice.maxChoices === 1) {
+      } else if ((pendingChoice.maxChoices ?? 1) === 1) {
         next.clear();
         next.add(id);
       }
@@ -41,7 +41,7 @@ export function SearchPicker({ pendingChoice, cards, onConfirm, onCancel }: Sear
   };
 
   const minChoices = pendingChoice.minChoices ?? 1;
-  const maxChoices = pendingChoice.maxChoices ?? cards.length;
+  const maxChoices = pendingChoice.maxChoices ?? cards.length || minChoices;
   const canConfirm = selectedIds.size >= minChoices && selectedIds.size <= maxChoices;
   const canSkip = minChoices === 0;
 
