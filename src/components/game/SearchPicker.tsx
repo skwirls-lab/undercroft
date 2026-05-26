@@ -41,7 +41,7 @@ export function SearchPicker({ pendingChoice, cards, onConfirm, onCancel }: Sear
   };
 
   const minChoices = pendingChoice.minChoices ?? 1;
-  const maxChoices = pendingChoice.maxChoices ?? cards.length || minChoices;
+  const maxChoices = (pendingChoice.maxChoices ?? cards.length) ?? minChoices;
   const canConfirm = selectedIds.size >= minChoices && selectedIds.size <= maxChoices;
   const canSkip = minChoices === 0;
 
