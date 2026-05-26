@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
 
@@ -114,12 +115,12 @@ function ChoicePanel({ choice, onRespond }: {
             : 'Look at your opening hand above. Keep or mulligan?'}
         </span>
         <div className="flex gap-3">
-          <button size="sm" onClick={() => onRespond(choice.requestId, { keep: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
+          <Button size="sm" onClick={() => onRespond(choice.requestId, { keep: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
             Keep Hand
-          </button>
-          <button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { keep: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onRespond(choice.requestId, { keep: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
             Mulligan
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -148,8 +149,8 @@ function ChoicePanel({ choice, onRespond }: {
       <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
         <h3 className="text-sm font-semibold text-foreground mb-3">{prompt || 'Confirm?'}</h3>
         <div className="flex gap-3">
-          <button size="sm" onClick={() => onRespond(choice.requestId, { confirmed: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">Yes</button>
-          <button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { confirmed: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">No</button>
+          <Button size="sm" onClick={() => onRespond(choice.requestId, { confirmed: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">Yes</Button>
+          <Button variant="outline" size="sm" onClick={() => onRespond(choice.requestId, { confirmed: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">No</Button>
         </div>
       </div>
     );
@@ -226,9 +227,9 @@ function ChoicePanel({ choice, onRespond }: {
             ))}
           </div>
         ) : null}
-        <button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { blocks: [] })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40">
-          No Blocks
-        </button>
+          <Button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { blocks: [] })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40">
+            No Blocks
+          </Button>
       </div>
     );
   }
@@ -241,9 +242,9 @@ function ChoicePanel({ choice, onRespond }: {
         <h3 className="text-sm font-semibold mb-2">{prompt || 'Choose a type'}</h3>
         <div className="flex flex-wrap gap-1.5">
           {typeOptions.map((t, i) => (
-            <button key={i} size="sm" variant="secondary" onClick={() => onRespond(choice.requestId, { chosen: t })} className="px-3 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">
+            <Button key={i} size="sm" variant="secondary" onClick={() => onRespond(choice.requestId, { chosen: t })} className="px-3 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">
               {String(t)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -278,8 +279,8 @@ function ChoicePanel({ choice, onRespond }: {
       <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
         <h3 className="text-sm font-semibold mb-2">{prompt || 'Play trigger?'}</h3>
         <div className="flex gap-2">
-          <button size="sm" onClick={() => onRespond(choice.requestId, { play: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">Yes</button>
-          <button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { play: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">No</button>
+          <Button size="sm" onClick={() => onRespond(choice.requestId, { play: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">Yes</Button>
+          <Button variant="outline" size="sm" onClick={() => onRespond(choice.requestId, { play: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">No</Button>
         </div>
       </div>
     );
@@ -290,8 +291,8 @@ function ChoicePanel({ choice, onRespond }: {
       <div className="mb-3 rounded-xl border border-border/30 bg-card/30 p-4">
         <h3 className="text-sm font-semibold mb-2">{prompt || 'Put on top of library?'}</h3>
         <div className="flex gap-2">
-          <button size="sm" onClick={() => onRespond(choice.requestId, { onTop: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">Top</button>
-          <button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { onTop: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">Bottom</button>
+          <Button size="sm" onClick={() => onRespond(choice.requestId, { onTop: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-gold/40 hover:bg-gold/10">Top</Button>
+          <Button variant="outline" size="sm" onClick={() => onRespond(choice.requestId, { onTop: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">Bottom</Button>
         </div>
       </div>
     );
@@ -318,9 +319,9 @@ function ChoicePanel({ choice, onRespond }: {
   return (
     <div className="mb-3 rounded-xl border border-border/30 bg-card/30 p-4">
       <h3 className="text-sm font-semibold mb-2">{prompt || `Choice: ${choiceType}`}</h3>
-      <button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { pass: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">
+      <Button size="sm" variant="outline" onClick={() => onRespond(choice.requestId, { pass: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">
         OK / Pass
-      </button>
+      </Button>
       <details className="mt-2">
         <summary className="cursor-pointer text-xs text-muted-foreground">Raw data</summary>
         <pre className="mt-1 max-h-32 overflow-auto rounded bg-black/50 p-2 text-[10px] text-muted-foreground">
