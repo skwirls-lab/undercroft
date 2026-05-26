@@ -207,7 +207,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     stack,
     turn,
     priority,
-    combat: null, // TODO: map combat state
+    combat: undefined, // TODO: map combat state from Forge
     pendingChoice: null, // Handled separately by forgeGameStore
     events: [],
     winner: null,
