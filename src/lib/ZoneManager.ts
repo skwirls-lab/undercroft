@@ -9,11 +9,11 @@ import type { GameState, ZoneType } from '@/lib/gameTypes';
 // Get Cards in a Specific Zone
 // ===================================================================
 
-export function getCardsInZone(gameState: GameState, zoneType: string, playerId?: string): string[] {
+export function getCardsInZone(gameState: GameState, playerId: string, zoneType: string): string[] {
   const zones = gameState.zones;
   
-  // Build the zone key
-  const zoneKey = playerId ? `${zoneType}:${playerId}` : zoneType;
+  // Build the zone key - format is "playerId:zoneType" to match forgeStateAdapter
+  const zoneKey = `${playerId}:${zoneType}`;
   
   const zone = zones.get(zoneKey);
   if (!zone) {
@@ -27,7 +27,7 @@ export function getCardsInZone(gameState: GameState, zoneType: string, playerId?
 // Get Zone Card Count
 // ===================================================================
 
-export function getZoneCardCount(gameState: GameState, zoneType: string, playerId?: string): number {
-  const cards = getCardsInZone(gameState, zoneType, playerId);
+export function getZoneCardCount(gameState: GameState, playerId: string, zoneType: string): number {
+  const cards = getCardsInZone(gameState, playerId, zoneType);
   return cards.length;
 }

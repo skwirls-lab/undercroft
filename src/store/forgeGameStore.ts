@@ -68,10 +68,10 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         const adapted = adaptForgeState(state);
         // Diagnostic: trace zone contents
         for (const p of adapted.players) {
-          const hand = adapted.zones.get(`hand:${p.id}`);
-          const bf = adapted.zones.get(`battlefield:${p.id}`);
-          const gy = adapted.zones.get(`graveyard:${p.id}`);
-          const cmd = adapted.zones.get(`command:${p.id}`);
+          const hand = adapted.zones.get(`${p.id}:hand`);
+          const bf = adapted.zones.get(`${p.id}:battlefield`);
+          const gy = adapted.zones.get(`${p.id}:graveyard`);
+          const cmd = adapted.zones.get(`${p.id}:command`);
           console.log(`[Forge] game_state zones for ${p.name} (${p.id}): hand=${hand?.cards.length ?? 0}, bf=${bf?.cards.length ?? 0}, gy=${gy?.cards.length ?? 0}, cmd=${cmd?.cards.length ?? 0}, life=${p.life}`);
           if (bf && bf.cards.length > 0) {
             console.log(`[Forge]   battlefield:`, bf.cards.map(id => {

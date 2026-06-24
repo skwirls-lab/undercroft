@@ -200,16 +200,16 @@ function ChoicePanel({ choice, onRespond }: {
   // --- declare_attackers ---
   if (choiceType === 'declare_attackers') {
     const attackers = (data.possibleAttackers || []) as CardOption[];
+    const defenders = (data.defenders || []) as CardOption[];
+    // Default defender is the first opponent (usually the only one in 1v1)
+    const defaultDefenderId = defenders.length > 0 ? defenders[0].id : -1;
     return (
-      <CardSelectPanel
-        prompt="Declare Attackers"
-        options={attackers}
-        min={0}
-        max={attackers.length}
+      <DeclareAttackersPanel
+        attackers={attackers}
+        defenders={defenders}
+        defaultDefenderId={defaultDefenderId}
         requestId={choice.requestId}
         onRespond={onRespond}
-        responseKey="attackerCardIds"
-        formatResponse={(ids) => ({ attackers: ids.map((id: number) => ({ cardId: id })) })}
       />
     );
   }
@@ -332,6 +332,100 @@ function ChoicePanel({ choice, onRespond }: {
           {JSON.stringify(choice, null, 2)}
         </pre>
       </details>
+    </div>
+  );
+}
+
+// ============================================================
+// DeclareAttackersPanel — select creatures to attack with
+// Properly formats response for backend: { attackers: [{ cardId, defenderId? }] }
+// ============================================================
+
+function DeclareAttackersPanel({ attackers, defenders, defaultDefenderId, requestId, onRespond }: {
+  attackers: CardOption[];
+  defenders: CardOption[];
+  defaultDefenderId: number;
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [selected, setSelected] = React.useState<Set<number>>(new Set());
+
+  const toggle = (id: number) => {
+    setSelected((prev: Set<number>) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirmAttack = () => {
+    const attackerDecls = Array.from(selected).map((cardId) => ({
+      cardId,
+      defenderId: defaultDefenderId,
+    }));
+    onRespond(requestId, { attackers: attackerDecls });
+  };
+
+  const skipCombat = () => {
+    onRespond(requestId, { attackers: [] });
+  };
+
+  return (
+    <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-semibold text-red-400">Declare Attackers</span>
+        {defenders.length > 1 && (
+          <span className="text-xs text-muted-foreground">
+            Attacking: {defenders.find(d => d.id === defaultDefenderId)?.name || 'Opponent'}
+          </span>
+        )}
+      </div>
+      {attackers.length > 0 ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-2">
+            Select creatures to attack with ({selected.size} selected)
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {attackers.map((att) => (
+              <Button
+                key={att.id}
+                onClick={() => toggle(att.id)}
+                className={`rounded-lg border px-3 py-1.5 text-xs text-left transition-colors ${
+                  selected.has(att.id)
+                    ? 'border-red-400/60 bg-red-400/15 text-red-300 ring-1 ring-red-400/40'
+                    : 'border-border/40 bg-card/60 hover:border-red-500/30 hover:bg-red-500/10 text-foreground'
+                }`}
+              >
+                {att.name}
+                {att.power !== undefined && <span className="ml-1 text-muted-foreground">{att.power}/{att.toughness}</span>}
+              </Button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground mb-3">No creatures available to attack.</p>
+      )}
+      <div className="flex gap-2">
+        {attackers.length > 0 && (
+          <Button
+            size="sm"
+            onClick={confirmAttack}
+            disabled={selected.size === 0}
+            className="px-4 h-8 rounded-lg border bg-red-600 text-xs font-medium hover:bg-red-700 text-white disabled:opacity-50 disabled:hover:bg-red-600"
+          >
+            Attack with {selected.size} Creature{selected.size !== 1 ? 's' : ''}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={skipCombat}
+          className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40"
+        >
+          Skip Combat
+        </Button>
+      </div>
     </div>
   );
 }
