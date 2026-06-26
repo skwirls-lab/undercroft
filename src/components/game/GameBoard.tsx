@@ -36,7 +36,7 @@ interface TargetingState {
 }
 
 export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
-  const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds } = useGameStore();
+  const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
   const { pendingChoice } = useForgeGameStore();
 
   console.log('[GameBoard] init:', { currentPlayerId, hasGameState: !!gameState });
@@ -330,13 +330,13 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
   const inCombatPhase = gameState.turn.phase === 'combat';
   const step = gameState.turn.step;
   // Only show native combat controls during interactive combat steps
-  // IMPORTANT: Disable when Forge has a pending choice (e.g., declare_attackers) to avoid duplicate UI
+  // IMPORTANT: Completely disable native combat controls when in Forge mode - Forge handles all combat UI
   const showCombatControls =
+    !forgeMode && // Never show native combat controls in Forge mode
     hasPriority &&
     inCombatPhase &&
     !isProcessing &&
     !gameState.isGameOver &&
-    !pendingChoice && // Don't show native controls when Forge is handling combat
     ((isMyTurn && step === 'declare_attackers' && !combat) ||
      (!isMyTurn && step === 'declare_blockers' && combat?.phase === 'declaring_blockers'));
 
