@@ -45,8 +45,8 @@ export function ForgeChoiceOverlay() {
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Semi-transparent backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" />
-      {/* Modal content */}
-      <div className="relative z-10 w-full max-w-xl mx-4 pointer-events-auto">
+      {/* Modal content - key forces re-mount when requestId changes */}
+      <div key={pendingChoice.requestId} className="relative z-10 w-full max-w-xl mx-4 pointer-events-auto">
         <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
       </div>
     </div>
