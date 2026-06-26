@@ -124,8 +124,10 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
               actionType = card.cardData.typeLine?.toLowerCase().includes('land')
                 ? 'PLAY_LAND' : 'CAST_SPELL';
             } else if (card.zone === 'battlefield') {
-              actionType = card.cardData.typeLine?.toLowerCase().includes('land')
-                ? 'TAP_FOR_MANA' : 'ACTIVATE_ABILITY';
+              // NOTE: Mana abilities (TAP_FOR_MANA) are NOT sent from the backend anymore.
+              // They are handled separately during mana payment flow.
+              // All battlefield abilities from legalPlays are now activated abilities.
+              actionType = 'ACTIVATE_ABILITY';
             } else if (card.zone === 'command') {
               actionType = 'CAST_SPELL';
             } else {
