@@ -151,7 +151,20 @@ export async function GET() {
         controller.enqueue(encoder.encode('data: {"status": "Fetching Scryfall bulk data list..."}\n\n'));
         
         const bulkResponse = await fetch('https://api.scryfall.com/bulk-data');
+        if (!bulkResponse.ok) {
+          controller.enqueue(encoder.encode(`data: {"error": "Scryfall API error: ${bulkResponse.status} ${bulkResponse.statusText}"}\n\n`));
+          controller.close();
+          return;
+        }
+        
         const bulkData = await bulkResponse.json() as { data: ScryfallBulkData[] };
+        
+        if (!bulkData || !bulkData.data || !Array.isArray(bulkData.data)) {
+          controller.enqueue(encoder.encode(`data: {"error": "Invalid response from Scryfall: ${JSON.stringify(bulkData).substring(0, 200)}"}\n\n`));
+          controller.close();
+          return;
+        }
+        
         const defaultCards = bulkData.data.find(d => d.type === 'default_cards');
         
         if (!defaultCards) {

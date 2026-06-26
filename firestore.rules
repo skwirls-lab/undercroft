@@ -4,10 +4,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // Global card data - read-only for all authenticated users
-    // Write access only for admin operations (via API routes)
+    // TEMPORARY: Write access enabled for initial population
+    // TODO: Change "allow write: if true" to "allow write: if false" after populating cards
     match /cards/{cardId} {
       allow read: if true; // Anyone can read cards (even unauthenticated)
-      allow write: if false; // Only server-side can write
+      allow write: if true; // TEMPORARY - for initial card population
     }
     
     // User profiles - users can read/write their own profile
