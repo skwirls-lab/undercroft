@@ -150,9 +150,16 @@ export async function GET() {
         // Step 1: Get bulk data URL
         controller.enqueue(encoder.encode('data: {"status": "Fetching Scryfall bulk data list..."}\n\n'));
         
-        const bulkResponse = await fetch('https://api.scryfall.com/bulk-data');
+        const bulkResponse = await fetch('https://api.scryfall.com/bulk-data', {
+          headers: {
+            'User-Agent': 'Undercroft/1.0',
+            'Accept': 'application/json',
+          },
+        });
+        
         if (!bulkResponse.ok) {
-          controller.enqueue(encoder.encode(`data: {"error": "Scryfall API error: ${bulkResponse.status} ${bulkResponse.statusText}"}\n\n`));
+          const errorText = await bulkResponse.text();
+          controller.enqueue(encoder.encode(`data: {"error": "Scryfall API error: ${bulkResponse.status} - ${errorText}"}\n\n`));
           controller.close();
           return;
         }
