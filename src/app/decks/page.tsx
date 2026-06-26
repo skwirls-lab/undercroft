@@ -54,46 +54,38 @@ export default function DecksPage() {
       // Parse and create the deck first
       const deck = importDeckFromText(deckText, deckName);
 
-      // If card data is loaded, resolve card names against IndexedDB
-      if (cardDataLoaded) {
-        const cardDb = CardDatabase.getInstance();
-        const uniqueNames = [...new Set(deck.cards.map((c) => c.cardName))];
-        const resolved = await cardDb.resolveCardNames(uniqueNames);
+      // Resolve card names against Firestore (always available)
+      const { resolveCardNames } = await import('@/lib/firebase/cards');
+      const uniqueNames = [...new Set(deck.cards.map((c) => c.cardName))];
+      const resolved = await resolveCardNames(uniqueNames);
 
-        // Update each card entry with resolution status
-        const updatedCards: DeckEntry[] = deck.cards.map((entry) => {
-          const card = resolved.get(entry.cardName);
-          return {
-            ...entry,
-            resolved: card !== null && card !== undefined,
-            scryfallId: card?.id,
-          };
-        });
+      // Update each card entry with resolution status
+      const updatedCards: DeckEntry[] = deck.cards.map((entry) => {
+        const card = resolved.get(entry.cardName);
+        return {
+          ...entry,
+          resolved: card !== null && card !== undefined,
+          scryfallId: card?.id,
+        };
+      });
 
-        const resolvedCount = updatedCards.filter((c) => c.resolved).length;
-        const unresolvedNames = updatedCards
-          .filter((c) => !c.resolved)
-          .map((c) => c.cardName);
-        const uniqueUnresolved = [...new Set(unresolvedNames)];
+      const resolvedCount = updatedCards.filter((c) => c.resolved).length;
+      const unresolvedNames = updatedCards
+        .filter((c) => !c.resolved)
+        .map((c) => c.cardName);
+      const uniqueUnresolved = [...new Set(unresolvedNames)];
 
-        updateDeck(deck.id, {
-          cards: updatedCards,
-          resolvedCount,
-          unresolvedCount: uniqueUnresolved.length,
-        });
+      updateDeck(deck.id, {
+        cards: updatedCards,
+        resolvedCount,
+        unresolvedCount: uniqueUnresolved.length,
+      });
 
-        setImportResult({
-          resolved: resolvedCount,
-          unresolved: uniqueUnresolved,
-          total: updatedCards.length,
-        });
-      } else {
-        setImportResult({
-          resolved: 0,
-          unresolved: [],
-          total: deck.cards.length,
-        });
-      }
+      setImportResult({
+        resolved: resolvedCount,
+        unresolved: uniqueUnresolved,
+        total: updatedCards.length,
+      });
     } finally {
       setImporting(false);
     }
@@ -103,9 +95,9 @@ export default function DecksPage() {
     const deck = decks.find((d) => d.id === deckId);
     if (!deck) return;
 
-    const cardDb = CardDatabase.getInstance();
+    const { resolveCardNames } = await import('@/lib/firebase/cards');
     const uniqueNames = [...new Set(deck.cards.map((c) => c.cardName))];
-    const resolved = await cardDb.resolveCardNames(uniqueNames);
+    const resolved = await resolveCardNames(uniqueNames);
 
     const updatedCards: DeckEntry[] = deck.cards.map((entry) => {
       const card = resolved.get(entry.cardName);
