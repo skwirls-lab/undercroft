@@ -87,7 +87,7 @@ interface ScryfallBulkData {
 }
 
 function slimCard(card: ScryfallCard) {
-  return {
+  const slim: Record<string, unknown> = {
     id: card.id,
     oracle_id: card.oracle_id || '',
     name: card.name,
@@ -98,40 +98,58 @@ function slimCard(card: ScryfallCard) {
     colors: card.colors || [],
     color_identity: card.color_identity || [],
     keywords: card.keywords || [],
-    power: card.power,
-    toughness: card.toughness,
-    loyalty: card.loyalty,
-    produced_mana: card.produced_mana,
     layout: card.layout || 'normal',
-    image_uris: card.image_uris ? {
+    legalities: { commander: 'legal' },
+    set: card.set || '',
+    set_name: card.set_name || '',
+    rarity: card.rarity || '',
+  };
+
+  // Only add optional fields if they exist
+  if (card.power !== undefined) slim.power = card.power;
+  if (card.toughness !== undefined) slim.toughness = card.toughness;
+  if (card.loyalty !== undefined) slim.loyalty = card.loyalty;
+  if (card.produced_mana !== undefined) slim.produced_mana = card.produced_mana;
+
+  if (card.image_uris) {
+    slim.image_uris = {
       small: card.image_uris.small || '',
       normal: card.image_uris.normal || '',
       large: card.image_uris.large || '',
       art_crop: card.image_uris.art_crop || '',
       border_crop: card.image_uris.border_crop || '',
       png: card.image_uris.png || '',
-    } : undefined,
-    card_faces: card.card_faces?.map(face => ({
-      name: face.name || '',
-      mana_cost: face.mana_cost || '',
-      type_line: face.type_line || '',
-      oracle_text: face.oracle_text || '',
-      power: face.power,
-      toughness: face.toughness,
-      image_uris: face.image_uris ? {
-        small: face.image_uris.small || '',
-        normal: face.image_uris.normal || '',
-        large: face.image_uris.large || '',
-        art_crop: face.image_uris.art_crop || '',
-        border_crop: face.image_uris.border_crop || '',
-        png: face.image_uris.png || '',
-      } : undefined,
-    })),
-    legalities: { commander: 'legal' },
-    set: card.set || '',
-    set_name: card.set_name || '',
-    rarity: card.rarity || '',
-  };
+    };
+  }
+
+  if (card.card_faces) {
+    slim.card_faces = card.card_faces.map(face => {
+      const slimFace: Record<string, unknown> = {
+        name: face.name || '',
+        mana_cost: face.mana_cost || '',
+        type_line: face.type_line || '',
+        oracle_text: face.oracle_text || '',
+      };
+
+      if (face.power !== undefined) slimFace.power = face.power;
+      if (face.toughness !== undefined) slimFace.toughness = face.toughness;
+
+      if (face.image_uris) {
+        slimFace.image_uris = {
+          small: face.image_uris.small || '',
+          normal: face.image_uris.normal || '',
+          large: face.image_uris.large || '',
+          art_crop: face.image_uris.art_crop || '',
+          border_crop: face.image_uris.border_crop || '',
+          png: face.image_uris.png || '',
+        };
+      }
+
+      return slimFace;
+    });
+  }
+
+  return slim;
 }
 
 export async function GET() {
