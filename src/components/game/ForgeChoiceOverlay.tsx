@@ -114,16 +114,34 @@ function ChoicePanel({ choice, onRespond }: {
   // --- mulligan: keep / mulligan hand ---
   if (choiceType === 'mulligan') {
     const cardsToReturn = (data.cardsToReturn as number) ?? 0;
+    const handCards = (data.hand || []) as CardOption[];
     return (
-      <div className="mb-3 flex flex-col items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-6 py-4">
+      <div className="mb-3 flex flex-col items-center gap-4 rounded-xl border border-primary/40 bg-primary/5 px-6 py-4 max-w-2xl">
         <span className="text-sm font-semibold text-primary">Mulligan Phase</span>
         <span className="text-xs text-muted-foreground">
           {cardsToReturn > 0
             ? `Keep hand? You'll put ${cardsToReturn} card(s) on the bottom.`
-            : 'Look at your opening hand above. Keep or mulligan?'}
+            : 'Review your opening hand below. Keep or mulligan?'}
         </span>
+        {/* Display hand cards as preview */}
+        {handCards.length > 0 && (
+          <div className="w-full">
+            <p className="text-xs text-muted-foreground mb-2 text-center">Your Hand ({handCards.length} cards):</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {handCards.map((card) => (
+                <div
+                  key={card.id}
+                  className="rounded-lg border border-border/40 bg-card/80 px-3 py-2 text-xs shadow-sm"
+                >
+                  <div className="font-medium text-foreground">{card.name}</div>
+                  {card.type && <div className="text-[10px] text-muted-foreground">{card.type}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex gap-3">
-          <Button size="sm" onClick={() => onRespond(choice.requestId, { keep: true })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
+          <Button size="sm" onClick={() => onRespond(choice.requestId, { keep: true })} className="px-4 h-8 rounded-lg border bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90">
             Keep Hand
           </Button>
           <Button variant="outline" size="sm" onClick={() => onRespond(choice.requestId, { keep: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
@@ -438,7 +456,7 @@ function DeclareAttackersPanel({ attackers, defenders, defaultDefenderId, reques
 
 // ============================================================
 // ManaPaymentPanel — interactive land selection for paying mana
-// Matches Forge desktop flow: click spell → pick lands → confirm
+// Backend expects one cardId per response (loops asking for lands one at a time)
 // ============================================================
 
 function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onRespond }: {
@@ -449,19 +467,9 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
   requestId: string;
   onRespond: (requestId: string, payload: Record<string, unknown>) => void;
 }) {
-  const [selected, setSelected] = React.useState<Set<number>>(new Set());
-
-  const toggle = (id: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const confirm = () => {
-    onRespond(requestId, { selectedIds: Array.from(selected) });
+  // Tap a single land - backend will loop and ask again if more mana needed
+  const tapLand = (cardId: number) => {
+    onRespond(requestId, { cardId });
   };
 
   const cancel = () => {
@@ -469,42 +477,37 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
   };
 
   return (
-    <div className="mb-3 rounded-xl border border-cyan-500/40 bg-cyan-500/5 p-4">
+    <div className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-4 max-w-lg">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-cyan-400">{prompt}</span>
-        <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-mono text-cyan-300">
+        <span className="text-sm font-semibold text-emerald-400">Pay Mana Cost</span>
+        <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-mono text-emerald-300">
           {manaCost}
         </span>
       </div>
       <p className="text-xs text-muted-foreground mb-3">
-        Select lands to tap for mana, then confirm. ({selected.size} selected)
+        Click a land to tap it for mana. Continue until cost is paid.
       </p>
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {sources.map((src) => (
-          
-          <Button
-            key={src.id}
-            onClick={() => toggle(src.id)}
-            className={`rounded-lg border px-3 py-1.5 text-xs text-left transition-colors ${
-              selected.has(src.id)
-                ? 'border-cyan-400/60 bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-400/40'
-                : 'border-border/40 bg-card/60 hover:border-cyan-500/30 hover:bg-cyan-500/10 text-foreground'
-            }`}
-          >
-            {src.name}
-          </Button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={confirm} disabled={selected.size === 0} className="px-4 h-8 rounded-lg border bg-cyan-600 text-xs font-medium hover:bg-cyan-700 text-white disabled:opacity-50 disabled:hover:bg-cyan-600">
-          Tap {selected.size} Land{selected.size !== 1 ? 's' : ''} & Pay
+      {sources.length > 0 ? (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {sources.map((src) => (
+            <Button
+              key={src.id}
+              onClick={() => tapLand(src.id)}
+              className="rounded-lg border border-border/40 bg-card/80 px-3 py-2 text-xs text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300"
+            >
+              <div className="font-medium">{src.name}</div>
+              {src.type && <div className="text-[10px] text-muted-foreground">{src.type}</div>}
+            </Button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-amber-400 mb-3">No untapped mana sources available!</p>
+      )}
+      {canCancel && (
+        <Button size="sm" variant="outline" onClick={cancel} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40 hover:bg-red-500/10">
+          Cancel Spell
         </Button>
-        {canCancel && (
-          <Button size="sm" variant="outline" onClick={cancel} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40 hover:bg-red-500/10">
-            Cancel Spell
-          </Button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
