@@ -180,49 +180,100 @@ export async function GET() {
           return;
         }
 
-        controller.enqueue(encoder.encode(`data: {"status": "Downloading ${defaultCards.name}..."}\n\n`));
+        controller.enqueue(encoder.encode(`data: {"status": "Streaming and processing ${defaultCards.name}..."}\n\n`));
 
-        // Step 2: Download and filter cards
+        // Step 2: Stream, filter, and upload cards in chunks
         const cardsResponse = await fetch(defaultCards.download_uri);
-        const allCards = await cardsResponse.json() as ScryfallCard[];
-        
-        controller.enqueue(encoder.encode(`data: {"status": "Downloaded ${allCards.length.toLocaleString()} cards, filtering..."}\n\n`));
-
-        const filtered = allCards.filter(card => {
-          if (card.lang !== 'en') return false;
-          if (card.layout === 'token' || card.layout === 'art_series' || card.layout === 'double_faced_token') return false;
-          if (!card.legalities || card.legalities.commander !== 'legal') return false;
-          return true;
-        });
-
-        controller.enqueue(encoder.encode(`data: {"status": "Filtered to ${filtered.length.toLocaleString()} Commander-legal cards"}\n\n`));
-
-        // Step 3: Upload to Firestore in batches
-        const BATCH_SIZE = 500; // Firestore batch limit
-        const cardsCollection = collection(db, 'cards');
-        let uploaded = 0;
-
-        for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
-          const batch = writeBatch(db);
-          const chunk = filtered.slice(i, i + BATCH_SIZE);
-
-          for (const card of chunk) {
-            const slim = slimCard(card);
-            const docRef = doc(cardsCollection, card.id);
-            batch.set(docRef, slim);
-          }
-
-          await batch.commit();
-          uploaded += chunk.length;
-
-          const percent = ((uploaded / filtered.length) * 100).toFixed(1);
-          controller.enqueue(encoder.encode(`data: {"progress": ${uploaded}, "total": ${filtered.length}, "percent": ${percent}}\n\n`));
-
-          // Small delay to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 100));
+        if (!cardsResponse.body) {
+          controller.enqueue(encoder.encode('data: {"error": "No response body from Scryfall"}\n\n'));
+          controller.close();
+          return;
         }
 
-        controller.enqueue(encoder.encode(`data: {"status": "Complete! Uploaded ${uploaded.toLocaleString()} cards", "done": true}\n\n`));
+        const reader = cardsResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let totalProcessed = 0;
+        let totalUploaded = 0;
+        let batchCards: ScryfallCard[] = [];
+        const BATCH_SIZE = 500;
+        const cardsCollection = collection(db, 'cards');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            // Process any remaining cards in buffer
+            if (buffer.trim()) {
+              try {
+                const card = JSON.parse(buffer) as ScryfallCard;
+                if (card.lang === 'en' && 
+                    card.layout !== 'token' && 
+                    card.layout !== 'art_series' && 
+                    card.layout !== 'double_faced_token' &&
+                    card.legalities?.commander === 'legal') {
+                  batchCards.push(card);
+                }
+              } catch {}
+            }
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            try {
+              const card = JSON.parse(line) as ScryfallCard;
+              totalProcessed++;
+
+              // Filter cards
+              if (card.lang === 'en' && 
+                  card.layout !== 'token' && 
+                  card.layout !== 'art_series' && 
+                  card.layout !== 'double_faced_token' &&
+                  card.legalities?.commander === 'legal') {
+                batchCards.push(card);
+
+                // Upload batch when full
+                if (batchCards.length >= BATCH_SIZE) {
+                  const batch = writeBatch(db);
+                  for (const c of batchCards) {
+                    const slim = slimCard(c);
+                    const docRef = doc(cardsCollection, c.id);
+                    batch.set(docRef, slim);
+                  }
+                  await batch.commit();
+                  totalUploaded += batchCards.length;
+                  
+                  controller.enqueue(encoder.encode(`data: {"progress": ${totalUploaded}, "status": "Uploaded ${totalUploaded.toLocaleString()} cards (processed ${totalProcessed.toLocaleString()})"}\n\n`));
+                  
+                  batchCards = [];
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                }
+              }
+            } catch (err) {
+              // Skip invalid JSON lines
+            }
+          }
+        }
+
+        // Upload final batch
+        if (batchCards.length > 0) {
+          const batch = writeBatch(db);
+          for (const c of batchCards) {
+            const slim = slimCard(c);
+            const docRef = doc(cardsCollection, c.id);
+            batch.set(docRef, slim);
+          }
+          await batch.commit();
+          totalUploaded += batchCards.length;
+        }
+
+        controller.enqueue(encoder.encode(`data: {"status": "Complete! Uploaded ${totalUploaded.toLocaleString()} cards", "done": true}\n\n`));
         controller.close();
 
       } catch (error) {
