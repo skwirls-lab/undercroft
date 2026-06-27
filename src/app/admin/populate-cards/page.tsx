@@ -41,7 +41,7 @@ export default function PopulateCardsPage() {
       const decoder = new TextDecoder();
       let buffer = '';
       let batchCards: any[] = [];
-      const BATCH_SIZE = 500;
+      const BATCH_SIZE = 100; // Reduced from 500 to avoid rate limits
       const cardsCollection = collection(db, 'cards');
       let totalUploaded = 0;
       let totalProcessed = 0;
@@ -106,7 +106,8 @@ export default function PopulateCardsPage() {
               });
               
               batchCards = [];
-              await new Promise(resolve => setTimeout(resolve, 50));
+              // Wait 1 second between batches to avoid rate limits
+              await new Promise(resolve => setTimeout(resolve, 1000));
             }
           } catch (err) {
             console.error('Failed to parse card:', line.substring(0, 100), err);
