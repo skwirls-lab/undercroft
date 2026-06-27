@@ -3,8 +3,8 @@ import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 import path from 'path';
 
-// Path to the Scryfall data file (relative to workspace root, one level up from Next.js project)
-const DATA_PATH = path.resolve(process.cwd(), '..', 'data', 'scryfall', 'default-cards-20260315090814.json');
+// Path to the Scryfall data file in resources folder
+const DATA_PATH = path.resolve(process.cwd(), 'resources', 'default-cards-20260627090824.json');
 
 export const dynamic = 'force-dynamic';
 
