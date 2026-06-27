@@ -29,6 +29,12 @@ export default function PopulateCardsPage() {
         throw new Error('Firebase not configured');
       }
 
+      // Show which Firebase project we're connected to
+      const app = db.app;
+      const projectId = app.options.projectId;
+      setStatus(`Connected to Firebase project: ${projectId}`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Show for 2 seconds
+
       setStatus('Connecting to Scryfall...');
       
       // Use server-side streaming endpoint
