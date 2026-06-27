@@ -29,10 +29,10 @@ export default function PopulateCardsPage() {
         throw new Error('Firebase not configured');
       }
 
-      setStatus('Streaming cards from local data...');
+      setStatus('Connecting to Scryfall...');
       
-      // Use the existing /api/cards/bulk endpoint that already works
-      const response = await fetch('/api/cards/bulk');
+      // Use server-side streaming endpoint
+      const response = await fetch('/api/admin/stream-scryfall');
       if (!response.body) {
         throw new Error('No response body');
       }
@@ -59,15 +59,34 @@ export default function PopulateCardsPage() {
           if (!line.trim()) continue;
           
           try {
-            const card = JSON.parse(line);
+            // Handle SSE format (data: {...})
+            let jsonStr = line;
+            if (line.startsWith('data: ')) {
+              jsonStr = line.slice(6);
+            }
             
-            // Skip metadata
-            if (card._meta || card._done) continue;
+            const data = JSON.parse(jsonStr);
             
+            // Handle status messages
+            if (data.status) {
+              setStatus(data.status);
+              continue;
+            }
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            if (data.done) {
+              break;
+            }
+            if (data.progress) {
+              continue; // Server sends progress, we track our own
+            }
+            
+            // It's a card object
             totalProcessed++;
 
             // Add to batch
-            batchCards.push(card);
+            batchCards.push(data);
 
             // Upload batch when full
             if (batchCards.length >= BATCH_SIZE) {
