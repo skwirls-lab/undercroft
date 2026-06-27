@@ -50,113 +50,40 @@ export default function PopulateCardsPage() {
         throw new Error('Could not find default_cards bulk data');
       }
 
-      setStatus(`Streaming ${defaultCards.name}...`);
+      setStatus(`Downloading ${defaultCards.name}... (this may take a minute)`);
 
-      // Step 2: Stream and process cards
+      // Step 2: Download all cards as JSON array
       const cardsResponse = await fetch(defaultCards.download_uri);
-      if (!cardsResponse.body) {
-        throw new Error('No response body from Scryfall');
+      if (!cardsResponse.ok) {
+        throw new Error(`Failed to download cards: ${cardsResponse.status}`);
       }
 
-      const reader = cardsResponse.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let totalProcessed = 0;
-      let totalUploaded = 0;
-      let batchCards: any[] = [];
+      setStatus('Parsing card data...');
+      const allCards = await cardsResponse.json() as any[];
+      
+      setStatus(`Filtering ${allCards.length.toLocaleString()} cards...`);
+      
+      // Filter to Commander-legal cards
+      const filtered = allCards.filter(card => 
+        card.lang === 'en' && 
+        card.layout !== 'token' && 
+        card.layout !== 'art_series' && 
+        card.layout !== 'double_faced_token' &&
+        card.legalities?.commander === 'legal'
+      );
+
+      setStatus(`Uploading ${filtered.length.toLocaleString()} Commander-legal cards...`);
+
+      // Upload in batches
       const BATCH_SIZE = 500;
       const cardsCollection = collection(db, 'cards');
+      let totalUploaded = 0;
 
-      while (true) {
-        const { done: streamDone, value } = await reader.read();
-        
-        if (streamDone) {
-          if (buffer.trim()) {
-            try {
-              const card = JSON.parse(buffer);
-              if (card.lang === 'en' && 
-                  card.layout !== 'token' && 
-                  card.layout !== 'art_series' && 
-                  card.layout !== 'double_faced_token' &&
-                  card.legalities?.commander === 'legal') {
-                batchCards.push(card);
-              }
-            } catch {}
-          }
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          
-          try {
-            const card = JSON.parse(line);
-            totalProcessed++;
-
-            if (card.lang === 'en' && 
-                card.layout !== 'token' && 
-                card.layout !== 'art_series' && 
-                card.layout !== 'double_faced_token' &&
-                card.legalities?.commander === 'legal') {
-              batchCards.push(card);
-
-              if (batchCards.length >= BATCH_SIZE) {
-                const batch = writeBatch(db);
-                for (const c of batchCards) {
-                  const slim: any = {
-                    id: c.id,
-                    oracle_id: c.oracle_id || '',
-                    name: c.name,
-                    mana_cost: c.mana_cost || '',
-                    cmc: c.cmc || 0,
-                    type_line: c.type_line || '',
-                    oracle_text: c.oracle_text || '',
-                    colors: c.colors || [],
-                    color_identity: c.color_identity || [],
-                    keywords: c.keywords || [],
-                    layout: c.layout || 'normal',
-                    legalities: { commander: 'legal' },
-                    set: c.set || '',
-                    set_name: c.set_name || '',
-                    rarity: c.rarity || '',
-                  };
-                  
-                  if (c.power !== undefined) slim.power = c.power;
-                  if (c.toughness !== undefined) slim.toughness = c.toughness;
-                  if (c.loyalty !== undefined) slim.loyalty = c.loyalty;
-                  if (c.image_uris) slim.image_uris = c.image_uris;
-                  
-                  const docRef = doc(cardsCollection, c.id);
-                  batch.set(docRef, slim);
-                }
-                await batch.commit();
-                totalUploaded += batchCards.length;
-                
-                setStatus(`Uploaded ${totalUploaded.toLocaleString()} cards (processed ${totalProcessed.toLocaleString()})`);
-                setProgress({
-                  current: totalUploaded,
-                  total: 25000,
-                  percent: Math.min(100, (totalUploaded / 25000) * 100),
-                });
-                
-                batchCards = [];
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
-          } catch (err) {
-            // Skip invalid lines
-          }
-        }
-      }
-
-      // Upload final batch
-      if (batchCards.length > 0) {
+      for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
         const batch = writeBatch(db);
-        for (const c of batchCards) {
+        const chunk = filtered.slice(i, i + BATCH_SIZE);
+
+        for (const c of chunk) {
           const slim: any = {
             id: c.id,
             oracle_id: c.oracle_id || '',
@@ -183,8 +110,20 @@ export default function PopulateCardsPage() {
           const docRef = doc(cardsCollection, c.id);
           batch.set(docRef, slim);
         }
+        
         await batch.commit();
-        totalUploaded += batchCards.length;
+        totalUploaded += chunk.length;
+        
+        const percent = ((totalUploaded / filtered.length) * 100).toFixed(1);
+        setStatus(`Uploaded ${totalUploaded.toLocaleString()} / ${filtered.length.toLocaleString()} cards`);
+        setProgress({
+          current: totalUploaded,
+          total: filtered.length,
+          percent: parseFloat(percent),
+        });
+        
+        // Small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       setStatus(`Complete! Uploaded ${totalUploaded.toLocaleString()} cards`);
