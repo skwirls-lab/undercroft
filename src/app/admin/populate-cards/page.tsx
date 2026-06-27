@@ -16,54 +16,180 @@ export default function PopulateCardsPage() {
     setLoading(true);
     setDone(false);
     setError(null);
-    setStatus('Connecting...');
+    setStatus('Initializing...');
     setProgress(null);
 
     try {
-      const response = await fetch('/api/admin/populate-cards');
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error('No response body');
+      // Import Firebase and Firestore on client side
+      const { getFirebaseDb } = await import('@/lib/firebase/config');
+      const { writeBatch, collection, doc } = await import('firebase/firestore');
+      
+      const db = getFirebaseDb();
+      if (!db) {
+        throw new Error('Firebase not configured');
       }
+
+      setStatus('Fetching Scryfall bulk data list...');
+      
+      // Step 1: Get bulk data URL
+      const bulkResponse = await fetch('https://api.scryfall.com/bulk-data', {
+        headers: {
+          'User-Agent': 'Undercroft/1.0',
+          'Accept': 'application/json',
+        },
+      });
+      
+      if (!bulkResponse.ok) {
+        throw new Error(`Scryfall API error: ${bulkResponse.status}`);
+      }
+      
+      const bulkData = await bulkResponse.json() as { data: Array<{ type: string; download_uri: string; name: string }> };
+      const defaultCards = bulkData.data.find(d => d.type === 'default_cards');
+      
+      if (!defaultCards) {
+        throw new Error('Could not find default_cards bulk data');
+      }
+
+      setStatus(`Streaming ${defaultCards.name}...`);
+
+      // Step 2: Stream and process cards
+      const cardsResponse = await fetch(defaultCards.download_uri);
+      if (!cardsResponse.body) {
+        throw new Error('No response body from Scryfall');
+      }
+
+      const reader = cardsResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let totalProcessed = 0;
+      let totalUploaded = 0;
+      let batchCards: any[] = [];
+      const BATCH_SIZE = 500;
+      const cardsCollection = collection(db, 'cards');
 
       while (true) {
         const { done: streamDone, value } = await reader.read();
-        if (streamDone) break;
+        
+        if (streamDone) {
+          if (buffer.trim()) {
+            try {
+              const card = JSON.parse(buffer);
+              if (card.lang === 'en' && 
+                  card.layout !== 'token' && 
+                  card.layout !== 'art_series' && 
+                  card.layout !== 'double_faced_token' &&
+                  card.legalities?.commander === 'legal') {
+                batchCards.push(card);
+              }
+            } catch {}
+          }
+          break;
+        }
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
+          if (!line.trim()) continue;
+          
+          try {
+            const card = JSON.parse(line);
+            totalProcessed++;
 
-            if (data.error) {
-              setError(data.error);
-              setLoading(false);
-              return;
-            }
+            if (card.lang === 'en' && 
+                card.layout !== 'token' && 
+                card.layout !== 'art_series' && 
+                card.layout !== 'double_faced_token' &&
+                card.legalities?.commander === 'legal') {
+              batchCards.push(card);
 
-            if (data.status) {
-              setStatus(data.status);
+              if (batchCards.length >= BATCH_SIZE) {
+                const batch = writeBatch(db);
+                for (const c of batchCards) {
+                  const slim: any = {
+                    id: c.id,
+                    oracle_id: c.oracle_id || '',
+                    name: c.name,
+                    mana_cost: c.mana_cost || '',
+                    cmc: c.cmc || 0,
+                    type_line: c.type_line || '',
+                    oracle_text: c.oracle_text || '',
+                    colors: c.colors || [],
+                    color_identity: c.color_identity || [],
+                    keywords: c.keywords || [],
+                    layout: c.layout || 'normal',
+                    legalities: { commander: 'legal' },
+                    set: c.set || '',
+                    set_name: c.set_name || '',
+                    rarity: c.rarity || '',
+                  };
+                  
+                  if (c.power !== undefined) slim.power = c.power;
+                  if (c.toughness !== undefined) slim.toughness = c.toughness;
+                  if (c.loyalty !== undefined) slim.loyalty = c.loyalty;
+                  if (c.image_uris) slim.image_uris = c.image_uris;
+                  
+                  const docRef = doc(cardsCollection, c.id);
+                  batch.set(docRef, slim);
+                }
+                await batch.commit();
+                totalUploaded += batchCards.length;
+                
+                setStatus(`Uploaded ${totalUploaded.toLocaleString()} cards (processed ${totalProcessed.toLocaleString()})`);
+                setProgress({
+                  current: totalUploaded,
+                  total: 25000,
+                  percent: Math.min(100, (totalUploaded / 25000) * 100),
+                });
+                
+                batchCards = [];
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
             }
-
-            if (data.progress !== undefined) {
-              setProgress({
-                current: data.progress,
-                total: data.total,
-                percent: parseFloat(data.percent),
-              });
-            }
-
-            if (data.done) {
-              setDone(true);
-              setLoading(false);
-            }
+          } catch (err) {
+            // Skip invalid lines
           }
         }
       }
+
+      // Upload final batch
+      if (batchCards.length > 0) {
+        const batch = writeBatch(db);
+        for (const c of batchCards) {
+          const slim: any = {
+            id: c.id,
+            oracle_id: c.oracle_id || '',
+            name: c.name,
+            mana_cost: c.mana_cost || '',
+            cmc: c.cmc || 0,
+            type_line: c.type_line || '',
+            oracle_text: c.oracle_text || '',
+            colors: c.colors || [],
+            color_identity: c.color_identity || [],
+            keywords: c.keywords || [],
+            layout: c.layout || 'normal',
+            legalities: { commander: 'legal' },
+            set: c.set || '',
+            set_name: c.set_name || '',
+            rarity: c.rarity || '',
+          };
+          
+          if (c.power !== undefined) slim.power = c.power;
+          if (c.toughness !== undefined) slim.toughness = c.toughness;
+          if (c.loyalty !== undefined) slim.loyalty = c.loyalty;
+          if (c.image_uris) slim.image_uris = c.image_uris;
+          
+          const docRef = doc(cardsCollection, c.id);
+          batch.set(docRef, slim);
+        }
+        await batch.commit();
+        totalUploaded += batchCards.length;
+      }
+
+      setStatus(`Complete! Uploaded ${totalUploaded.toLocaleString()} cards`);
+      setDone(true);
+      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setLoading(false);
