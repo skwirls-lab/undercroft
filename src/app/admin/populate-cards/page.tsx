@@ -16,7 +16,7 @@ export default function PopulateCardsPage() {
     setLoading(true);
     setDone(false);
     setError(null);
-    setStatus('Initializing...');
+    setStatus('Connecting to local card data...');
     setProgress(null);
 
     try {
@@ -29,104 +29,89 @@ export default function PopulateCardsPage() {
         throw new Error('Firebase not configured');
       }
 
-      setStatus('Fetching Scryfall bulk data list...');
+      setStatus('Streaming cards from local data...');
       
-      // Step 1: Get bulk data URL
-      const bulkResponse = await fetch('https://api.scryfall.com/bulk-data', {
-        headers: {
-          'User-Agent': 'Undercroft/1.0',
-          'Accept': 'application/json',
-        },
-      });
-      
-      if (!bulkResponse.ok) {
-        throw new Error(`Scryfall API error: ${bulkResponse.status}`);
-      }
-      
-      const bulkData = await bulkResponse.json() as { data: Array<{ type: string; download_uri: string; name: string }> };
-      const defaultCards = bulkData.data.find(d => d.type === 'default_cards');
-      
-      if (!defaultCards) {
-        throw new Error('Could not find default_cards bulk data');
+      // Use the existing /api/cards/bulk endpoint that already works
+      const response = await fetch('/api/cards/bulk');
+      if (!response.body) {
+        throw new Error('No response body');
       }
 
-      setStatus(`Downloading ${defaultCards.name}... (this may take a minute)`);
-
-      // Step 2: Download all cards as JSON array
-      const cardsResponse = await fetch(defaultCards.download_uri);
-      if (!cardsResponse.ok) {
-        throw new Error(`Failed to download cards: ${cardsResponse.status}`);
-      }
-
-      setStatus('Parsing card data...');
-      const allCards = await cardsResponse.json() as any[];
-      
-      setStatus(`Filtering ${allCards.length.toLocaleString()} cards...`);
-      
-      // Filter to Commander-legal cards
-      const filtered = allCards.filter(card => 
-        card.lang === 'en' && 
-        card.layout !== 'token' && 
-        card.layout !== 'art_series' && 
-        card.layout !== 'double_faced_token' &&
-        card.legalities?.commander === 'legal'
-      );
-
-      setStatus(`Uploading ${filtered.length.toLocaleString()} Commander-legal cards...`);
-
-      // Upload in batches
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let batchCards: any[] = [];
       const BATCH_SIZE = 500;
       const cardsCollection = collection(db, 'cards');
       let totalUploaded = 0;
+      let totalProcessed = 0;
 
-      for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        const chunk = filtered.slice(i, i + BATCH_SIZE);
+      while (true) {
+        const { done: streamDone, value } = await reader.read();
+        
+        if (streamDone) break;
 
-        for (const c of chunk) {
-          const slim: any = {
-            id: c.id,
-            oracle_id: c.oracle_id || '',
-            name: c.name,
-            mana_cost: c.mana_cost || '',
-            cmc: c.cmc || 0,
-            type_line: c.type_line || '',
-            oracle_text: c.oracle_text || '',
-            colors: c.colors || [],
-            color_identity: c.color_identity || [],
-            keywords: c.keywords || [],
-            layout: c.layout || 'normal',
-            legalities: { commander: 'legal' },
-            set: c.set || '',
-            set_name: c.set_name || '',
-            rarity: c.rarity || '',
-          };
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
           
-          if (c.power !== undefined) slim.power = c.power;
-          if (c.toughness !== undefined) slim.toughness = c.toughness;
-          if (c.loyalty !== undefined) slim.loyalty = c.loyalty;
-          if (c.image_uris) slim.image_uris = c.image_uris;
-          
-          const docRef = doc(cardsCollection, c.id);
-          batch.set(docRef, slim);
+          try {
+            const card = JSON.parse(line);
+            
+            // Skip metadata
+            if (card._meta || card._done) continue;
+            
+            totalProcessed++;
+
+            // Add to batch
+            batchCards.push(card);
+
+            // Upload batch when full
+            if (batchCards.length >= BATCH_SIZE) {
+              const batch = writeBatch(db);
+              for (const c of batchCards) {
+                const docRef = doc(cardsCollection, c.id);
+                batch.set(docRef, c);
+              }
+              await batch.commit();
+              totalUploaded += batchCards.length;
+              
+              setStatus(`Uploaded ${totalUploaded.toLocaleString()} cards`);
+              setProgress({
+                current: totalUploaded,
+                total: 25000,
+                percent: Math.min(100, (totalUploaded / 25000) * 100),
+              });
+              
+              batchCards = [];
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+          } catch (err) {
+            console.error('Failed to parse card:', line.substring(0, 100), err);
+          }
         }
-        
+      }
+
+      // Upload final batch
+      if (batchCards.length > 0) {
+        const batch = writeBatch(db);
+        for (const c of batchCards) {
+          const docRef = doc(cardsCollection, c.id);
+          batch.set(docRef, c);
+        }
         await batch.commit();
-        totalUploaded += chunk.length;
-        
-        const percent = ((totalUploaded / filtered.length) * 100).toFixed(1);
-        setStatus(`Uploaded ${totalUploaded.toLocaleString()} / ${filtered.length.toLocaleString()} cards`);
-        setProgress({
-          current: totalUploaded,
-          total: filtered.length,
-          percent: parseFloat(percent),
-        });
-        
-        // Small delay to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 100));
+        totalUploaded += batchCards.length;
       }
 
       setStatus(`Complete! Uploaded ${totalUploaded.toLocaleString()} cards`);
+      setProgress({
+        current: totalUploaded,
+        total: totalUploaded,
+        percent: 100,
+      });
       setDone(true);
       setLoading(false);
     } catch (err) {
