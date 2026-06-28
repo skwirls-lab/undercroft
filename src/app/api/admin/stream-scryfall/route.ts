@@ -29,18 +29,19 @@ export async function GET() {
         }
 
         const bulkData = await bulkResponse.json() as { data: Array<{ type: string; download_uri: string; name: string }> };
-        const defaultCards = bulkData.data.find(d => d.type === 'default_cards');
+        // Use 'unique_artwork' to get one of each unique card including special editions
+        const uniqueCards = bulkData.data.find(d => d.type === 'unique_artwork');
 
-        if (!defaultCards) {
-          controller.enqueue(encoder.encode('data: {"error": "Could not find default_cards"}\n\n'));
+        if (!uniqueCards) {
+          controller.enqueue(encoder.encode('data: {"error": "Could not find unique_artwork"}\n\n'));
           controller.close();
           return;
         }
 
-        controller.enqueue(encoder.encode(`data: {"status": "Downloading ${defaultCards.name}..."}\n\n`));
+        controller.enqueue(encoder.encode(`data: {"status": "Downloading ${uniqueCards.name}..."}\n\n`));
 
         // Step 2: Stream the Scryfall data
-        const cardsResponse = await fetch(defaultCards.download_uri);
+        const cardsResponse = await fetch(uniqueCards.download_uri);
         if (!cardsResponse.body) {
           controller.enqueue(encoder.encode('data: {"error": "No response body from Scryfall"}\n\n'));
           controller.close();
