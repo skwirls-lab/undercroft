@@ -60,16 +60,16 @@ export default function CardStatsPage() {
                 
                 <div className="mt-6 pt-6 border-t border-gray-700">
                   <div className="text-sm text-gray-400">
-                    <p className="mb-2">Expected from Scryfall: ~25,000 cards</p>
+                    <p className="mb-2">Expected from Scryfall: ~90,000 cards (unique artwork)</p>
                     <p className="mb-2">
-                      Coverage: {((stats.total / 25000) * 100).toFixed(1)}%
+                      Coverage: {((stats.total / 90000) * 100).toFixed(1)}%
                     </p>
-                    {stats.total < 25000 && (
+                    {stats.total < 90000 && (
                       <p className="text-yellow-400 mt-4">
-                        ⚠️ Missing {(25000 - stats.total).toLocaleString()} cards
+                        ⚠️ Missing {(90000 - stats.total).toLocaleString()} cards
                       </p>
                     )}
-                    {stats.total >= 25000 && (
+                    {stats.total >= 90000 && (
                       <p className="text-green-400 mt-4">
                         ✓ All cards loaded successfully!
                       </p>

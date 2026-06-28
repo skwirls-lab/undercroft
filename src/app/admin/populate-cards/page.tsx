@@ -16,8 +16,8 @@ export default function PopulateCardsPage() {
     setLoading(true);
     setDone(false);
     setError(null);
-    setStatus('Connecting to local card data...');
-    setProgress(null);
+    setStatus('Starting population...');
+    setProgress({ current: 0, total: 90000, percent: 0 });
 
     try {
       // Import Firebase and Firestore on client side
@@ -107,8 +107,8 @@ export default function PopulateCardsPage() {
               setStatus(`Uploaded ${totalUploaded.toLocaleString()} cards`);
               setProgress({
                 current: totalUploaded,
-                total: 25000,
-                percent: Math.min(100, (totalUploaded / 25000) * 100),
+                total: 90000,
+                percent: Math.min(100, (totalUploaded / 90000) * 100),
               });
               
               batchCards = [];
@@ -135,7 +135,7 @@ export default function PopulateCardsPage() {
       setStatus(`Complete! Uploaded ${totalUploaded.toLocaleString()} cards`);
       setProgress({
         current: totalUploaded,
-        total: totalUploaded,
+        total: 90000,
         percent: 100,
       });
       setDone(true);
