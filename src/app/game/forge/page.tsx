@@ -45,7 +45,7 @@ export default function ForgeGamePage() {
     concede,
   } = useForgeGameStore();
 
-  const { gameState, legalActions, performAction, events } = useGameStore();
+  const { gameState, legalActions, performAction } = useGameStore();
 
   // Hand data — derived from gameStore so the hand can live outside GameBoard
   const handCardIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'hand') : [];
@@ -56,7 +56,12 @@ export default function ForgeGamePage() {
   const commandZoneIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'command') : [];
   const commandZoneCards = commandZoneIds
     .map(id => gameState?.cardInstances.get(id))
-    .filter((c): c is CardInstance => !!c);
+    .filter((c): c is CardInstance => !!c)
+    .filter(c => {
+      const name = (c.cardData.name || '').toLowerCase();
+      const typeLine = (c.cardData.typeLine || '').toLowerCase();
+      return !name.includes('effect') && !typeLine.includes('effect') && !typeLine.includes('emblem');
+    });
   const hasPriority = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
   const handLegalActions = hasPriority ? legalActions : [];
 
@@ -185,7 +190,7 @@ export default function ForgeGamePage() {
 
               {/* Left: Card Preview (desktop only) */}
               <div className="hidden lg:flex w-[120px] shrink-0 border-r border-border/20 flex-col overflow-hidden p-1.5">
-                <CardPreviewPanel />
+                <CardPreviewPanel compact />
               </div>
 
               {/* Center: Commander (if any) + Hand */}
@@ -245,7 +250,11 @@ export default function ForgeGamePage() {
               {/* Right: Game Log (desktop only) */}
               <div className="hidden lg:block w-[200px] shrink-0 border-l border-border/20 overflow-hidden">
                 <GameLog
-                  events={events}
+                  events={gameEvents.map((e, i) => ({
+                    type: String(e.eventType) as 'CARD_PLAYED',
+                    data: e as Record<string, unknown>,
+                    id: `f${i}`,
+                  }))}
                   currentPlayerId={HUMAN_PLAYER_ID}
                   collapsible={false}
                   className="h-full rounded-none border-0"

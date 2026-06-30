@@ -33,9 +33,10 @@ function getActiveFace(card: CardInstance) {
 
 interface CardPreviewPanelProps {
   className?: string;
+  compact?: boolean;
 }
 
-export function CardPreviewPanel({ className }: CardPreviewPanelProps) {
+export function CardPreviewPanel({ className, compact }: CardPreviewPanelProps) {
   const { previewCard } = useCardPreview();
 
   // Resolve active face for DFC cards
@@ -44,9 +45,11 @@ export function CardPreviewPanel({ className }: CardPreviewPanelProps) {
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
-        Card Preview
-      </div>
+      {!compact && (
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
+          Card Preview
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {previewCard && face ? (
@@ -91,19 +94,21 @@ export function CardPreviewPanel({ className }: CardPreviewPanelProps) {
             )}
 
             {/* Card info below image */}
-            <div className="mt-2 space-y-0.5">
-              <p className="text-xs font-semibold text-foreground truncate">
-                {face.name}
-              </p>
-              <p className="text-[10px] text-muted-foreground truncate">
-                {face.typeLine}
-              </p>
-              {face.oracleText && imageUrl && (
-                <p className="text-[10px] leading-relaxed text-muted-foreground/80 mt-1 line-clamp-6">
-                  {face.oracleText}
+            {!compact && (
+              <div className="mt-2 space-y-0.5">
+                <p className="text-xs font-semibold text-foreground truncate">
+                  {face.name}
                 </p>
-              )}
-            </div>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {face.typeLine}
+                </p>
+                {face.oracleText && imageUrl && (
+                  <p className="text-[10px] leading-relaxed text-muted-foreground/80 mt-1 line-clamp-6">
+                    {face.oracleText}
+                  </p>
+                )}
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div

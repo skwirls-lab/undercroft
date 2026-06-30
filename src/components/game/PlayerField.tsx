@@ -137,7 +137,10 @@ export function PlayerField({
   const cardMode = isCurrentUser ? 'art' : 'pip';
 
   // Commander art for backdrop
-  const commanderCard = commandZone[0]
+  const commanderCard = commandZone.find(c =>
+    c.cardData.typeLine.toLowerCase().includes('legendary') ||
+    c.cardData.typeLine.toLowerCase().includes('planeswalker')
+  ) || commandZone[0]
     || battlefield.find(c => c.cardData.typeLine.toLowerCase().includes('legendary'));
   const commanderArtUrl = commanderCard?.cardData.imageUris?.artCrop
     || commanderCard?.cardData.cardFaces?.[0]?.imageUris?.artCrop;
