@@ -39,6 +39,8 @@ export function ForgeChoiceOverlay() {
   const { pendingChoice, respondToChoice } = useForgeGameStore();
 
   if (!pendingChoice) return null;
+  // mana_payment is handled inline by GameBoard (land highlighting + cancel banner) — no overlay needed
+  if (pendingChoice.choiceType === 'mana_payment') return null;
 
   // Render as a centered modal overlay for better visibility
   return (

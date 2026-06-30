@@ -40,6 +40,7 @@ interface PlayerFieldProps {
   // Forge-style mana payment: highlight these lands, clicking taps for mana
   manaPaymentSourceIds?: Set<string>;
   onTapForManaPayment?: (cardInstanceId: string) => void;
+  hideCommandZone?: boolean;
   className?: string;
 }
 
@@ -59,6 +60,7 @@ export function PlayerField({
   libraryCount,
   isActivePlayer,
   isCurrentUser,
+  hideCommandZone,
   legalActions,
   combat,
   onTapLand,
@@ -255,7 +257,7 @@ export function PlayerField({
       </div>
 
       {/* Command zone */}
-      {commandZone.length > 0 && (
+      {!hideCommandZone && commandZone.length > 0 && (
         <div className="relative mb-2">
           <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-primary/70">
             <Crown className="h-3 w-3" />

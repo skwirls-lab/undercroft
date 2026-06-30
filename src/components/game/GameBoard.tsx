@@ -21,6 +21,7 @@ interface GameBoardProps {
   currentPlayerId: string;
   className?: string;
   hideHand?: boolean;
+  hideCommandZone?: boolean;
   // Forge-style mana payment: lands the player can tap to pay for a spell
   manaPaymentSourceIds?: Set<string>;
   manaPaymentInfo?: { manaCost: string; spellName: string };
@@ -36,7 +37,7 @@ interface TargetingState {
   validTargetIds: Set<string>; // Quick lookup of valid target IDs
 }
 
-export function GameBoard({ currentPlayerId, className, hideHand, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
+export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZone, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
   const { pendingChoice } = useForgeGameStore();
 
@@ -607,9 +608,9 @@ export function GameBoard({ currentPlayerId, className, hideHand, manaPaymentSou
           onActivateAbility={handleActivateAbility}
           pendingManaChoice={pendingManaChoice}
           onManaColorPicked={handleManaColorPicked}
-      // Debug: show all zone card counts for current player
           manaPaymentSourceIds={manaPaymentSourceIds}
           onTapForManaPayment={onTapForManaPayment}
+          hideCommandZone={hideCommandZone}
         />
       )}
 

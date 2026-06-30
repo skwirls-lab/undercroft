@@ -13,6 +13,8 @@ import { CardPreviewPanel } from '@/components/game/CardPreviewPanel';
 import { ForgeChoiceOverlay } from '@/components/game/ForgeChoiceOverlay';
 import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
+import { cn } from '@/lib/utils';
+import { CardView } from '@/components/game/CardView';
 import type { CardInstance } from '@/lib/gameTypes';
 import {
   ArrowLeft,
@@ -48,6 +50,11 @@ export default function ForgeGamePage() {
   // Hand data — derived from gameStore so the hand can live outside GameBoard
   const handCardIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'hand') : [];
   const handCards = handCardIds
+    .map(id => gameState?.cardInstances.get(id))
+    .filter((c): c is CardInstance => !!c);
+
+  const commandZoneIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'command') : [];
+  const commandZoneCards = commandZoneIds
     .map(id => gameState?.cardInstances.get(id))
     .filter((c): c is CardInstance => !!c);
   const hasPriority = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
@@ -143,9 +150,8 @@ export default function ForgeGamePage() {
           </div>
         </header>
 
-        {/* Two-column layout: game board + sidebar */}
+        {/* Full-width main area — no sidebar */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* Main game area — flex column, NO outer scroll */}
           <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
 
             {/* Game Over banner */}
@@ -159,13 +165,13 @@ export default function ForgeGamePage() {
               </div>
             )}
 
-            {/* Scrollable board content — opponents + my field + action bar.
-                Only THIS section scrolls; the hand below never moves. */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2">
+            {/* Board — overflow-hidden, NO scroll at all */}
+            <div className="flex-1 min-h-0 overflow-hidden p-1.5">
               <GameBoard
                 currentPlayerId={HUMAN_PLAYER_ID}
                 hideHand
-                className="min-h-full"
+                hideCommandZone
+                className="h-full"
                 manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
                 manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
                 onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
@@ -174,39 +180,79 @@ export default function ForgeGamePage() {
               <ForgeChoiceOverlay />
             </div>
 
-            {/* Hand — always visible, never scrolls */}
-            <div className="shrink-0 border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] px-2 pt-2 pb-1">
-              <div className="mb-1 flex items-center justify-between px-2">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
-                  Hand · {handCards.length}
-                </span>
-                {hasPriority && !isGameOver && handCards.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground/40 italic">Tap a card to select · tap again to play</span>
-                )}
+            {/* Bottom bar — card preview | commander+hand | game log */}
+            <div className="shrink-0 border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] flex items-stretch">
+
+              {/* Left: Card Preview (desktop only) */}
+              <div className="hidden lg:flex w-[120px] shrink-0 border-r border-border/20 flex-col overflow-hidden p-1.5">
+                <CardPreviewPanel />
               </div>
-              <Hand
-                cards={handCards}
-                legalActions={handLegalActions}
-                onPlayCard={handleForgePlayCard}
-                isActive={!!hasPriority && !isGameOver}
-              />
+
+              {/* Center: Commander (if any) + Hand */}
+              <div className="flex-1 min-w-0 px-2 pt-1 pb-1 flex flex-col">
+                <div className="mb-0.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
+                      Hand · {handCards.length}
+                    </span>
+                    {commandZoneCards.length > 0 && (
+                      <span className="text-[10px] text-muted-foreground/30 uppercase tracking-widest font-semibold">
+                        · Commander
+                      </span>
+                    )}
+                  </div>
+                  {hasPriority && !isGameOver && (
+                    <span className="text-[10px] text-muted-foreground/40 italic">tap · play</span>
+                  )}
+                </div>
+                <div className="flex items-end gap-2">
+                  {/* Commander zone cards */}
+                  {commandZoneCards.map(card => {
+                    const canCast = legalActions.some(
+                      a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
+                    );
+                    return (
+                      <div key={card.instanceId} className="shrink-0 flex flex-col items-center gap-0.5">
+                        <span className={cn(
+                          'text-[8px] font-bold uppercase tracking-wider',
+                          canCast ? 'text-gold' : 'text-muted-foreground/30'
+                        )}>⚜ Cmd</span>
+                        <div
+                          onClick={() => canCast && handleForgePlayCard(card)}
+                          className={cn(
+                            'rounded-lg transition-all',
+                            canCast && 'cursor-pointer ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
+                            !canCast && 'opacity-40 saturate-0'
+                          )}
+                        >
+                          <CardView card={card} mode="art" highlighted={canCast} interactive={false} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Hand */}
+                  <div className="flex-1 min-w-0">
+                    <Hand
+                      cards={handCards}
+                      legalActions={handLegalActions}
+                      onPlayCard={handleForgePlayCard}
+                      isActive={!!hasPriority && !isGameOver}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Game Log (desktop only) */}
+              <div className="hidden lg:block w-[200px] shrink-0 border-l border-border/20 overflow-hidden">
+                <GameLog
+                  events={events}
+                  currentPlayerId={HUMAN_PLAYER_ID}
+                  collapsible={false}
+                  className="h-full rounded-none border-0"
+                />
+              </div>
             </div>
           </main>
-
-          {/* Right sidebar — card preview + game log */}
-          <aside className="hidden lg:flex w-[260px] shrink-0 border-l border-border/20 bg-card/10 flex-col overflow-hidden">
-            <div className="p-3 shrink-0">
-              <CardPreviewPanel />
-            </div>
-            <div className="flex-1 min-h-0 border-t border-border/10">
-              <GameLog
-                events={events}
-                currentPlayerId={HUMAN_PLAYER_ID}
-                collapsible={false}
-                className="h-full rounded-none border-0"
-              />
-            </div>
-          </aside>
         </div>
       </div>
     </CardPreviewProvider>
