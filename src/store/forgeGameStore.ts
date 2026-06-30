@@ -19,7 +19,66 @@ import {
 } from '@/lib/forgeClient';
 import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { useGameStore } from '@/store/gameStore';
-import type { GameAction } from '@/lib/gameTypes';
+import type { GameAction, GameState, CardData } from '@/lib/gameTypes';
+
+// ===================================================================
+// Image URL cache — persists for the game session so we don't
+// re-fetch Firestore for the same card name on every state update
+// ===================================================================
+const imageUrisCache = new Map<string, CardData['imageUris'] | null>();
+
+async function enrichAndUpdateImages(adapted: GameState) {
+  const namesToFetch: string[] = [];
+  for (const [, instance] of adapted.cardInstances) {
+    const name = instance.cardData.name;
+    if (!name || name === '???' || imageUrisCache.has(name)) continue;
+    namesToFetch.push(name);
+  }
+
+  const uniqueNames = [...new Set(namesToFetch)];
+  if (uniqueNames.length > 0) {
+    try {
+      const { resolveCardNames } = await import('@/lib/firebase/cards');
+      const resolved = await resolveCardNames(uniqueNames);
+
+      for (const [name, card] of resolved) {
+        if (card?.image_uris) {
+          imageUrisCache.set(name, {
+            artCrop: card.image_uris.art_crop || undefined,
+            normal: card.image_uris.normal || undefined,
+            small: card.image_uris.small || undefined,
+            large: card.image_uris.large || undefined,
+          });
+        } else {
+          imageUrisCache.set(name, null);
+        }
+      }
+    } catch (err) {
+      console.error('[ForgeGameStore] Failed to fetch card images:', err);
+      return;
+    }
+  }
+
+  // Enrich card instances that are still missing imageUris
+  const enrichedInstances = new Map(adapted.cardInstances);
+  let anyChanged = false;
+
+  for (const [id, instance] of enrichedInstances) {
+    const name = instance.cardData.name;
+    const cachedUris = imageUrisCache.get(name);
+    if (cachedUris !== undefined && !instance.cardData.imageUris) {
+      enrichedInstances.set(id, {
+        ...instance,
+        cardData: { ...instance.cardData, imageUris: cachedUris ?? undefined },
+      });
+      anyChanged = true;
+    }
+  }
+
+  if (anyChanged) {
+    useGameStore.getState().setForgeState({ ...adapted, cardInstances: enrichedInstances });
+  }
+}
 
 // Re-use existing UI types where possible
 export interface ForgeGameStoreState {
@@ -66,6 +125,9 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         set({ gameState: state });
         // Push adapted state into the main gameStore so existing UI components work
         const adapted = adaptForgeState(state);
+        useGameStore.getState().setForgeState(adapted);
+        // Async: enrich card instances with Scryfall artwork (cached after first fetch)
+        enrichAndUpdateImages(adapted);
         // Diagnostic: trace zone contents
         for (const p of adapted.players) {
           const hand = adapted.zones.get(`${p.id}:hand`);
@@ -83,7 +145,6 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         if (adapted.stack.length > 0) {
           console.log(`[Forge] stack:`, adapted.stack.map(s => s.cardData?.name ?? s.id));
         }
-        useGameStore.getState().setForgeState(adapted);
       },
 
       onChoiceRequest: (choice) => {
@@ -205,6 +266,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   disconnect: () => {
     const { client } = get();
     client?.disconnect();
+    imageUrisCache.clear();
     set({
       client: null,
       connectionStatus: 'disconnected',
