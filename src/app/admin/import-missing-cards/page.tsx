@@ -67,7 +67,10 @@ export default function ImportMissingCardsPage() {
           batch.set(docRef, cardData);
           await batch.commit();
 
-          importResults.push({ name, success: true, message: `✓ Imported (${cardData.set.toUpperCase()})` });
+          // Show the actual name stored in Firestore
+          const storedName = cardData.name;
+          const nameMatch = storedName === name ? '' : ` → Stored as: "${storedName}"`;
+          importResults.push({ name, success: true, message: `✓ Imported (${cardData.set.toUpperCase()})${nameMatch}` });
 
           // Rate limit: Scryfall allows 10 requests per second
           await new Promise(resolve => setTimeout(resolve, 150));
