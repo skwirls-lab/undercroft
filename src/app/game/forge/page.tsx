@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
@@ -269,22 +268,20 @@ function CommanderCard({
   canCast: boolean;
   onPlay: () => void;
 }) {
-  const { setPreviewCard } = useCardPreview();
-  const [selected, setSelected] = useState(false);
+  const { previewCard, setPreviewCard } = useCardPreview();
+  const isSelected = previewCard?.instanceId === card.instanceId;
 
-  const handleTap = () => {
-    if (selected) {
-      setSelected(false);
+  const handleTap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSelected) {
       setPreviewCard(null);
     } else {
-      setSelected(true);
       setPreviewCard(card);
     }
   };
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelected(false);
     setPreviewCard(null);
     onPlay();
   };
@@ -299,13 +296,13 @@ function CommanderCard({
         onClick={handleTap}
         className={cn(
           'relative rounded-lg transition-all duration-150 cursor-pointer',
-          selected && 'ring-2 ring-white/60 scale-110 z-10',
-          !selected && canCast && 'ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
+          isSelected && 'ring-2 ring-white/60 scale-110 z-10',
+          !isSelected && canCast && 'ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
           !canCast && 'opacity-60 saturate-0'
         )}
       >
         <CardView card={card} mode="art" highlighted={canCast} interactive={false} />
-        {selected && canCast && (
+        {isSelected && canCast && (
           <div className="absolute inset-x-0 bottom-1 flex justify-center pointer-events-none">
             <button
               className="pointer-events-auto bg-green-500 hover:bg-green-400 active:bg-green-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-green-900/60 flex items-center gap-1 touch-manipulation"
@@ -325,9 +322,24 @@ function CommanderCard({
 // CardPreviewFloating — fixed overlay, no layout impact
 // ============================================================
 function CardPreviewFloating() {
-  const { previewCard } = useCardPreview();
+  const { previewCard, setPreviewCard } = useCardPreview();
   const imageUrl = previewCard?.cardData.imageUris?.normal
     ?? previewCard?.cardData.cardFaces?.[0]?.imageUris?.normal;
+
+  // Dismiss on the next click that reaches the document (card clicks stopPropagation so they don't count)
+  useEffect(() => {
+    if (!previewCard) return;
+    let raf: number;
+    let handler: (() => void) | null = null;
+    raf = requestAnimationFrame(() => {
+      handler = () => setPreviewCard(null);
+      document.addEventListener('click', handler, { once: true });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (handler) document.removeEventListener('click', handler);
+    };
+  }, [previewCard?.instanceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AnimatePresence>
@@ -341,14 +353,9 @@ function CardPreviewFloating() {
           className="fixed bottom-56 left-4 z-30 w-[200px] rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 pointer-events-none"
         >
           {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={previewCard.cardData.name}
-              width={240}
-              height={336}
-              className="w-full"
-              priority
-            />
+            // Plain <img> avoids next/image domain whitelist requirement for external URLs
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt={previewCard.cardData.name} className="w-full" />
           ) : (
             <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center p-3">
               <p className="text-xs text-center text-muted-foreground">{previewCard.cardData.name}</p>

@@ -87,7 +87,7 @@ export function Hand({ cards, legalActions, onPlayCard, isActive, className }: H
                 scale: isSelected ? 1.1 : 0.97,
               }}
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-              onClick={() => handleCardTap(index, card)}
+              onClick={(e) => { e.stopPropagation(); handleCardTap(index, card); }}
             >
               <CardView
                 card={card}
