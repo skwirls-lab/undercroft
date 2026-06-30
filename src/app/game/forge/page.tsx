@@ -3,13 +3,14 @@
 import React, { useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { GameBoard } from '@/components/game/GameBoard';
 import { Hand } from '@/components/game/Hand';
 import { GameLog } from '@/components/game/GameLog';
-import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
-import { CardPreviewPanel } from '@/components/game/CardPreviewPanel';
+import { CardPreviewProvider, useCardPreview } from '@/components/game/CardPreviewContext';
 import { ForgeChoiceOverlay } from '@/components/game/ForgeChoiceOverlay';
 import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
@@ -58,9 +59,8 @@ export default function ForgeGamePage() {
     .map(id => gameState?.cardInstances.get(id))
     .filter((c): c is CardInstance => !!c)
     .filter(c => {
-      const name = (c.cardData.name || '').toLowerCase();
       const typeLine = (c.cardData.typeLine || '').toLowerCase();
-      return !name.includes('effect') && !typeLine.includes('effect') && !typeLine.includes('emblem');
+      return typeLine.includes('legendary') || typeLine.includes('planeswalker');
     });
   const hasPriority = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
   const handLegalActions = hasPriority ? legalActions : [];
@@ -188,11 +188,6 @@ export default function ForgeGamePage() {
             {/* Bottom bar — card preview | commander+hand | game log */}
             <div className="shrink-0 border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] flex items-stretch">
 
-              {/* Left: Card Preview (desktop only) */}
-              <div className="hidden lg:flex w-[120px] shrink-0 border-r border-border/20 flex-col overflow-hidden p-1.5">
-                <CardPreviewPanel compact />
-              </div>
-
               {/* Center: Commander (if any) + Hand */}
               <div className="flex-1 min-w-0 px-2 pt-1 pb-1 flex flex-col">
                 <div className="mb-0.5 flex items-center justify-between">
@@ -217,22 +212,12 @@ export default function ForgeGamePage() {
                       a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
                     );
                     return (
-                      <div key={card.instanceId} className="shrink-0 flex flex-col items-center gap-0.5">
-                        <span className={cn(
-                          'text-[8px] font-bold uppercase tracking-wider',
-                          canCast ? 'text-gold' : 'text-muted-foreground/30'
-                        )}>⚜ Cmd</span>
-                        <div
-                          onClick={() => canCast && handleForgePlayCard(card)}
-                          className={cn(
-                            'rounded-lg transition-all',
-                            canCast && 'cursor-pointer ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
-                            !canCast && 'opacity-40 saturate-0'
-                          )}
-                        >
-                          <CardView card={card} mode="art" highlighted={canCast} interactive={false} />
-                        </div>
-                      </div>
+                      <CommanderCard
+                        key={card.instanceId}
+                        card={card}
+                        canCast={canCast}
+                        onPlay={() => handleForgePlayCard(card)}
+                      />
                     );
                   })}
                   {/* Hand */}
@@ -264,6 +249,80 @@ export default function ForgeGamePage() {
           </main>
         </div>
       </div>
+      <CardPreviewFloating />
     </CardPreviewProvider>
+  );
+}
+
+// ============================================================
+// CommanderCard — needs useCardPreview() so must be a child
+// of CardPreviewProvider (not called at ForgeGamePage top level)
+// ============================================================
+function CommanderCard({
+  card,
+  canCast,
+  onPlay,
+}: {
+  card: CardInstance;
+  canCast: boolean;
+  onPlay: () => void;
+}) {
+  const { setPreviewCard } = useCardPreview();
+  return (
+    <div className="shrink-0 flex flex-col items-center gap-0.5">
+      <span className={cn(
+        'text-[8px] font-bold uppercase tracking-wider',
+        canCast ? 'text-gold' : 'text-muted-foreground/30'
+      )}>⚜ Cmd</span>
+      <div
+        onClick={() => { setPreviewCard(card); if (canCast) onPlay(); }}
+        className={cn(
+          'rounded-lg transition-all cursor-pointer',
+          canCast && 'ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
+          !canCast && 'opacity-60 saturate-0'
+        )}
+      >
+        <CardView card={card} mode="art" highlighted={canCast} interactive={false} />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// CardPreviewFloating — fixed overlay, no layout impact
+// ============================================================
+function CardPreviewFloating() {
+  const { previewCard } = useCardPreview();
+  const imageUrl = previewCard?.cardData.imageUris?.normal
+    ?? previewCard?.cardData.cardFaces?.[0]?.imageUris?.normal;
+
+  return (
+    <AnimatePresence>
+      {previewCard && (
+        <motion.div
+          key={previewCard.instanceId}
+          initial={{ opacity: 0, scale: 0.94, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 6 }}
+          transition={{ duration: 0.12 }}
+          className="fixed bottom-56 left-4 z-30 w-[200px] rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 pointer-events-none"
+        >
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={previewCard.cardData.name}
+              width={240}
+              height={336}
+              className="w-full"
+              priority
+            />
+          ) : (
+            <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center p-3">
+              <p className="text-xs text-center text-muted-foreground">{previewCard.cardData.name}</p>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

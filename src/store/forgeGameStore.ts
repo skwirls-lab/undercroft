@@ -122,7 +122,31 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       },
 
       onGameState: (state) => {
+        const prevState = get().gameState;
         set({ gameState: state });
+
+        // Generate synthetic game events from state changes for the GameLog
+        const syntheticEvents: ForgeGameEvent[] = [];
+        if (!prevState) {
+          syntheticEvents.push({ eventType: 'GAME_STARTED' });
+        } else {
+          if (prevState.turn.turnNumber !== state.turn.turnNumber) {
+            syntheticEvents.push({ eventType: 'TURN_STARTED', turnNumber: state.turn.turnNumber, activePlayer: state.turn.activePlayer } as ForgeGameEvent);
+          }
+          if (prevState.turn.phase !== state.turn.phase) {
+            syntheticEvents.push({ eventType: 'PHASE_CHANGED', phase: state.turn.phase } as ForgeGameEvent);
+          }
+          for (const player of state.players) {
+            const prev = prevState.players.find((p) => p.id === player.id);
+            if (prev && prev.life !== player.life) {
+              syntheticEvents.push({ eventType: 'LIFE_CHANGED', playerName: player.name, newLife: player.life, oldLife: prev.life } as ForgeGameEvent);
+            }
+          }
+        }
+        if (syntheticEvents.length > 0) {
+          set((prev) => ({ gameEvents: [...prev.gameEvents.slice(-90), ...syntheticEvents] }));
+        }
+
         // Push adapted state into the main gameStore so existing UI components work
         const adapted = adaptForgeState(state);
         useGameStore.getState().setForgeState(adapted);
@@ -234,7 +258,12 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
           set({ pendingChoice: null });
         } else {
           // Non-action choices: show overlay, clear forge legal actions
-          console.log('[Forge] non-action choice received', { choiceType: choice.choiceType, requestId: choice.requestId, dataKeys: Object.keys(choice.data || {}) });
+          console.log('[Forge] non-action choice received', {
+            choiceType: choice.choiceType,
+            requestId: choice.requestId,
+            dataKeys: Object.keys(choice.data || {}),
+            data: choice.data,
+          });
           useGameStore.getState().clearForgeLegalActions();
           set({ pendingChoice: choice });
         }
