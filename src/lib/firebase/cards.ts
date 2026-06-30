@@ -33,15 +33,29 @@ export async function getCardById(id: string): Promise<ScryfallCardRecord | null
 
 /**
  * Get a card by its name (case-insensitive)
+ * Tries exact match first, then tries with proper capitalization
  */
 export async function getCardByName(name: string): Promise<ScryfallCardRecord | null> {
   const db = getFirebaseDb();
   if (!db) return null;
 
-  // Use lowercase field for case-insensitive matching
   const cardsRef = collection(db, 'cards');
-  const q = query(cardsRef, where('name_lower', '==', name.toLowerCase()), firestoreLimit(1));
-  const snapshot = await getDocs(q);
+  
+  // Try exact match first
+  let q = query(cardsRef, where('name', '==', name), firestoreLimit(1));
+  let snapshot = await getDocs(q);
+  
+  if (!snapshot.empty) {
+    return snapshot.docs[0].data() as ScryfallCardRecord;
+  }
+  
+  // Try with title case (capitalize first letter of each word)
+  const titleCase = name.split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  ).join(' ');
+  
+  q = query(cardsRef, where('name', '==', titleCase), firestoreLimit(1));
+  snapshot = await getDocs(q);
 
   if (snapshot.empty) return null;
 
@@ -90,15 +104,35 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
     }
 
     const cardsRef = collection(db, 'cards');
-    // Use lowercase names for case-insensitive matching
-    const lowerBatch = batch.map(n => n.toLowerCase());
-    const q = query(cardsRef, where('name_lower', 'in', lowerBatch));
-    const snapshot = await getDocs(q);
-
-    // Map results back to original names (case-insensitive)
-    const found = new Map(snapshot.docs.map(d => [d.data().name_lower, d.data() as ScryfallCardRecord]));
-    batch.forEach((name, idx) => {
-      results.set(name, found.get(lowerBatch[idx]) || null);
+    
+    // Try exact match first
+    let q = query(cardsRef, where('name', 'in', batch));
+    let snapshot = await getDocs(q);
+    const found = new Map(snapshot.docs.map(d => [d.data().name, d.data() as ScryfallCardRecord]));
+    
+    // For unmatched names, try title case
+    const unmatched = batch.filter(name => !found.has(name));
+    if (unmatched.length > 0) {
+      const titleCaseBatch = unmatched.map(name => 
+        name.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ')
+      );
+      
+      q = query(cardsRef, where('name', 'in', titleCaseBatch));
+      snapshot = await getDocs(q);
+      
+      // Map title case results back to original names
+      const titleCaseFound = new Map(snapshot.docs.map(d => [d.data().name.toLowerCase(), d.data() as ScryfallCardRecord]));
+      unmatched.forEach(name => {
+        const card = titleCaseFound.get(name.toLowerCase());
+        if (card) found.set(name, card);
+      });
+    }
+    
+    // Set results
+    batch.forEach(name => {
+      results.set(name, found.get(name) || null);
     });
   }
 
