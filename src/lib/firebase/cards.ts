@@ -32,34 +32,55 @@ export async function getCardById(id: string): Promise<ScryfallCardRecord | null
 }
 
 /**
+ * Normalize card name for matching (handle apostrophes, case, etc.)
+ */
+function normalizeCardName(name: string): string[] {
+  // Generate variations to try
+  const variations: string[] = [];
+  
+  // Original
+  variations.push(name);
+  
+  // Title case
+  const titleCase = name.split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  ).join(' ');
+  variations.push(titleCase);
+  
+  // Replace straight apostrophe with curly apostrophe (U+2019)
+  const curlyApostrophe = name.replace(/'/g, '\u2019');
+  variations.push(curlyApostrophe);
+  
+  // Title case with curly apostrophe
+  const titleCaseCurly = titleCase.replace(/'/g, '\u2019');
+  variations.push(titleCaseCurly);
+  
+  // Remove duplicates
+  return [...new Set(variations)];
+}
+
+/**
  * Get a card by its name (case-insensitive)
- * Tries exact match first, then tries with proper capitalization
+ * Tries multiple variations to handle apostrophes and capitalization
  */
 export async function getCardByName(name: string): Promise<ScryfallCardRecord | null> {
   const db = getFirebaseDb();
   if (!db) return null;
 
   const cardsRef = collection(db, 'cards');
+  const variations = normalizeCardName(name);
   
-  // Try exact match first
-  let q = query(cardsRef, where('name', '==', name), firestoreLimit(1));
-  let snapshot = await getDocs(q);
-  
-  if (!snapshot.empty) {
-    return snapshot.docs[0].data() as ScryfallCardRecord;
+  // Try each variation
+  for (const variant of variations) {
+    const q = query(cardsRef, where('name', '==', variant), firestoreLimit(1));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      return snapshot.docs[0].data() as ScryfallCardRecord;
+    }
   }
-  
-  // Try with title case (capitalize first letter of each word)
-  const titleCase = name.split(' ').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ');
-  
-  q = query(cardsRef, where('name', '==', titleCase), firestoreLimit(1));
-  snapshot = await getDocs(q);
 
-  if (snapshot.empty) return null;
-
-  return snapshot.docs[0].data() as ScryfallCardRecord;
+  return null;
 }
 
 /**
@@ -110,24 +131,36 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
     let snapshot = await getDocs(q);
     const found = new Map(snapshot.docs.map(d => [d.data().name, d.data() as ScryfallCardRecord]));
     
-    // For unmatched names, try title case
+    // For unmatched names, try all variations
     const unmatched = batch.filter(name => !found.has(name));
     if (unmatched.length > 0) {
-      const titleCaseBatch = unmatched.map(name => 
-        name.split(' ').map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ')
-      );
-      
-      q = query(cardsRef, where('name', 'in', titleCaseBatch));
-      snapshot = await getDocs(q);
-      
-      // Map title case results back to original names
-      const titleCaseFound = new Map(snapshot.docs.map(d => [d.data().name.toLowerCase(), d.data() as ScryfallCardRecord]));
+      // Generate all variations for unmatched names
+      const allVariations = new Map<string, string>(); // variant -> original name
       unmatched.forEach(name => {
-        const card = titleCaseFound.get(name.toLowerCase());
-        if (card) found.set(name, card);
+        const variations = normalizeCardName(name);
+        variations.forEach(variant => {
+          if (variant !== name) { // Skip original since we already tried it
+            allVariations.set(variant, name);
+          }
+        });
       });
+      
+      // Try all variations (in batches of 10)
+      const variantNames = Array.from(allVariations.keys());
+      for (let j = 0; j < variantNames.length; j += 10) {
+        const variantBatch = variantNames.slice(j, j + 10);
+        q = query(cardsRef, where('name', 'in', variantBatch));
+        snapshot = await getDocs(q);
+        
+        // Map results back to original names
+        snapshot.docs.forEach(doc => {
+          const cardName = doc.data().name;
+          const originalName = allVariations.get(cardName);
+          if (originalName && !found.has(originalName)) {
+            found.set(originalName, doc.data() as ScryfallCardRecord);
+          }
+        });
+      }
     }
     
     // Set results
