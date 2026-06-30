@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CardView } from './CardView';
@@ -18,7 +18,16 @@ interface HandProps {
 
 export function Hand({ cards, legalActions, onPlayCard, isActive, className }: HandProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const { setPreviewCard } = useCardPreview();
+  const { setPreviewCard, previewCard } = useCardPreview();
+
+  // Deselect when previewCard is cleared externally (board click) or changed to a different card
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    const selectedCard = cards[selectedIndex];
+    if (!previewCard || previewCard.instanceId !== selectedCard?.instanceId) {
+      setSelectedIndex(null);
+    }
+  }, [previewCard?.instanceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const playableCardIds = new Set(
     legalActions

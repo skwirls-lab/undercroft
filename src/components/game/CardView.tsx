@@ -378,6 +378,7 @@ export function CardView({
 
   return (
     <div
+      data-card-preview-safe
       className={cn(
         'relative inline-block transition-all duration-150',
         interactive && 'cursor-pointer hover:brightness-110',
@@ -387,7 +388,7 @@ export function CardView({
         combatRole === 'blocking' && 'ring-2 ring-blue-500/80 ring-offset-1 ring-offset-background rounded-lg shadow-[0_0_12px_rgba(59,130,246,0.4)]',
         className
       )}
-      onClick={() => onClick?.(card)}
+      onClick={() => { setPreviewCard(card); onClick?.(card); }}
       onDoubleClick={() => onDoubleClick?.(card)}
     >
       {mode === 'pip' && <PipView card={card} />}

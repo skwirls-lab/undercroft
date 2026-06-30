@@ -326,14 +326,19 @@ function CardPreviewFloating() {
   const imageUrl = previewCard?.cardData.imageUris?.normal
     ?? previewCard?.cardData.cardFaces?.[0]?.imageUris?.normal;
 
-  // Dismiss on the next click that reaches the document (card clicks stopPropagation so they don't count)
+  // Dismiss on any click that is NOT on a card element (data-card-preview-safe).
+  // Uses rAF delay so the click that opened the preview doesn't immediately close it.
   useEffect(() => {
     if (!previewCard) return;
     let raf: number;
-    let handler: (() => void) | null = null;
+    let handler: ((e: MouseEvent) => void) | null = null;
     raf = requestAnimationFrame(() => {
-      handler = () => setPreviewCard(null);
-      document.addEventListener('click', handler, { once: true });
+      handler = (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('[data-card-preview-safe]')) return;
+        setPreviewCard(null);
+        document.removeEventListener('click', handler!);
+      };
+      document.addEventListener('click', handler);
     });
     return () => {
       cancelAnimationFrame(raf);
