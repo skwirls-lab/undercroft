@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,6 +22,7 @@ import {
   Loader2,
   Flag,
   RotateCcw,
+  Play,
 } from 'lucide-react';
 
 // ============================================================
@@ -269,6 +270,25 @@ function CommanderCard({
   onPlay: () => void;
 }) {
   const { setPreviewCard } = useCardPreview();
+  const [selected, setSelected] = useState(false);
+
+  const handleTap = () => {
+    if (selected) {
+      setSelected(false);
+      setPreviewCard(null);
+    } else {
+      setSelected(true);
+      setPreviewCard(card);
+    }
+  };
+
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelected(false);
+    setPreviewCard(null);
+    onPlay();
+  };
+
   return (
     <div className="shrink-0 flex flex-col items-center gap-0.5">
       <span className={cn(
@@ -276,14 +296,26 @@ function CommanderCard({
         canCast ? 'text-gold' : 'text-muted-foreground/30'
       )}>⚜ Cmd</span>
       <div
-        onClick={() => { setPreviewCard(card); if (canCast) onPlay(); }}
+        onClick={handleTap}
         className={cn(
-          'rounded-lg transition-all cursor-pointer',
-          canCast && 'ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
+          'relative rounded-lg transition-all duration-150 cursor-pointer',
+          selected && 'ring-2 ring-white/60 scale-110 z-10',
+          !selected && canCast && 'ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
           !canCast && 'opacity-60 saturate-0'
         )}
       >
         <CardView card={card} mode="art" highlighted={canCast} interactive={false} />
+        {selected && canCast && (
+          <div className="absolute inset-x-0 bottom-1 flex justify-center pointer-events-none">
+            <button
+              className="pointer-events-auto bg-green-500 hover:bg-green-400 active:bg-green-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-green-900/60 flex items-center gap-1 touch-manipulation"
+              onClick={handlePlay}
+            >
+              <Play className="h-2.5 w-2.5" />
+              Play
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
