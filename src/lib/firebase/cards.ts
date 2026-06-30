@@ -32,7 +32,7 @@ export async function getCardById(id: string): Promise<ScryfallCardRecord | null
 }
 
 /**
- * Normalize card name for matching (handle apostrophes, case, etc.)
+ * Normalize card name for matching (handle apostrophes, case, double-faced cards, etc.)
  */
 function normalizeCardName(name: string): string[] {
   // Generate variations to try
@@ -57,6 +57,23 @@ function normalizeCardName(name: string): string[] {
   
   // Remove duplicates
   return [...new Set(variations)];
+}
+
+/**
+ * Check if a stored card name matches the search name
+ * Handles double-faced cards (e.g., "Sink into Stupor // Soporific Springs" matches "Sink into Stupor")
+ */
+function cardNameMatches(storedName: string, searchName: string): boolean {
+  // Exact match
+  if (storedName === searchName) return true;
+  
+  // Check if stored name is a double-faced card and search name matches the front face
+  if (storedName.includes(' // ')) {
+    const frontFace = storedName.split(' // ')[0].trim();
+    if (frontFace === searchName) return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -131,7 +148,7 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
     let snapshot = await getDocs(q);
     const found = new Map(snapshot.docs.map(d => [d.data().name, d.data() as ScryfallCardRecord]));
     
-    // For unmatched names, try all variations
+    // For unmatched names, try all variations AND double-faced card prefix search
     const unmatched = batch.filter(name => !found.has(name));
     if (unmatched.length > 0) {
       // Generate all variations for unmatched names
@@ -160,6 +177,33 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
             found.set(originalName, doc.data() as ScryfallCardRecord);
           }
         });
+      }
+      
+      // Still unmatched? Try prefix search for double-faced cards
+      const stillUnmatched = unmatched.filter(name => !found.has(name));
+      for (const name of stillUnmatched) {
+        // Try prefix search (for double-faced cards like "Sink into Stupor // Soporific Springs")
+        const variations = normalizeCardName(name);
+        for (const variant of variations) {
+          if (found.has(name)) break; // Already found
+          
+          q = query(
+            cardsRef,
+            where('name', '>=', variant),
+            where('name', '<=', variant + '\uf8ff'),
+            firestoreLimit(5)
+          );
+          snapshot = await getDocs(q);
+          
+          // Check if any result is a double-faced card matching our search
+          for (const doc of snapshot.docs) {
+            const cardData = doc.data();
+            if (cardNameMatches(cardData.name, variant)) {
+              found.set(name, cardData as ScryfallCardRecord);
+              break;
+            }
+          }
+        }
       }
     }
     

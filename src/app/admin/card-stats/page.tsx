@@ -51,24 +51,40 @@ export default function CardStatsPage() {
 
       const cardsCollection = collection(db, 'cards');
       
-      // Try exact match first
-      let q = query(cardsCollection, where('name', '==', searchQuery.trim()), limit(10));
-      let snapshot = await getDocs(q);
-      let results = snapshot.docs.map(d => d.data());
+      // Try multiple variations (case-insensitive)
+      const searchTerm = searchQuery.trim();
+      const variations = [
+        searchTerm,
+        searchTerm.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
+        searchTerm.toLowerCase(),
+        searchTerm.toUpperCase()
+      ];
       
-      // If no exact match, try prefix search
+      let results: any[] = [];
+      
+      // Try exact matches with all variations
+      for (const variant of variations) {
+        if (results.length >= 10) break;
+        const q = query(cardsCollection, where('name', '==', variant), limit(10));
+        const snapshot = await getDocs(q);
+        const newResults = snapshot.docs.map(d => d.data());
+        results = [...results, ...newResults.filter(r => !results.some(existing => existing.id === r.id))];
+      }
+      
+      // If still no results, try prefix search with title case
       if (results.length === 0) {
-        q = query(
+        const titleCase = searchTerm.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        const q = query(
           cardsCollection,
-          where('name', '>=', searchQuery.trim()),
-          where('name', '<=', searchQuery.trim() + '\uf8ff'),
+          where('name', '>=', titleCase),
+          where('name', '<=', titleCase + '\uf8ff'),
           limit(10)
         );
-        snapshot = await getDocs(q);
+        const snapshot = await getDocs(q);
         results = snapshot.docs.map(d => d.data());
       }
       
-      setSearchResults(results);
+      setSearchResults(results.slice(0, 10));
     } catch (err) {
       console.error('Search failed:', err);
     } finally {
@@ -152,20 +168,10 @@ export default function CardStatsPage() {
                 
                 <div className="mt-6 pt-6 border-t border-gray-700">
                   <div className="text-sm text-gray-400">
-                    <p className="mb-2">Expected from Scryfall: ~90,000 cards (unique artwork)</p>
-                    <p className="mb-2">
-                      Coverage: {((stats.total / 90000) * 100).toFixed(1)}%
+                    <p className="mb-2">Note: Scryfall has ~90,000 cards (unique artwork), but Firestore write limits prevented full import.</p>
+                    <p className="text-blue-400 mt-2">
+                      ℹ️ Current database contains {stats.total.toLocaleString()} cards
                     </p>
-                    {stats.total < 90000 && (
-                      <p className="text-yellow-400 mt-4">
-                        ⚠️ Missing {(90000 - stats.total).toLocaleString()} cards
-                      </p>
-                    )}
-                    {stats.total >= 90000 && (
-                      <p className="text-green-400 mt-4">
-                        ✓ All cards loaded successfully!
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
