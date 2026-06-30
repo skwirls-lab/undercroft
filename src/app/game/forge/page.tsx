@@ -238,6 +238,7 @@ export default function ForgeGamePage() {
                   events={gameEvents.map((e, i) => ({
                     type: String(e.eventType) as 'CARD_PLAYED',
                     data: e as Record<string, unknown>,
+                    timestamp: Date.now() - (gameEvents.length - i) * 100,
                     id: `f${i}`,
                   }))}
                   currentPlayerId={HUMAN_PLAYER_ID}
