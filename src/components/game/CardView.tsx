@@ -391,6 +391,7 @@ export function CardView({
       onDoubleClick={() => onDoubleClick?.(card)}
       onMouseEnter={() => interactive && setPreviewCard(card)}
       onMouseLeave={() => interactive && setPreviewCard(null)}
+      onTouchStart={() => interactive && setPreviewCard(card)}
     >
       {mode === 'pip' && <PipView card={card} />}
       {mode === 'art' && <ArtView card={card} />}

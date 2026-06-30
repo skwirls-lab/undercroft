@@ -612,12 +612,15 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
         />
       )}
 
-      {/* Hand (bottom) */}
-      <div className="relative border-t border-border/15 pt-3">
-        <div className="mb-1.5 flex items-center justify-between px-3">
+      {/* Hand — sticky to bottom so it's always visible without scrolling */}
+      <div className="sticky bottom-0 z-30 border-t border-border/20 bg-background/90 backdrop-blur-xl px-2 pt-2 pb-1 shadow-[0_-8px_32px_rgba(0,0,0,0.3)]">
+        <div className="mb-1 flex items-center justify-between px-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
             Hand · {handCards.length}
           </span>
+          {hasPriority && !gameState.isGameOver && (
+            <span className="text-[10px] text-muted-foreground/40 italic">Tap a card to select</span>
+          )}
         </div>
         <Hand
           cards={handCards.map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}

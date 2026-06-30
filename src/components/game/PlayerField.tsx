@@ -155,18 +155,19 @@ export function PlayerField({
     >
       {/* Commander art backdrop */}
       {commanderArtUrl && (
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
           <Image
             src={commanderArtUrl}
             alt=""
             fill
             sizes="600px"
-            className="object-cover opacity-[0.15] scale-125 saturate-[1.2]"
+            className="object-cover object-top opacity-[0.28] scale-110 saturate-[1.4] blur-[1px]"
             unoptimized
           />
-          {/* Warm vignette overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/50 to-background/30" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
+          {/* Vignette layers — heavier at edges, lighter in center to let art breathe */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-background/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/70 via-transparent to-background/70" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 to-transparent" />
         </div>
       )}
       {/* Player info bar */}
