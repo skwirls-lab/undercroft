@@ -91,6 +91,9 @@ export default function PopulateCardsPage() {
             // It's a card object
             totalProcessed++;
 
+            // Add lowercase name for case-insensitive queries
+            data.name_lower = data.name.toLowerCase();
+
             // Add to batch
             batchCards.push(data);
 

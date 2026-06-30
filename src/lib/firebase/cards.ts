@@ -38,10 +38,9 @@ export async function getCardByName(name: string): Promise<ScryfallCardRecord | 
   const db = getFirebaseDb();
   if (!db) return null;
 
-  // Firestore doesn't support case-insensitive queries, so we need to normalize
-  // For now, we'll do an exact match and rely on the client to handle case
+  // Use lowercase field for case-insensitive matching
   const cardsRef = collection(db, 'cards');
-  const q = query(cardsRef, where('name', '==', name), firestoreLimit(1));
+  const q = query(cardsRef, where('name_lower', '==', name.toLowerCase()), firestoreLimit(1));
   const snapshot = await getDocs(q);
 
   if (snapshot.empty) return null;
@@ -91,13 +90,15 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
     }
 
     const cardsRef = collection(db, 'cards');
-    const q = query(cardsRef, where('name', 'in', batch));
+    // Use lowercase names for case-insensitive matching
+    const lowerBatch = batch.map(n => n.toLowerCase());
+    const q = query(cardsRef, where('name_lower', 'in', lowerBatch));
     const snapshot = await getDocs(q);
 
-    // Map results
-    const found = new Map(snapshot.docs.map(d => [d.data().name, d.data() as ScryfallCardRecord]));
-    batch.forEach(name => {
-      results.set(name, found.get(name) || null);
+    // Map results back to original names (case-insensitive)
+    const found = new Map(snapshot.docs.map(d => [d.data().name_lower, d.data() as ScryfallCardRecord]));
+    batch.forEach((name, idx) => {
+      results.set(name, found.get(lowerBatch[idx]) || null);
     });
   }
 
