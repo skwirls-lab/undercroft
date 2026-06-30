@@ -20,6 +20,7 @@ import { ArrowRight, Flag, Loader2, FastForward, X } from 'lucide-react';
 interface GameBoardProps {
   currentPlayerId: string;
   className?: string;
+  hideHand?: boolean;
   // Forge-style mana payment: lands the player can tap to pay for a spell
   manaPaymentSourceIds?: Set<string>;
   manaPaymentInfo?: { manaCost: string; spellName: string };
@@ -35,7 +36,7 @@ interface TargetingState {
   validTargetIds: Set<string>; // Quick lookup of valid target IDs
 }
 
-export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
+export function GameBoard({ currentPlayerId, className, hideHand, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
   const { pendingChoice } = useForgeGameStore();
 
@@ -612,23 +613,25 @@ export function GameBoard({ currentPlayerId, className, manaPaymentSourceIds, ma
         />
       )}
 
-      {/* Hand — sticky to bottom so it's always visible without scrolling */}
-      <div className="sticky bottom-0 z-30 border-t border-border/20 bg-background/90 backdrop-blur-xl px-2 pt-2 pb-1 shadow-[0_-8px_32px_rgba(0,0,0,0.3)]">
-        <div className="mb-1 flex items-center justify-between px-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
-            Hand · {handCards.length}
-          </span>
-          {hasPriority && !gameState.isGameOver && (
-            <span className="text-[10px] text-muted-foreground/40 italic">Tap a card to select</span>
-          )}
+      {/* Hand — rendered here only if forge page is NOT handling it externally */}
+      {!hideHand && (
+        <div className="border-t border-border/20 bg-background/90 backdrop-blur-xl px-2 pt-2 pb-1">
+          <div className="mb-1 flex items-center justify-between px-2">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
+              Hand · {handCards.length}
+            </span>
+            {hasPriority && !gameState.isGameOver && (
+              <span className="text-[10px] text-muted-foreground/40 italic">Tap a card to select</span>
+            )}
+          </div>
+          <Hand
+            cards={handCards.map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
+            legalActions={hasPriority ? filteredLegalActions : []}
+            onPlayCard={handlePlayCard}
+            isActive={hasPriority}
+          />
         </div>
-        <Hand
-          cards={handCards.map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
-          legalActions={hasPriority ? filteredLegalActions : []}
-          onPlayCard={handlePlayCard}
-          isActive={hasPriority}
-        />
-      </div>
+      )}
 
       {/* Game over overlay */}
       <AnimatePresence>

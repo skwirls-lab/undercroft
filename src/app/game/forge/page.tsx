@@ -6,15 +6,17 @@ import Link from 'next/link';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { GameBoard } from '@/components/game/GameBoard';
+import { Hand } from '@/components/game/Hand';
 import { GameLog } from '@/components/game/GameLog';
 import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
 import { CardPreviewPanel } from '@/components/game/CardPreviewPanel';
 import { ForgeChoiceOverlay } from '@/components/game/ForgeChoiceOverlay';
 import { Button } from '@/components/ui/button';
+import { getCardsInZone } from '@/lib/ZoneManager';
+import type { CardInstance } from '@/lib/gameTypes';
 import {
   ArrowLeft,
   Loader2,
-  Shield,
   Flag,
   RotateCcw,
 } from 'lucide-react';
@@ -41,7 +43,23 @@ export default function ForgeGamePage() {
     concede,
   } = useForgeGameStore();
 
-  const { gameState, events } = useGameStore();
+  const { gameState, legalActions, performAction, events } = useGameStore();
+
+  // Hand data — derived from gameStore so the hand can live outside GameBoard
+  const handCardIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'hand') : [];
+  const handCards = handCardIds
+    .map(id => gameState?.cardInstances.get(id))
+    .filter((c): c is CardInstance => !!c);
+  const hasPriority = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
+  const handLegalActions = hasPriority ? legalActions : [];
+
+  const handleForgePlayCard = useCallback((card: CardInstance) => {
+    const cardActions = legalActions.filter(
+      a => (a.type === 'PLAY_LAND' || a.type === 'CAST_SPELL') &&
+        a.payload.cardInstanceId === card.instanceId
+    );
+    if (cardActions.length > 0) performAction(cardActions[0]);
+  }, [legalActions, performAction]);
 
   // Forge-style mana payment: detect mana_payment choice and extract source IDs
   const isManaPayment = pendingChoice?.choiceType === 'mana_payment';
@@ -126,33 +144,53 @@ export default function ForgeGamePage() {
         </header>
 
         {/* Two-column layout: game board + sidebar */}
-        <div className="flex flex-1 min-h-0">
-          {/* Main game area */}
-          <main className="flex-1 overflow-auto p-3 flex flex-col">
-            {/* Game Over overlay */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Main game area — flex column, NO outer scroll */}
+          <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+
+            {/* Game Over banner */}
             {isGameOver && (
-              <div className="mb-4 rounded-xl border border-gold/30 bg-gold/10 p-6 text-center">
-                <h2 className="text-2xl font-bold text-gold">Game Over</h2>
-                <p className="mt-2 text-lg">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`}</p>
-                <Button className="mt-4" onClick={() => { disconnect(); router.push('/game'); }}>
+              <div className="shrink-0 mx-2 mt-2 rounded-xl border border-gold/30 bg-gold/10 p-4 text-center">
+                <h2 className="text-xl font-bold text-gold">Game Over</h2>
+                <p className="mt-1 text-base">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`}</p>
+                <Button className="mt-3" onClick={() => { disconnect(); router.push('/game'); }}>
                   New Game
                 </Button>
               </div>
             )}
 
-            {/* The existing GameBoard reads from useGameStore (populated by adapter) */}
-            {/* choose_action is integrated into GameBoard via synthetic legalActions */}
-            <GameBoard
-              currentPlayerId={HUMAN_PLAYER_ID}
-              className="flex-1"
-              manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
-              manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
-              onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
-              onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
-            />
+            {/* Scrollable board content — opponents + my field + action bar.
+                Only THIS section scrolls; the hand below never moves. */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2">
+              <GameBoard
+                currentPlayerId={HUMAN_PLAYER_ID}
+                hideHand
+                className="min-h-full"
+                manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
+                manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
+                onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
+                onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
+              />
+              <ForgeChoiceOverlay />
+            </div>
 
-            {/* Non-action choice overlays (mulligan, sacrifice, targets, etc.) positioned near bottom */}
-            <ForgeChoiceOverlay />
+            {/* Hand — always visible, never scrolls */}
+            <div className="shrink-0 border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] px-2 pt-2 pb-1">
+              <div className="mb-1 flex items-center justify-between px-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
+                  Hand · {handCards.length}
+                </span>
+                {hasPriority && !isGameOver && handCards.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground/40 italic">Tap a card to select · tap again to play</span>
+                )}
+              </div>
+              <Hand
+                cards={handCards}
+                legalActions={handLegalActions}
+                onPlayCard={handleForgePlayCard}
+                isActive={!!hasPriority && !isGameOver}
+              />
+            </div>
           </main>
 
           {/* Right sidebar — card preview + game log */}

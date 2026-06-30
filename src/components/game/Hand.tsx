@@ -4,10 +4,9 @@ import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CardView } from './CardView';
-import { Button } from '@/components/ui/button';
 import { useCardPreview } from './CardPreviewContext';
 import type { CardInstance, GameAction } from '@/lib/gameTypes';
-import { Play, X, Eye } from 'lucide-react';
+import { Play } from 'lucide-react';
 
 interface HandProps {
   cards: CardInstance[];
@@ -65,47 +64,6 @@ export function Hand({ cards, legalActions, onPlayCard, isActive, className }: H
 
   return (
     <div className={cn('relative flex flex-col items-center select-none', className)}>
-
-      {/* Action bar — slides up when a card is selected */}
-      <AnimatePresence>
-        {selectedCard && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-            className="flex items-center gap-2 mb-2 z-50 rounded-xl border border-border/30 bg-card/80 backdrop-blur-sm px-3 py-1.5 shadow-lg"
-          >
-            <Eye className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-            <span className="text-xs text-muted-foreground truncate max-w-[160px]">
-              {selectedCard.cardData.name}
-            </span>
-            {isSelectedPlayable ? (
-              <Button
-                size="sm"
-                onClick={handlePlay}
-                className="h-7 px-3 text-xs bg-green-600 hover:bg-green-500 text-white gap-1 ml-1"
-              >
-                <Play className="h-3 w-3" />
-                Play
-              </Button>
-            ) : (
-              <span className="text-[10px] text-muted-foreground/50 ml-1 italic">
-                {isActive ? 'Not playable' : 'Not your turn'}
-              </span>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleCancel}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground ml-0.5"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Fan of cards */}
       <div
         className="relative flex items-end justify-center w-full"
@@ -124,9 +82,9 @@ export function Hand({ cards, legalActions, onPlayCard, isActive, className }: H
               style={{ zIndex: isSelected ? 50 : index + 1, transformOrigin: 'bottom center' }}
               animate={{
                 x: offset,
-                y: isSelected ? -30 : 5,
+                y: isSelected ? -36 : 5,
                 rotate: isSelected ? 0 : rotation,
-                scale: isSelected ? 1.12 : 0.97,
+                scale: isSelected ? 1.1 : 0.97,
               }}
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
               onClick={() => handleCardTap(index, card)}
@@ -144,6 +102,33 @@ export function Hand({ cards, legalActions, onPlayCard, isActive, className }: H
                   !isActive && !isSelected && 'opacity-50 saturate-50',
                 )}
               />
+
+              {/* In-card play button — appears directly on the selected card */}
+              <AnimatePresence>
+                {isSelected && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                    className="absolute inset-0 flex flex-col items-center justify-center rounded-lg pointer-events-none"
+                  >
+                    {isPlayable ? (
+                      <button
+                        className="pointer-events-auto bg-green-500 hover:bg-green-400 active:bg-green-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-green-900/60 flex items-center gap-1 touch-manipulation"
+                        onClick={(e) => { e.stopPropagation(); handlePlay(); }}
+                      >
+                        <Play className="h-2.5 w-2.5" />
+                        Play
+                      </button>
+                    ) : (
+                      <span className="bg-black/60 text-white/70 text-[9px] px-2 py-0.5 rounded-full">
+                        {isActive ? 'Not playable' : 'Not your turn'}
+                      </span>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           );
         })}
