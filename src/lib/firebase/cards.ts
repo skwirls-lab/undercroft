@@ -205,6 +205,38 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
           }
         }
       }
+      
+      // STILL unmatched? Try Scryfall API to get oracle_id, then search by that
+      const finallyUnmatched = unmatched.filter(name => !found.has(name));
+      for (const name of finallyUnmatched) {
+        try {
+          // Query Scryfall for the oracle_id
+          const scryfallUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`;
+          const response = await fetch(scryfallUrl, {
+            headers: { 'User-Agent': 'Undercroft/1.0' }
+          });
+          
+          if (response.ok) {
+            const scryfallCard = await response.json();
+            const oracleId = scryfallCard.oracle_id;
+            
+            if (oracleId) {
+              // Search Firestore by oracle_id
+              q = query(cardsRef, where('oracle_id', '==', oracleId), firestoreLimit(1));
+              snapshot = await getDocs(q);
+              
+              if (!snapshot.empty) {
+                found.set(name, snapshot.docs[0].data() as ScryfallCardRecord);
+              }
+            }
+          }
+          
+          // Rate limit: 100ms between requests
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (err) {
+          console.error(`Failed to resolve ${name} via Scryfall:`, err);
+        }
+      }
     }
     
     // Set results
