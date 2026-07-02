@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import type { CardInstance } from '@/lib/gameTypes';
 import { getLandProducibleColors, getEffectiveLandCardData } from '@/lib/OracleTextParser';
 import { useCardPreview } from './CardPreviewContext';
+import { ManaSymbol, parseManaSymbols } from './ManaSymbol';
 
 // Resolve the active face for DFC cards on the battlefield
 function getActiveFace(card: CardInstance) {
@@ -70,24 +71,6 @@ interface CardViewProps {
   className?: string;
 }
 
-const MANA_COLORS: Record<string, string> = {
-  W: 'bg-gradient-to-br from-amber-50 to-amber-200 text-amber-900 border border-amber-300',
-  U: 'bg-gradient-to-br from-blue-400 to-blue-600 text-white border border-blue-300',
-  B: 'bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-100 border border-zinc-600',
-  R: 'bg-gradient-to-br from-red-500 to-red-700 text-white border border-red-400',
-  G: 'bg-gradient-to-br from-green-500 to-green-700 text-white border border-green-400',
-  C: 'bg-gradient-to-br from-zinc-300 to-zinc-500 text-zinc-900 border border-zinc-400',
-};
-
-function getManaSymbols(manaCost: string): string[] {
-  const symbols: string[] = [];
-  const regex = /\{([^}]+)\}/g;
-  let match;
-  while ((match = regex.exec(manaCost)) !== null) {
-    symbols.push(match[1]);
-  }
-  return symbols;
-}
 
 function getCardColorClass(card: CardInstance): string {
   const colors = card.cardData.colors;
@@ -136,25 +119,14 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
         </div>
       ) : (
         <div className="flex shrink-0 gap-0.5">
-          {isLand ? (
-            landColors.slice(0, 3).map((color) => {
-              const colorClass = MANA_COLORS[color] || 'bg-zinc-500 text-white';
-              return (
-                <span key={color} className={cn('flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-bold', colorClass)}>
-                  {color}
-                </span>
-              );
-            })
-          ) : (
-            getManaSymbols(card.cardData.manaCost).slice(0, 3).map((sym, i) => {
-              const colorClass = MANA_COLORS[sym] || 'bg-zinc-500 text-white';
-              return (
-                <span key={i} className={cn('flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-bold', colorClass)}>
-                  {sym.length <= 2 ? sym : ''}
-                </span>
-              );
-            })
-          )}
+          {isLand
+            ? landColors.slice(0, 3).map((color) => (
+                <ManaSymbol key={color} symbol={color} size="xs" />
+              ))
+            : parseManaSymbols(card.cardData.manaCost).slice(0, 3).map((sym, i) => (
+                <ManaSymbol key={i} symbol={sym} size="xs" />
+              ))
+          }
         </div>
       )}
 
@@ -233,14 +205,9 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
 
       {/* Top dark strip for mana cost */}
       <div className="absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 bg-gradient-to-b from-black/60 to-transparent px-1 pt-0.5 pb-3">
-        {getManaSymbols(face.manaCost).slice(0, 5).map((sym, i) => {
-          const colorClass = MANA_COLORS[sym] || 'bg-zinc-500 text-white';
-          return (
-            <span key={i} className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-bold shadow-sm', colorClass)}>
-              {sym.length <= 2 ? sym : ''}
-            </span>
-          );
-        })}
+        {parseManaSymbols(face.manaCost).slice(0, 5).map((sym, i) => (
+          <ManaSymbol key={i} symbol={sym} size="xs" className="shadow-sm" />
+        ))}
       </div>
 
       {/* Name overlay at bottom */}

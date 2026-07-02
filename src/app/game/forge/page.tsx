@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { cn } from '@/lib/utils';
 import { CardView } from '@/components/game/CardView';
+import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
 import type { CardInstance } from '@/lib/gameTypes';
 import {
   ArrowLeft,
@@ -356,10 +357,11 @@ function CardPreviewFloating() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 6 }}
           transition={{ duration: 0.12 }}
-          className="fixed bottom-[194px] left-1/2 -translate-x-1/2 z-30 flex items-start gap-2 pointer-events-none"
+          className="fixed bottom-[194px] left-1/2 -translate-x-1/2 z-30 flex items-start gap-2"
+        style={{ pointerEvents: 'none' }}
         >
-          {/* Card image */}
-          <div className="w-[220px] shrink-0 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+          {/* Card image — non-interactive */}
+          <div className="w-[220px] shrink-0 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10" style={{ pointerEvents: 'none' }}>
             {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt={previewCard.cardData.name} className="w-full" />
@@ -369,11 +371,17 @@ function CardPreviewFloating() {
               </div>
             )}
           </div>
-          {/* Card details text panel */}
-          <div className="w-[220px] shrink-0 rounded-xl bg-black/85 border border-white/10 p-3 flex flex-col gap-1.5 shadow-2xl backdrop-blur-sm">
+          {/* Card details text panel — pointer-events-auto so oracle text is scrollable */}
+          <div
+            data-card-preview-safe
+            className="w-[220px] shrink-0 rounded-xl bg-black/85 border border-white/10 p-3 flex flex-col gap-1.5 shadow-2xl backdrop-blur-sm"
+            style={{ pointerEvents: 'auto' }}
+          >
             <div className="font-bold text-sm text-white leading-tight">{previewCard.cardData.name}</div>
             {previewCard.cardData.manaCost && (
-              <div className="text-amber-300/90 font-mono text-xs">{previewCard.cardData.manaCost}</div>
+              <div className="flex items-center gap-0.5">
+                <ManaCostDisplay manaCost={previewCard.cardData.manaCost} size="md" />
+              </div>
             )}
             {previewCard.cardData.typeLine && (
               <div className="text-sky-300/70 text-[11px] italic border-b border-white/10 pb-1.5">
@@ -381,8 +389,8 @@ function CardPreviewFloating() {
               </div>
             )}
             {previewCard.cardData.oracleText && (
-              <div className="text-white/80 leading-relaxed text-[11px] max-h-[140px] overflow-y-auto whitespace-pre-line">
-                {previewCard.cardData.oracleText}
+              <div className="text-white/80 text-[11px] max-h-[140px] overflow-y-auto">
+                <OracleText text={previewCard.cardData.oracleText} />
               </div>
             )}
             {previewCard.cardData.power !== undefined && (
