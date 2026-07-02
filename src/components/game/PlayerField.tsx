@@ -148,7 +148,7 @@ export function PlayerField({
   return (
     <div
       className={cn(
-        'relative rounded-2xl border p-4 transition-all overflow-hidden',
+        'relative rounded-2xl border p-4 transition-all overflow-hidden flex flex-col',
         isActivePlayer 
           ? 'border-gold/40 bg-gold/[0.03] shadow-[0_0_20px_rgba(212,169,68,0.08)] ring-1 ring-gold/20' 
           : isCurrentUser
@@ -293,7 +293,7 @@ export function PlayerField({
       )}
 
       {/* Battlefield */}
-      <div className="relative flex flex-col gap-3">
+      <div className="relative flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto">
         {/* Creatures row */}
         {creatures.length > 0 && (
           <div>

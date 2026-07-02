@@ -351,8 +351,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_20%,rgba(80,60,30,0.05),transparent)]" />
       </div>
 
-      {/* ─── TOP ZONE: phase tracker + opponents — expands with window height ─── */}
-      <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+      {/* ─── TOP ZONE: phase tracker + opponents — natural height, does not expand ─── */}
+      <div className="shrink-0 flex flex-col gap-2">
       {/* Phase tracker */}
       <PhaseTracker
         turn={gameState.turn}
@@ -361,7 +361,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
 
       {/* Opponent fields (top) */}
       <div className={cn(
-        'flex-1 min-h-0 grid gap-2',
+        'grid gap-2',
         opponents.length === 1 && 'grid-cols-1',
         opponents.length === 2 && 'grid-cols-2',
         opponents.length >= 3 && 'grid-cols-3'
@@ -598,9 +598,10 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
       {/* ─── BOTTOM ZONE: player field ─── */}
       <div className="flex-1 min-h-0 flex flex-col gap-2">
 
-      {/* Current player field */}
+      {/* Current player field — flex-1 so it expands to fill the bottom zone */}
       {currentPlayer && (
         <PlayerField
+          className="flex-1 min-h-0"
           player={currentPlayer}
           battlefield={getCardsInZone(gameState, currentPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
           commandZone={getCardsInZone(gameState, currentPlayerId, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
