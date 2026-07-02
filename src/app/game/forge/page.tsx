@@ -186,8 +186,8 @@ export default function ForgeGamePage() {
               <ForgeChoiceOverlay />
             </div>
 
-            {/* Bottom bar — card preview | commander+hand | game log */}
-            <div className="shrink-0 border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] flex items-stretch">
+            {/* Bottom bar — commander+hand | game log — fixed height so log can scroll */}
+            <div className="shrink-0 h-[186px] border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] flex items-stretch overflow-hidden">
 
               {/* Center: Commander (if any) + Hand */}
               <div className="flex-1 min-w-0 px-2 pt-1 pb-1 flex flex-col">
@@ -234,7 +234,7 @@ export default function ForgeGamePage() {
               </div>
 
               {/* Right: Game Log (desktop only) */}
-              <div className="hidden lg:block w-[200px] shrink-0 border-l border-border/20 overflow-hidden">
+              <div className="hidden lg:flex lg:flex-col w-[220px] shrink-0 border-l border-border/20 overflow-hidden">
                 <GameLog
                   events={gameEvents.map((e, i) => ({
                     type: String(e.eventType) as 'CARD_PLAYED',
@@ -356,17 +356,44 @@ function CardPreviewFloating() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 6 }}
           transition={{ duration: 0.12 }}
-          className="fixed bottom-56 left-4 z-30 w-[200px] rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 pointer-events-none"
+          className="fixed bottom-[194px] left-1/2 -translate-x-1/2 z-30 flex items-start gap-2 pointer-events-none"
         >
-          {imageUrl ? (
-            // Plain <img> avoids next/image domain whitelist requirement for external URLs
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt={previewCard.cardData.name} className="w-full" />
-          ) : (
-            <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center p-3">
-              <p className="text-xs text-center text-muted-foreground">{previewCard.cardData.name}</p>
-            </div>
-          )}
+          {/* Card image */}
+          <div className="w-[220px] shrink-0 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt={previewCard.cardData.name} className="w-full" />
+            ) : (
+              <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center p-3">
+                <p className="text-xs text-center text-muted-foreground">{previewCard.cardData.name}</p>
+              </div>
+            )}
+          </div>
+          {/* Card details text panel */}
+          <div className="w-[220px] shrink-0 rounded-xl bg-black/85 border border-white/10 p-3 flex flex-col gap-1.5 shadow-2xl backdrop-blur-sm">
+            <div className="font-bold text-sm text-white leading-tight">{previewCard.cardData.name}</div>
+            {previewCard.cardData.manaCost && (
+              <div className="text-amber-300/90 font-mono text-xs">{previewCard.cardData.manaCost}</div>
+            )}
+            {previewCard.cardData.typeLine && (
+              <div className="text-sky-300/70 text-[11px] italic border-b border-white/10 pb-1.5">
+                {previewCard.cardData.typeLine}
+              </div>
+            )}
+            {previewCard.cardData.oracleText && (
+              <div className="text-white/80 leading-relaxed text-[11px] max-h-[140px] overflow-y-auto whitespace-pre-line">
+                {previewCard.cardData.oracleText}
+              </div>
+            )}
+            {previewCard.cardData.power !== undefined && (
+              <div className="mt-auto pt-1.5 border-t border-white/10 text-right font-bold text-sm text-white/90">
+                {previewCard.cardData.power}/{previewCard.cardData.toughness}
+              </div>
+            )}
+            {!previewCard.cardData.oracleText && !previewCard.cardData.typeLine && (
+              <div className="text-muted-foreground/50 text-[11px] italic">No card data</div>
+            )}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

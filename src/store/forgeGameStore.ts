@@ -127,24 +127,89 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
         // Generate synthetic game events from state changes for the GameLog
         const syntheticEvents: ForgeGameEvent[] = [];
+        const humanPlayer = state.players.find((p) => !p.isAI);
+        const humanId = humanPlayer?.id;
+
         if (!prevState) {
           syntheticEvents.push({ eventType: 'GAME_STARTED' });
         } else {
+          // --- Turn & phase ---
           if (prevState.turn.turnNumber !== state.turn.turnNumber) {
             syntheticEvents.push({ eventType: 'TURN_STARTED', turnNumber: state.turn.turnNumber, activePlayer: state.turn.activePlayer } as ForgeGameEvent);
           }
-          if (prevState.turn.phase !== state.turn.phase) {
-            syntheticEvents.push({ eventType: 'PHASE_CHANGED', phase: state.turn.phase } as ForgeGameEvent);
+          // Only log major phase changes (not every micro-step)
+          const MAJOR_PHASES = new Set(['MAIN1', 'MAIN2', 'COMBAT', 'BEGIN_COMBAT', 'END_OF_COMBAT', 'CLEANUP']);
+          if (prevState.turn.phase !== state.turn.phase && MAJOR_PHASES.has(state.turn.phase)) {
+            syntheticEvents.push({ eventType: 'PHASE_CHANGED', phase: state.turn.phase, activePlayer: state.turn.activePlayer } as ForgeGameEvent);
           }
+
+          // --- Spells resolved (left the stack) — once, not per player ---
+          const curStackIds = new Set(state.stack.map((s) => s.cardId).filter((id) => id != null));
+          for (const item of prevState.stack) {
+            if (item.cardId != null && !curStackIds.has(item.cardId)) {
+              syntheticEvents.push({ eventType: 'SPELL_RESOLVED', cardName: item.cardName, controller: item.controller } as ForgeGameEvent);
+            }
+          }
+
+          const prevStackIdSet = new Set(prevState.stack.map((s) => s.cardId).filter((id) => id != null));
+
           for (const player of state.players) {
             const prev = prevState.players.find((p) => p.id === player.id);
-            if (prev && prev.life !== player.life) {
-              syntheticEvents.push({ eventType: 'LIFE_CHANGED', playerName: player.name, newLife: player.life, oldLife: prev.life } as ForgeGameEvent);
+            if (!prev) continue;
+            const isHuman = player.id === humanId;
+            const label = isHuman ? 'You' : player.name;
+
+            // --- Life changes ---
+            if (prev.life !== player.life) {
+              const delta = player.life - prev.life;
+              syntheticEvents.push({ eventType: 'LIFE_CHANGED', playerName: label, newLife: player.life, delta } as ForgeGameEvent);
+            }
+
+            // --- Cards drawn (hand grew) ---
+            const prevHandIds = new Set(prev.hand.map((c) => c.id));
+            const newHandCards = player.hand.filter((c) => !prevHandIds.has(c.id));
+            for (const card of newHandCards) {
+              syntheticEvents.push({
+                eventType: 'CARD_DRAWN',
+                playerName: label,
+                cardName: isHuman ? card.name : null,
+                isOwn: isHuman,
+              } as ForgeGameEvent);
+            }
+
+            // --- Cards leaving hand (played/cast) ---
+            const curHandIds = new Set(player.hand.map((c) => c.id));
+            const leftHand = prev.hand.filter((c) => !curHandIds.has(c.id));
+            for (const card of leftHand) {
+              const onStack = state.stack.find((s) => s.cardId === card.id);
+              const onBattlefield = player.battlefield.find((c) => c.id === card.id);
+              if (onStack) {
+                syntheticEvents.push({ eventType: 'SPELL_CAST', cardName: card.name, playerName: label } as ForgeGameEvent);
+              } else if (onBattlefield) {
+                syntheticEvents.push({ eventType: 'CARD_PLAYED', cardName: card.name, playerName: label } as ForgeGameEvent);
+              }
+            }
+
+            // --- Creatures/permanents dying (battlefield → graveyard) ---
+            const prevBfIds = new Set(prev.battlefield.map((c) => c.id));
+            const prevGyIds = new Set(prev.graveyard.map((c) => c.id));
+            for (const card of player.graveyard) {
+              if (prevBfIds.has(card.id) && !prevGyIds.has(card.id)) {
+                syntheticEvents.push({ eventType: 'CARD_DESTROYED', cardName: card.name, playerName: label } as ForgeGameEvent);
+              }
+            }
+
+            // --- New permanents entering battlefield from non-hand/non-stack (tokens, triggered) ---
+            const prevHandIdSet = new Set(prev.hand.map((c) => c.id));
+            for (const card of player.battlefield) {
+              if (!prevBfIds.has(card.id) && !prevHandIdSet.has(card.id) && !prevStackIdSet.has(card.id)) {
+                syntheticEvents.push({ eventType: 'CARD_PLAYED', cardName: card.name, playerName: label } as ForgeGameEvent);
+              }
             }
           }
         }
         if (syntheticEvents.length > 0) {
-          set((prev) => ({ gameEvents: [...prev.gameEvents.slice(-90), ...syntheticEvents] }));
+          set((prev) => ({ gameEvents: [...prev.gameEvents.slice(-190), ...syntheticEvents] }));
         }
 
         // Push adapted state into the main gameStore so existing UI components work
