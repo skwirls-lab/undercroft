@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDeckStore } from '@/store/deckStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { FORGE_SERVER_URL } from '@/lib/forgeConfig';
+import { pickRandomAIDeck, aiDeckToForgeFormat, AI_DECKS } from '@/lib/aiDecks';
 import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
+import { AuthGuard } from '@/components/AuthGuard';
 
 /**
  * Forge game client for WebSocket communication.
@@ -45,6 +47,10 @@ function buildForgeDeck(deck: ReturnType<typeof useDeckStore.getState>['decks'][
 }
 
 export default function GameSetupPage() {
+  return <AuthGuard><GameSetupContent /></AuthGuard>;
+}
+
+function GameSetupContent() {
   const router = useRouter();
   const { decks } = useDeckStore();
   const { connect, startGame, connectionStatus } = useForgeGameStore();
@@ -180,26 +186,34 @@ export default function GameSetupPage() {
               // Build deck list from selected deck, or automatically use demo/defaults for everyone
               let allDecks: Array<{ deckList: string[]; commander?: string }>;
 
+              // Build AI decks — each AI gets a unique random deck
+              const usedNames: string[] = [];
+              const aiDecks = Array.from({ length: aiCount }, () => {
+                const picked = pickRandomAIDeck(usedNames);
+                usedNames.push(picked.name);
+                return aiDeckToForgeFormat(picked);
+              });
+
               if (decks.length === 0) {
-                // NO DECKS IN YOUR LIST - auto-give player demo deck and dummy decks to AIs
+                // NO DECKS IN YOUR LIST - auto-give player demo deck
                 const myDeck = buildGoblinDemo();
-                allDecks = aiCount === 0 ? [{ deckList: myDeck, commander: 'Krenko, Mob Boss' }] : [
-                  { deckList: myDeck, commander: 'Krenko, Mob Boss' }, // Player demo deck FIRST
-                  ...Array(aiCount).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }),
+                allDecks = [
+                  { deckList: myDeck, commander: 'Krenko, Mob Boss' },
+                  ...aiDecks,
                 ];
               } else if (selectedDeck) {
-                // HAVE DECKS IN LIST - use selected deck for player, dummy decks for AIs
+                // HAVE DECKS IN LIST - use selected deck for player
                 const myForgeDeck = buildForgeDeck(selectedDeck);
-                allDecks = aiCount === 0 ? [myForgeDeck] : [
-                  myForgeDeck, // Player's selected deck FIRST
-                  ...Array(aiCount).fill({ deckList: Array(42).fill('1 Goblin Gullet'), commander: 'Goblin Gullet' }),
+                allDecks = [
+                  myForgeDeck,
+                  ...aiDecks,
                 ];
               } else {
                 // DECKS EXIST BUT NONE SELECTED - prompt user or skip
                 throw new Error('Please select a deck to continue');
               }
 
-              console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, `- commanders:`, allDecks.map(d => d.commander || 'Goblin Gullet'));
+              console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, `- commanders:`, allDecks.map(d => d.commander || 'unknown'));
 
               // Send start_game to server - player's deck is always first in the array
               startGame(allDecks[0].deckList, allDecks[0].commander ?? undefined, 'Player', aiCount);

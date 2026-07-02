@@ -9,8 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useSettingsStore } from '@/store/settingsStore';
 import { CardDatabase } from '@/cards/CardDatabase';
 import { ArrowLeft, Bot, Database, Save, Check, Download, Loader2, Trash2 } from 'lucide-react';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export default function SettingsPage() {
+  return <AuthGuard><SettingsContent /></AuthGuard>;
+}
+
+function SettingsContent() {
   const { aiProvider, setAIProvider, cardDataLoaded, cardDataProgress, setCardDataLoaded, setCardDataProgress } = useSettingsStore();
   const [provider, setProvider] = useState<'groq' | 'openai' | 'anthropic' | 'custom'>(aiProvider?.provider || 'groq');
   const [apiKey, setApiKey] = useState(aiProvider?.apiKey || '');

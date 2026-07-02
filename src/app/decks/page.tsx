@@ -30,8 +30,13 @@ import {
   CloudOff,
   LogIn,
 } from 'lucide-react';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export default function DecksPage() {
+  return <AuthGuard><DecksContent /></AuthGuard>;
+}
+
+function DecksContent() {
   const { decks, removeDeck, importDeckFromText, updateDeck, isSyncing, syncedUserId } = useDeckStore();
   const { cardDataLoaded } = useSettingsStore();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
