@@ -190,13 +190,20 @@ export class ForgeGameClient {
   }
 
   /** Start a new game */
-  startGame(deckList: string[], commander?: string, playerName?: string, aiCount?: number) {
+  startGame(
+    deckList: string[],
+    commander?: string,
+    playerName?: string,
+    aiCount?: number,
+    aiDecks?: Array<{ deckList: string[]; commander?: string }>,
+  ) {
     this.send('start_game', {
       deckList,
       commander,
       playerName: playerName || 'Player',
       format: 'commander',
       aiCount: aiCount ?? 1,
+      ...(aiDecks && aiDecks.length > 0 ? { aiDecks } : {}),
     });
   }
 

@@ -215,8 +215,10 @@ function GameSetupContent() {
 
               console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, `- commanders:`, allDecks.map(d => d.commander || 'unknown'));
 
-              // Send start_game to server - player's deck is always first in the array
-              startGame(allDecks[0].deckList, allDecks[0].commander ?? undefined, 'Player', aiCount);
+              // Send start_game to server - player's deck first, AI decks separately
+              const playerDeck = allDecks[0];
+              const aiDeckPayloads = allDecks.slice(1);
+              startGame(playerDeck.deckList, playerDeck.commander ?? undefined, 'Player', aiCount, aiDeckPayloads as Array<{ deckList: string[]; commander?: string }>);
 
       setTimeout(() => router.push('/game/forge'), 500);
     } catch (e) {

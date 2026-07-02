@@ -96,7 +96,7 @@ export interface ForgeGameStoreState {
   // Actions
   connect: (serverUrl: string) => Promise<void>;
   disconnect: () => void;
-  startGame: (deckList: string[], commander?: string, playerName?: string, aiCount?: number) => void;
+  startGame: (deckList: string[], commander?: string, playerName?: string, aiCount?: number, aiDecks?: Array<{ deckList: string[]; commander?: string }>) => void;
   respondToChoice: (requestId: string, payload: Record<string, unknown>) => void;
   concede: () => void;
 
@@ -372,7 +372,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
     });
   },
 
-  startGame: (deckList, commander, playerName, aiCount) => {
+  startGame: (deckList, commander, playerName, aiCount, aiDecks) => {
     const { client } = get();
     if (client) {
       set({
@@ -384,7 +384,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       });
       // Put the main game store into forge mode so existing UI components render correctly
       useGameStore.getState().enterForgeMode();
-      client.startGame(deckList, commander, playerName, aiCount);
+      client.startGame(deckList, commander, playerName, aiCount, aiDecks);
     }
   },
 
