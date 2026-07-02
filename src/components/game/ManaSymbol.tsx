@@ -45,7 +45,7 @@ export function ManaSymbol({ symbol, size = 'sm', className }: ManaSymbolProps) 
   }
 
   // Tap / Untap
-  if (s === 'T') return <span aria-label="Tap" title="Tap" className={cn(base, TAP_BG)}>↻</span>;
+  if (s === 'T') return <span aria-label="Tap" title="Tap" className={cn(base, TAP_BG)}>↷</span>;
   if (s === 'Q') return <span aria-label="Untap" title="Untap" className={cn(base, TAP_BG)}>↺</span>;
 
   // Hybrid like W/U, 2/U — show smaller text
@@ -112,7 +112,9 @@ interface OracleTextProps {
 
 export function OracleText({ text, className }: OracleTextProps) {
   if (!text) return null;
-  const lines = text.split('\n');
+  // Normalize literal \n sequences (from Forge data) to real newlines before splitting
+  const normalized = text.replace(/\\n/g, '\n');
+  const lines = normalized.split('\n');
   return (
     <div className={cn('leading-relaxed', className)}>
       {lines.map((line, li) => {

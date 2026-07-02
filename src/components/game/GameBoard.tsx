@@ -343,7 +343,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
      (!isMyTurn && step === 'declare_blockers' && combat?.phase === 'declaring_blockers'));
 
   return (
-    <div className={cn('relative flex flex-col gap-2.5', className)}>
+    <div className={cn('relative flex flex-col', className)}>
       {/* Warm ambient battlefield glow */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_40%,rgba(120,80,30,0.08),transparent)]" />
@@ -351,6 +351,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_20%,rgba(80,60,30,0.05),transparent)]" />
       </div>
 
+      {/* ─── TOP ZONE: phase tracker + opponents — expands with window height ─── */}
+      <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
       {/* Phase tracker */}
       <PhaseTracker
         turn={gameState.turn}
@@ -359,7 +361,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
 
       {/* Opponent fields (top) */}
       <div className={cn(
-        'grid gap-2',
+        'flex-1 min-h-0 grid gap-2',
         opponents.length === 1 && 'grid-cols-1',
         opponents.length === 2 && 'grid-cols-2',
         opponents.length >= 3 && 'grid-cols-3'
@@ -369,7 +371,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
             key={opp.id}
             player={opp}
             battlefield={getCardsInZone(gameState, opp.id, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
-            commandZone={getCardsInZone(gameState, opp.id, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
+            commandZone={getCardsInZone(gameState, opp.id, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c).filter(c => { const tl = (c.cardData.typeLine || '').toLowerCase(); return tl.includes('legendary') || tl.includes('planeswalker'); })}
             graveyardCount={getZoneCardCount(gameState, opp.id, 'graveyard')}
             exileCount={getZoneCardCount(gameState, opp.id, 'exile')}
             libraryCount={getZoneCardCount(gameState, opp.id, 'library')}
@@ -383,6 +385,10 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           />
         ))}
       </div>
+      </div>{/* end TOP ZONE */}
+
+      {/* ─── CENTER BAND: overlays + action bar ─── */}
+      <div className="shrink-0 flex flex-col gap-2 py-1">
 
       {/* Mulligan phase UI */}
       <AnimatePresence>
@@ -587,6 +593,10 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           </Button>
         </div>
       </div>
+      </div>{/* end CENTER BAND */}
+
+      {/* ─── BOTTOM ZONE: player field ─── */}
+      <div className="flex-1 min-h-0 flex flex-col gap-2">
 
       {/* Current player field */}
       {currentPlayer && (
@@ -633,6 +643,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           />
         </div>
       )}
+      </div>{/* end BOTTOM ZONE */}
 
       {/* Game over overlay */}
       <AnimatePresence>
