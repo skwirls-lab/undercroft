@@ -282,6 +282,23 @@ function ChoicePanel({ choice, onRespond }: {
     );
   }
 
+  // --- choose_modes: modal/charm spell mode selection ---
+  if (choiceType === 'choose_modes') {
+    const modes = (data.modes || []) as Array<{ index: number; description: string }>;
+    const min = (data.min as number) ?? 1;
+    const max = (data.max as number) ?? 1;
+    return (
+      <ChooseModesPanel
+        prompt={prompt || 'Choose mode'}
+        modes={modes}
+        min={min}
+        max={max}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
   // --- choose_ability / choose_single_spell / choose_spell_abilities ---
   if (['choose_ability', 'choose_single_spell', 'choose_spell_abilities'].includes(choiceType)) {
     const abilities = (data.abilities || []) as LegalPlay[];
@@ -300,6 +317,16 @@ function ChoicePanel({ choice, onRespond }: {
               <div className="text-[10px] text-muted-foreground/70 max-w-[250px] truncate">{a.description}</div>
             </Button>
           ))}
+          {abilities.length === 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onRespond(choice.requestId, { cancel: true })}
+              className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-red-500/40 hover:bg-red-500/10"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -573,15 +600,28 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
     }
   };
 
+  // separate named function to avoid stale closure lint warnings
+  const skipOrCancel = () => {
+    if (formatResponse) {
+      onRespond(requestId, formatResponse([]));
+    } else {
+      onRespond(requestId, { [responseKey]: arrayKeys.has(responseKey) ? [] : null });
+    }
+  };
+
+  const canSkip = min === 0;
+  const hasOptions = options.length > 0;
+
   return (
     <div className="mb-3 rounded-xl border border-border/30 bg-card/30 p-4">
       <h3 className="text-sm font-semibold mb-2">{prompt}</h3>
-      {!isSingle && (
+      {!isSingle && hasOptions && (
         <p className="text-xs text-muted-foreground mb-2">Select {min === max ? min : `${min}-${max}`} · {selected.size} selected</p>
       )}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {options.map((opt) => (
-          
+      {hasOptions ? (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {options.map((opt) => (
+            
           <Button
             key={opt.id}
             onClick={() => toggle(opt.id)}
@@ -595,19 +635,91 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
             {opt.power !== undefined && <span className="ml-1 text-muted-foreground">{opt.power}/{opt.toughness}</span>}
             {opt.type === 'player' && <span className="ml-1 text-muted-foreground">(Life: {opt.life})</span>}
           </Button>
-        ))}
-      </div>
-      {!isSingle && (
-        <div className="flex gap-2">
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-amber-400 mb-3">No valid options available.</p>
+      )}
+      <div className="flex gap-2">
+        {!isSingle && (
           <Button size="sm" disabled={selected.size < min} onClick={confirm} className="px-4 h-8 rounded-lg border bg-gold text-xs font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold">
             Confirm ({selected.size})
           </Button>
-          {min === 0 && (
-            <Button size="sm" variant="outline" onClick={() => onRespond(requestId, { [responseKey]: [] })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">
-              Skip
-            </Button>
-          )}
-        </div>
+        )}
+        {(canSkip || !hasOptions) && (
+          <Button size="sm" variant="outline" onClick={skipOrCancel} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-border/40">
+            {canSkip ? 'Skip' : 'Cancel'}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ChooseModesPanel — modal/charm spell mode selection
+// ============================================================
+
+function ChooseModesPanel({ prompt, modes, min, max, requestId, onRespond }: {
+  prompt: string;
+  modes: Array<{ index: number; description: string }>;
+  min: number;
+  max: number;
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const isMulti = max > 1;
+  const [modeSelected, setModeSelected] = React.useState<Set<number>>(new Set());
+
+  const toggleMode = (idx: number) => {
+    if (!isMulti) {
+      onRespond(requestId, { indices: [idx] });
+      return;
+    }
+    setModeSelected((prev: Set<number>) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else if (next.size < max) next.add(idx);
+      return next;
+    });
+  };
+
+  const confirmModes = () => {
+    onRespond(requestId, { indices: Array.from(modeSelected) });
+  };
+
+  return (
+    <div className="mb-3 rounded-xl border border-border/30 bg-card/30 p-4">
+      <h3 className="text-sm font-semibold mb-2">{prompt}</h3>
+      {isMulti && (
+        <p className="text-xs text-muted-foreground mb-2">
+          Choose {min === max ? min : `${min}–${max}`} · {modeSelected.size} selected
+        </p>
+      )}
+      <div className="flex flex-col gap-1.5 mb-3">
+        {modes.map((m) => (
+          <Button
+            key={m.index}
+            onClick={() => toggleMode(m.index)}
+            className={`rounded-lg border px-3 py-2 text-xs text-left transition-colors ${
+              modeSelected.has(m.index)
+                ? 'border-gold/60 bg-gold/15 text-gold'
+                : 'border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10 text-foreground'
+            }`}
+          >
+            {m.description}
+          </Button>
+        ))}
+      </div>
+      {isMulti && (
+        <Button
+          size="sm"
+          disabled={modeSelected.size < min}
+          onClick={confirmModes}
+          className="px-4 h-8 rounded-lg border bg-gold text-xs font-medium hover:bg-gold/90 disabled:opacity-50"
+        >
+          Confirm ({modeSelected.size})
+        </Button>
       )}
     </div>
   );

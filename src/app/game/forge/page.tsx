@@ -78,9 +78,10 @@ export default function ForgeGamePage() {
   const manaPaymentData = useMemo(() => {
     if (!isManaPayment || !pendingChoice) return null;
     const data = pendingChoice.data as Record<string, unknown>;
-    const sourceIds = (data.sourceIds || []) as number[];
+    // Backend sends data.sources as [{id, name, type}, ...] objects
+    const sources = (data.sources || []) as Array<{ id: number }>;
     return {
-      sourceIdSet: new Set(sourceIds.map((id: number) => `forge-${id}`)),
+      sourceIdSet: new Set(sources.map((s) => `forge-${s.id}`)),
       manaCost: (data.manaCost as string) || '?',
       spellName: (data.spellName as string) || 'spell',
       requestId: pendingChoice.requestId,
