@@ -40,7 +40,9 @@ function buildForgeDeck(deck: ReturnType<typeof useDeckStore.getState>['decks'][
   for (const entry of deck.cards) {
     // Skip the commander line if it's also in the main list
     if (commander && entry.cardName === commander) continue;
-    deckList.push(`${entry.quantity} ${entry.cardName}`);
+    // Use forgeName if the card needed a substitution (e.g., reprint → original)
+    const name = entry.forgeName || entry.cardName;
+    deckList.push(`${entry.quantity} ${name}`);
   }
 
   return { deckList, commander };

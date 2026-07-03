@@ -11,6 +11,9 @@ export interface DeckEntry {
   quantity: number;
   resolved?: boolean;
   scryfallId?: string;
+  oracleId?: string;
+  forgeName?: string;       // Forge-compatible name if different from cardName (e.g., reprint → original)
+  forgeResolved?: boolean;  // Whether the card (or its equivalent) exists in Forge's database
 }
 
 export interface Deck {

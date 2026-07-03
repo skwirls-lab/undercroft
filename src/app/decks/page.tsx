@@ -47,8 +47,11 @@ function DecksContent() {
   const [importResult, setImportResult] = useState<{
     resolved: number;
     unresolved: string[];
+    forgeSubstituted: Array<{ original: string; forgeName: string }>;
+    forgeUnresolvable: string[];
     total: number;
   } | null>(null);
+  const [importStep, setImportStep] = useState<string>('');
 
   const handleImport = useCallback(async () => {
     if (!deckName.trim() || !deckText.trim()) return;
@@ -56,43 +59,74 @@ function DecksContent() {
     setImportResult(null);
 
     try {
-      // Parse and create the deck first
+      // Step 1: Parse and create the deck
+      setImportStep('Parsing decklist…');
       const deck = importDeckFromText(deckText, deckName);
 
-      // Resolve card names against Firestore (always available)
+      // Step 2: Resolve card names against Firestore/Scryfall
+      setImportStep('Resolving cards in Scryfall…');
       const { resolveCardNames } = await import('@/lib/firebase/cards');
       const uniqueNames = [...new Set(deck.cards.map((c) => c.cardName))];
       const resolved = await resolveCardNames(uniqueNames);
 
-      // Update each card entry with resolution status
-      const updatedCards: DeckEntry[] = deck.cards.map((entry) => {
+      // Build initial card entries with Scryfall resolution
+      let updatedCards: DeckEntry[] = deck.cards.map((entry) => {
         const card = resolved.get(entry.cardName);
         return {
           ...entry,
           resolved: card !== null && card !== undefined,
           scryfallId: card?.id,
+          oracleId: card?.oracle_id,
         };
       });
 
       const resolvedCount = updatedCards.filter((c) => c.resolved).length;
-      const unresolvedNames = updatedCards
-        .filter((c) => !c.resolved)
-        .map((c) => c.cardName);
-      const uniqueUnresolved = [...new Set(unresolvedNames)];
+      const unresolvedNames = [...new Set(updatedCards.filter((c) => !c.resolved).map((c) => c.cardName))];
+
+      // Step 3: Check resolved cards against Forge
+      setImportStep('Verifying cards in Forge engine…');
+      const { resolveCardsForForge } = await import('@/lib/forgeCardCheck');
+      const cardsForForge = updatedCards
+        .filter((c) => c.resolved)
+        .map((c) => ({ cardName: c.cardName, oracleId: c.oracleId }));
+
+      const forgeResult = await resolveCardsForForge(cardsForForge);
+
+      // Update cards with Forge resolution status
+      const substitutedEntries: Array<{ original: string; forgeName: string }> = [];
+      updatedCards = updatedCards.map((entry) => {
+        if (!entry.resolved) {
+          return { ...entry, forgeResolved: false };
+        }
+        if (forgeResult.direct.includes(entry.cardName)) {
+          return { ...entry, forgeResolved: true };
+        }
+        const forgeName = forgeResult.substituted.get(entry.cardName);
+        if (forgeName) {
+          if (!substitutedEntries.find((s) => s.original === entry.cardName)) {
+            substitutedEntries.push({ original: entry.cardName, forgeName });
+          }
+          return { ...entry, forgeResolved: true, forgeName };
+        }
+        return { ...entry, forgeResolved: false };
+      });
 
       updateDeck(deck.id, {
         cards: updatedCards,
         resolvedCount,
-        unresolvedCount: uniqueUnresolved.length,
+        unresolvedCount: unresolvedNames.length,
       });
 
       setImportResult({
         resolved: resolvedCount,
-        unresolved: uniqueUnresolved,
+        unresolved: unresolvedNames,
+        forgeSubstituted: substitutedEntries,
+        forgeUnresolvable: forgeResult.unresolvable,
         total: updatedCards.length,
       });
     } finally {
       setImporting(false);
+      setImportStep('');
     }
   }, [deckName, deckText, cardDataLoaded, importDeckFromText, updateDeck]);
 
@@ -177,34 +211,75 @@ function DecksContent() {
               {importResult ? (
                 // Show import results
                 <div className="flex flex-col gap-3">
+                  {/* Scryfall resolution */}
                   <div className="flex items-center gap-2 text-sm">
                     {importResult.unresolved.length === 0 ? (
                       <>
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                         <span className="text-green-400">
-                          All {importResult.resolved} cards resolved successfully!
+                          All {importResult.resolved} cards resolved in Scryfall.
                         </span>
                       </>
                     ) : (
                       <>
                         <AlertCircle className="h-5 w-5 text-amber-500" />
                         <span>
-                          {importResult.resolved} of {importResult.total} cards resolved.{' '}
+                          {importResult.resolved} of {importResult.total} cards resolved in Scryfall.{' '}
                           {importResult.unresolved.length} not found.
                         </span>
                       </>
                     )}
                   </div>
 
+                  {/* Forge resolution */}
+                  {importResult.forgeSubstituted.length === 0 && importResult.forgeUnresolvable.length === 0 ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <span className="text-green-400">All cards verified in Forge engine.</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm">
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
+                      <span>
+                        Forge engine:{' '}
+                        {importResult.forgeSubstituted.length > 0 && `${importResult.forgeSubstituted.length} substituted`}
+                        {importResult.forgeSubstituted.length > 0 && importResult.forgeUnresolvable.length > 0 && ', '}
+                        {importResult.forgeUnresolvable.length > 0 && `${importResult.forgeUnresolvable.length} unavailable`}
+                      </span>
+                    </div>
+                  )}
+
                   {importResult.unresolved.length > 0 && (
-                    <div className="max-h-32 overflow-y-auto rounded border border-border/30 bg-card/50 p-2">
+                    <div className="max-h-28 overflow-y-auto rounded border border-border/30 bg-card/50 p-2">
                       <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        Unresolved cards:
+                        Not found in Scryfall:
                       </p>
                       {importResult.unresolved.map((name) => (
-                        <p key={name} className="text-xs text-destructive">
-                          {name}
+                        <p key={name} className="text-xs text-destructive">{name}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {importResult.forgeSubstituted.length > 0 && (
+                    <div className="max-h-28 overflow-y-auto rounded border border-blue-500/20 bg-blue-500/5 p-2">
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-blue-400/70">
+                        Forge substitutions (reprints → originals):
+                      </p>
+                      {importResult.forgeSubstituted.map((s) => (
+                        <p key={s.original} className="text-xs text-blue-300">
+                          {s.original} → <span className="text-blue-400 font-medium">{s.forgeName}</span>
                         </p>
+                      ))}
+                    </div>
+                  )}
+
+                  {importResult.forgeUnresolvable.length > 0 && (
+                    <div className="max-h-28 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 p-2">
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-red-400/70">
+                        Not found in Forge (won&apos;t work in-game):
+                      </p>
+                      {importResult.forgeUnresolvable.map((name) => (
+                        <p key={name} className="text-xs text-red-400">{name}</p>
                       ))}
                     </div>
                   )}
@@ -243,7 +318,7 @@ function DecksContent() {
                     {importing ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Resolving cards...
+                        {importStep || 'Resolving cards...'}
                       </>
                     ) : (
                       <>
