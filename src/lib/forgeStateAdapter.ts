@@ -120,22 +120,39 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
           flipped: fc.flipped ?? false,
           faceDown: fc.faceDown ?? false,
           counters: fc.counters ?? {},
-          attachedTo: undefined,
+          attachedTo: fc.attachedTo ? `forge-${fc.attachedTo.id}` : undefined,
+          attachedToName: fc.attachedTo?.name,
           attachments: [],
+          attachmentNames: [],
           damage: fc.damage ?? 0,
           summoningSick: fc.sick ?? false,
           abilities: [],
         };
+
+        // Compute modifiedPower/Toughness to capture equipment/aura/other buffs
+        // getDisplayPT calculates: basePower + counterBonus + modifiedPower
+        // Forge sends net P/T (includes everything), so: modified = net - base - counters
+        if (fc.power != null && fc.basePower != null) {
+          const counterBonus = (fc.counters?.['+1/+1'] ?? 0) - (fc.counters?.['-1/-1'] ?? 0);
+          cardInstance.modifiedPower = fc.power - fc.basePower - counterBonus;
+          cardInstance.modifiedToughness = (fc.toughness ?? 0) - (fc.baseToughness ?? 0) - counterBonus;
+        }
 
         // Handle equipment/aura attachments
         if (fc.equippedBy) {
           cardInstance.attachments.push(
             ...fc.equippedBy.map((eq) => `forge-${eq.id}`)
           );
+          cardInstance.attachmentNames.push(
+            ...fc.equippedBy.map((eq) => eq.name)
+          );
         }
         if (fc.enchantedBy) {
           cardInstance.attachments.push(
             ...fc.enchantedBy.map((a) => `forge-${a.id}`)
+          );
+          cardInstance.attachmentNames.push(
+            ...fc.enchantedBy.map((a) => a.name)
           );
         }
 

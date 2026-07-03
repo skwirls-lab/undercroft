@@ -71,6 +71,7 @@ export interface ForgeCard {
   counters?: Record<string, number>;
   equippedBy?: { id: number; name: string }[];
   enchantedBy?: { id: number; name: string }[];
+  attachedTo?: { id: number; name: string; controllerId: number };
   keywords?: string[];
   owner?: string;
   ownerId?: number;

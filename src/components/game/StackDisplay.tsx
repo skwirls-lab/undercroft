@@ -21,6 +21,7 @@ function stackItemToPreviewCard(item: StackItem): CardInstance | null {
     faceDown: false,
     counters: {},
     attachments: [],
+    attachmentNames: [],
     attachedTo: undefined,
     abilities: [],
     summoningSick: false,

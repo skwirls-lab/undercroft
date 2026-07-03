@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,8 @@ import { CardView, type CombatRole } from './CardView';
 import { ManaPoolDisplay } from './ManaPoolDisplay';
 import type { CardInstance, PlayerState, GameAction, CombatState, ManaColor } from '@/lib/gameTypes';
 import { ManaColorPicker } from './ManaColorPicker';
-import { Heart, Skull, Droplets, Crown, Library, ArchiveX, ZapOff, Sword, Gem } from 'lucide-react';
+import { Heart, Skull, Droplets, Crown, Library, ArchiveX, ZapOff, Sword, Gem, X, ChevronRight } from 'lucide-react';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const cardEnter = { opacity: 0, scale: 0.7, y: 12 };
 const cardAnimate = { opacity: 1, scale: 1, y: 0 };
@@ -78,6 +79,9 @@ export function PlayerField({
   onTapForManaPayment,
   className,
 }: PlayerFieldProps) {
+  // Detect mobile viewport for collapsible battlefield zones
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
   // Track life changes for animation
   const prevLifeRef = useRef(player.life);
   const [lifeDelta, setLifeDelta] = useState<number | null>(null);
@@ -120,6 +124,15 @@ export function PlayerField({
       .map((a) => a.payload.cardInstanceId as string)
   );
 
+  // Build a set of card IDs that are attached to something (equipment on a creature, aura on a creature)
+  // These should NOT appear standalone in the "Other" row — they show as badges on their host
+  const attachedCardIds = new Set<string>();
+  for (const card of battlefield) {
+    if (card.attachedTo) {
+      attachedCardIds.add(card.instanceId);
+    }
+  }
+
   // Separate battlefield into creature and non-creature permanents
   const creatures = battlefield.filter((c) =>
     c.cardData.typeLine.toLowerCase().includes('creature')
@@ -130,7 +143,8 @@ export function PlayerField({
   const otherPermanents = battlefield.filter(
     (c) =>
       !c.cardData.typeLine.toLowerCase().includes('creature') &&
-      !c.cardData.typeLine.toLowerCase().includes('land')
+      !c.cardData.typeLine.toLowerCase().includes('land') &&
+      !attachedCardIds.has(c.instanceId)
   );
 
   // Use pip mode for opponents, art mode for current user
@@ -293,6 +307,32 @@ export function PlayerField({
       )}
 
       {/* Battlefield */}
+      {isMobile ? (
+        <MobileBattlefield
+          creatures={creatures}
+          otherPermanents={otherPermanents}
+          lands={lands}
+          cardMode={cardMode}
+          combat={combat}
+          validTargetIds={validTargetIds}
+          activatableIds={activatableIds}
+          equippableIds={equippableIds}
+          tappableLandIds={tappableLandIds}
+          untappableLandIds={untappableLandIds}
+          manaPaymentSourceIds={manaPaymentSourceIds}
+          pendingManaChoice={pendingManaChoice}
+          onSelectTarget={onSelectTarget}
+          onActivateAbility={onActivateAbility}
+          onEquipClick={onEquipClick}
+          onTapLand={onTapLand}
+          onUntapLand={onUntapLand}
+          onTapForManaPayment={onTapForManaPayment}
+          onManaColorPicked={onManaColorPicked}
+          onCancelManaChoice={onCancelManaChoice}
+          onCardClick={onCardClick}
+          isEmpty={battlefield.length === 0}
+        />
+      ) : (
       <div className="relative flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto">
         {/* Creatures row */}
         {creatures.length > 0 && (
@@ -460,6 +500,300 @@ export function PlayerField({
           </div>
         )}
       </div>
+      )}
+    </div>
+  );
+}
+
+// ==================== MOBILE BATTLEFIELD ====================
+// Collapsed zone rows that expand to full-screen overlays on tap
+
+interface MobileBattlefieldProps {
+  creatures: CardInstance[];
+  otherPermanents: CardInstance[];
+  lands: CardInstance[];
+  cardMode: 'pip' | 'art';
+  combat?: CombatState | null;
+  validTargetIds?: Set<string>;
+  activatableIds: Set<string>;
+  equippableIds: Set<string>;
+  tappableLandIds: Set<string>;
+  untappableLandIds: Set<string>;
+  manaPaymentSourceIds?: Set<string>;
+  pendingManaChoice?: { cardInstanceId: string; actions: GameAction[] } | null;
+  onSelectTarget?: (targetId: string) => void;
+  onActivateAbility?: (card: CardInstance) => void;
+  onEquipClick?: (card: CardInstance) => void;
+  onTapLand: (card: CardInstance) => void;
+  onUntapLand?: (card: CardInstance) => void;
+  onTapForManaPayment?: (cardInstanceId: string) => void;
+  onManaColorPicked?: (color: ManaColor | 'C') => void;
+  onCancelManaChoice?: () => void;
+  onCardClick?: (card: CardInstance) => void;
+  isEmpty: boolean;
+}
+
+function MobileBattlefield({
+  creatures,
+  otherPermanents,
+  lands,
+  cardMode,
+  combat,
+  validTargetIds,
+  activatableIds,
+  equippableIds,
+  tappableLandIds,
+  untappableLandIds,
+  manaPaymentSourceIds,
+  pendingManaChoice,
+  onSelectTarget,
+  onActivateAbility,
+  onEquipClick,
+  onTapLand,
+  onUntapLand,
+  onTapForManaPayment,
+  onManaColorPicked,
+  onCancelManaChoice,
+  onCardClick,
+  isEmpty,
+}: MobileBattlefieldProps) {
+  const [expandedZone, setExpandedZone] = useState<'creatures' | 'other' | 'lands' | null>(null);
+
+  // Get summary stats for a zone
+  const creatureSummary = creatures.map(c => {
+    const p = c.cardData.power ?? '?';
+    const t = c.cardData.toughness ?? '?';
+    const counters = c.counters['+1/+1'] || 0;
+    const tapped = c.tapped;
+    return { name: c.cardData.name, p, t, counters, tapped, attacking: getCardCombatRole(c.instanceId, combat) === 'attacking' };
+  });
+
+  const tappedLandCount = lands.filter(l => l.tapped).length;
+  const untappedLandCount = lands.length - tappedLandCount;
+
+  return (
+    <div className="relative flex-1 min-h-0 flex flex-col gap-1">
+      {/* Creatures summary row */}
+      {creatures.length > 0 && (
+        <button
+          onClick={() => setExpandedZone('creatures')}
+          className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-950/20 px-2.5 py-1.5 text-left w-full"
+        >
+          <Sword className="h-3.5 w-3.5 text-red-400 shrink-0" />
+          <span className="text-[10px] font-semibold text-red-300 uppercase tracking-wide shrink-0">
+            Creatures ({creatures.length})
+          </span>
+          <div className="flex-1 min-w-0 flex gap-1.5 overflow-hidden">
+            {creatureSummary.slice(0, 4).map((c, i) => (
+              <span key={i} className={cn(
+                'text-[9px] font-mono px-1 py-0.5 rounded shrink-0',
+                c.tapped ? 'bg-red-900/30 text-red-400/50' : 'bg-red-900/40 text-red-200',
+                c.attacking && 'ring-1 ring-red-400'
+              )}>
+                {c.name.length > 8 ? c.name.slice(0, 7) + '\u2026' : c.name} {c.p}/{c.t}{c.counters > 0 ? ` +${c.counters}` : ''}
+              </span>
+            ))}
+            {creatures.length > 4 && (
+              <span className="text-[9px] text-red-400/60">+{creatures.length - 4}</span>
+            )}
+          </div>
+          <ChevronRight className="h-3 w-3 text-red-400/40 shrink-0" />
+        </button>
+      )}
+
+      {/* Other permanents summary row */}
+      {otherPermanents.length > 0 && (
+        <button
+          onClick={() => setExpandedZone('other')}
+          className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-950/20 px-2.5 py-1.5 text-left w-full"
+        >
+          <Gem className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+          <span className="text-[10px] font-semibold text-purple-300 uppercase tracking-wide shrink-0">
+            Other ({otherPermanents.length})
+          </span>
+          <div className="flex-1 min-w-0 flex gap-1 overflow-hidden">
+            {otherPermanents.slice(0, 3).map((c, i) => (
+              <span key={i} className="text-[9px] font-mono px-1 py-0.5 rounded bg-purple-900/30 text-purple-200 shrink-0 truncate max-w-[80px]">
+                {c.cardData.name}
+              </span>
+            ))}
+            {otherPermanents.length > 3 && (
+              <span className="text-[9px] text-purple-400/60">+{otherPermanents.length - 3}</span>
+            )}
+          </div>
+          <ChevronRight className="h-3 w-3 text-purple-400/40 shrink-0" />
+        </button>
+      )}
+
+      {/* Lands summary row */}
+      {lands.length > 0 && (
+        <button
+          onClick={() => setExpandedZone('lands')}
+          className="flex items-center gap-2 rounded-lg border border-amber-600/20 bg-amber-950/20 px-2.5 py-1.5 text-left w-full"
+        >
+          <Library className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+          <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wide">
+            Lands ({lands.length})
+          </span>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <span className="text-[9px] text-green-400 font-semibold">{untappedLandCount} untapped</span>
+            {tappedLandCount > 0 && (
+              <span className="text-[9px] text-amber-400/50">{tappedLandCount} tapped</span>
+            )}
+          </div>
+          <ChevronRight className="h-3 w-3 text-amber-400/40 shrink-0" />
+        </button>
+      )}
+
+      {/* Empty battlefield */}
+      {isEmpty && (
+        <div className="flex items-center justify-center py-3 text-[10px] text-muted-foreground/30 italic">
+          No permanents
+        </div>
+      )}
+
+      {/* Expanded zone overlay */}
+      <AnimatePresence>
+        {expandedZone && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md"
+          >
+            {/* Header */}
+            <div className={cn(
+              'flex items-center justify-between px-4 py-3 border-b shrink-0',
+              expandedZone === 'creatures' && 'border-red-500/30 bg-red-950/30',
+              expandedZone === 'other' && 'border-purple-500/30 bg-purple-950/30',
+              expandedZone === 'lands' && 'border-amber-600/30 bg-amber-950/30',
+            )}>
+              <div className="flex items-center gap-2">
+                {expandedZone === 'creatures' && <Sword className="h-4 w-4 text-red-400" />}
+                {expandedZone === 'other' && <Gem className="h-4 w-4 text-purple-400" />}
+                {expandedZone === 'lands' && <Library className="h-4 w-4 text-amber-400" />}
+                <span className="text-sm font-semibold capitalize">
+                  {expandedZone === 'other' ? 'Other Permanents' : expandedZone} ({
+                    expandedZone === 'creatures' ? creatures.length :
+                    expandedZone === 'other' ? otherPermanents.length :
+                    lands.length
+                  })
+                </span>
+              </div>
+              <button
+                onClick={() => setExpandedZone(null)}
+                className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Scrollable card grid */}
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="flex flex-wrap gap-2 justify-center">
+                {expandedZone === 'creatures' && creatures.map(card => {
+                  const isTarget = validTargetIds?.has(card.instanceId);
+                  const canActivate = activatableIds.has(card.instanceId);
+                  return (
+                    <div key={card.instanceId}>
+                      <CardView
+                        card={card}
+                        mode="art"
+                        onClick={(c) => {
+                          if (isTarget) onSelectTarget?.(c.instanceId);
+                          else if (canActivate) onActivateAbility?.(c);
+                          else onCardClick?.(c);
+                        }}
+                        combatRole={getCardCombatRole(card.instanceId, combat)}
+                        highlighted={isTarget || canActivate}
+                        interactive
+                        className={cn(
+                          isTarget && 'ring-2 ring-cyan-500/60',
+                          canActivate && !isTarget && 'ring-2 ring-emerald-500/60'
+                        )}
+                      />
+                    </div>
+                  );
+                })}
+
+                {expandedZone === 'other' && otherPermanents.map(card => {
+                  const isTarget = validTargetIds?.has(card.instanceId);
+                  const canEquip = equippableIds.has(card.instanceId);
+                  const canActivate = activatableIds.has(card.instanceId);
+                  return (
+                    <div key={card.instanceId}>
+                      <CardView
+                        card={card}
+                        mode="art"
+                        onClick={(c) => {
+                          if (isTarget) onSelectTarget?.(c.instanceId);
+                          else if (canEquip) onEquipClick?.(c);
+                          else if (canActivate) onActivateAbility?.(c);
+                          else onCardClick?.(c);
+                        }}
+                        highlighted={isTarget || canEquip || canActivate}
+                        interactive
+                        className={cn(
+                          isTarget && 'ring-2 ring-cyan-500/60',
+                          canEquip && !isTarget && 'ring-2 ring-amber-500/60',
+                          canActivate && !isTarget && !canEquip && 'ring-2 ring-emerald-500/60'
+                        )}
+                      />
+                    </div>
+                  );
+                })}
+
+                {expandedZone === 'lands' && lands.map(card => {
+                  const isManaPaymentSource = manaPaymentSourceIds?.has(card.instanceId);
+                  const canTap = tappableLandIds.has(card.instanceId);
+                  const canUntap = untappableLandIds.has(card.instanceId);
+                  const canActivate = activatableIds.has(card.instanceId);
+                  const hasPendingChoice = pendingManaChoice?.cardInstanceId === card.instanceId;
+                  return (
+                    <div key={card.instanceId} className="relative">
+                      <div
+                        onClick={() => {
+                          if (isManaPaymentSource && onTapForManaPayment) {
+                            onTapForManaPayment(card.instanceId);
+                            return;
+                          }
+                          if (hasPendingChoice) return;
+                          if (canTap) onTapLand(card);
+                          else if (canActivate) onActivateAbility?.(card);
+                          else if (canUntap && onUntapLand) onUntapLand(card);
+                          else onCardClick?.(card);
+                        }}
+                      >
+                        <CardView
+                          card={card}
+                          mode="pip"
+                          highlighted={isManaPaymentSource || canTap || canActivate || hasPendingChoice}
+                          interactive
+                          className={cn(
+                            isManaPaymentSource && 'ring-2 ring-emerald-400/70',
+                            !isManaPaymentSource && canActivate && !canTap && 'ring-2 ring-emerald-500/60',
+                            !isManaPaymentSource && canUntap && !canTap && !canActivate && 'ring-1 ring-amber-500/50',
+                            hasPendingChoice && 'ring-2 ring-primary'
+                          )}
+                        />
+                      </div>
+                      {hasPendingChoice && onManaColorPicked && onCancelManaChoice && (
+                        <ManaColorPicker
+                          colors={pendingManaChoice.actions.map((a) => a.payload.manaColor as ManaColor | 'C')}
+                          onPick={onManaColorPicked}
+                          onCancel={onCancelManaChoice}
+                          className="-top-16 left-1/2 -translate-x-1/2"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

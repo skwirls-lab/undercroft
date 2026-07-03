@@ -86,7 +86,9 @@ export interface CardInstance {
   faceDown: boolean;
   counters: Record<string, number>;
   attachedTo?: string;
+  attachedToName?: string;
   attachments: string[];
+  attachmentNames: string[];
   damage: number;
   summoningSick: boolean;
   modifiedPower?: number;

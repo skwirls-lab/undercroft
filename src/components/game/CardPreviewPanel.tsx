@@ -107,6 +107,43 @@ export function CardPreviewPanel({ className, compact }: CardPreviewPanelProps) 
                     {face.oracleText}
                   </p>
                 )}
+
+                {/* Counters */}
+                {Object.keys(previewCard.counters).length > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-border/20">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-0.5">Counters</p>
+                    {Object.entries(previewCard.counters).map(([type, count]) => (
+                      <p key={type} className={cn(
+                        'text-[10px] font-semibold',
+                        type === '+1/+1' ? 'text-green-400' : type === '-1/-1' ? 'text-red-400' : 'text-purple-400'
+                      )}>
+                        {count}x {type}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Attachments on this card */}
+                {previewCard.attachmentNames.length > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-border/20">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-0.5">Attached</p>
+                    {previewCard.attachmentNames.map((name, i) => (
+                      <p key={i} className="text-[10px] font-medium text-amber-400">
+                        ⚔ {name}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* What this card is attached to */}
+                {previewCard.attachedToName && (
+                  <div className="mt-1.5 pt-1.5 border-t border-border/20">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-0.5">Attached to</p>
+                    <p className="text-[10px] font-medium text-blue-400">
+                      → {previewCard.attachedToName}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

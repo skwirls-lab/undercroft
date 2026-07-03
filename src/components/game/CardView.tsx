@@ -141,9 +141,11 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
         {(card.counters['+1/+1'] || 0) > 0 && (
           <span className="text-[8px] font-bold text-green-400">+{card.counters['+1/+1']}</span>
         )}
-        {/* Equipment */}
-        {card.attachments.length > 0 && (
-          <span className="text-[7px] font-bold text-amber-400">EQ</span>
+        {/* Attachments */}
+        {card.attachmentNames.length > 0 && (
+          <span className="text-[7px] font-bold text-amber-400" title={card.attachmentNames.join(', ')}>
+            {card.attachmentNames.length}x⚔
+          </span>
         )}
         {/* Token */}
         {isToken(card) && (
@@ -237,10 +239,10 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
         </div>
       )}
 
-      {/* Equipment attached indicator */}
-      {card.attachments.length > 0 && (
-        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 px-1 py-0.5 text-[7px] font-bold text-amber-100 shadow">
-          EQ
+      {/* Attachments indicator */}
+      {card.attachmentNames.length > 0 && (
+        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 px-1 py-0.5 text-[7px] font-bold text-amber-100 shadow max-w-[70px] truncate" title={card.attachmentNames.join(', ')}>
+          {card.attachmentNames.length === 1 ? card.attachmentNames[0] : `${card.attachmentNames.length} attached`}
         </div>
       )}
 
