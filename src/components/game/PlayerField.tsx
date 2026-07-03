@@ -79,8 +79,10 @@ export function PlayerField({
   onTapForManaPayment,
   className,
 }: PlayerFieldProps) {
-  // Detect compact viewport — triggers on mobile AND resized desktop windows
-  const isMobile = useMediaQuery('(max-width: 1024px)');
+  // Detect compact viewport — triggers on narrow width OR short height (landscape mobile)
+  const isNarrow = useMediaQuery('(max-width: 1024px)');
+  const isShort = useMediaQuery('(max-height: 600px)');
+  const isMobile = isNarrow || isShort;
 
   // Track life changes for animation
   const prevLifeRef = useRef(player.life);
@@ -313,6 +315,9 @@ export function PlayerField({
           creatures={creatures}
           otherPermanents={otherPermanents}
           lands={lands}
+          commandZone={hideCommandZone ? [] : commandZone}
+          castableCommanderIds={castableCommanderIds}
+          onCastCommander={onCastCommander}
           cardMode={cardMode}
           combat={combat}
           validTargetIds={validTargetIds}
@@ -537,6 +542,9 @@ interface MobileBattlefieldProps {
   creatures: CardInstance[];
   otherPermanents: CardInstance[];
   lands: CardInstance[];
+  commandZone: CardInstance[];
+  castableCommanderIds: Set<string>;
+  onCastCommander?: (card: CardInstance) => void;
   cardMode: 'pip' | 'art';
   combat?: CombatState | null;
   validTargetIds?: Set<string>;
@@ -562,6 +570,9 @@ function MobileBattlefield({
   creatures,
   otherPermanents,
   lands,
+  commandZone,
+  castableCommanderIds,
+  onCastCommander,
   cardMode,
   combat,
   validTargetIds,
@@ -582,7 +593,7 @@ function MobileBattlefield({
   onCardClick,
   isEmpty,
 }: MobileBattlefieldProps) {
-  const [expandedZone, setExpandedZone] = useState<'creatures' | 'other' | 'lands' | null>(null);
+  const [expandedZone, setExpandedZone] = useState<'creatures' | 'other' | 'lands' | 'command' | null>(null);
 
   // Get summary stats for a zone
   const creatureSummary = creatures.map(c => {
@@ -598,6 +609,27 @@ function MobileBattlefield({
 
   return (
     <div className="relative flex-1 min-h-0 flex flex-col gap-1">
+      {/* Command zone summary row */}
+      {commandZone.length > 0 && (
+        <button
+          onClick={() => setExpandedZone('command')}
+          className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-left w-full"
+        >
+          <Crown className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+          <span className="text-[10px] font-semibold text-primary/70 uppercase tracking-wide shrink-0">
+            Command ({commandZone.length})
+          </span>
+          <div className="flex-1 min-w-0 flex gap-1.5 overflow-hidden">
+            {commandZone.map((c, i) => (
+              <span key={i} className="text-[9px] font-mono px-1 py-0.5 rounded bg-primary/10 text-primary/80 shrink-0 truncate max-w-[100px]">
+                {c.cardData.name}
+              </span>
+            ))}
+          </div>
+          <ChevronRight className="h-3 w-3 text-primary/30 shrink-0" />
+        </button>
+      )}
+
       {/* Creatures summary row */}
       {creatures.length > 0 && (
         <button
@@ -690,16 +722,19 @@ function MobileBattlefield({
             {/* Header */}
             <div className={cn(
               'flex items-center justify-between px-4 py-3 border-b shrink-0',
+              expandedZone === 'command' && 'border-primary/30 bg-primary/10',
               expandedZone === 'creatures' && 'border-red-500/30 bg-red-950/30',
               expandedZone === 'other' && 'border-purple-500/30 bg-purple-950/30',
               expandedZone === 'lands' && 'border-amber-600/30 bg-amber-950/30',
             )}>
               <div className="flex items-center gap-2">
+                {expandedZone === 'command' && <Crown className="h-4 w-4 text-primary/70" />}
                 {expandedZone === 'creatures' && <Sword className="h-4 w-4 text-red-400" />}
                 {expandedZone === 'other' && <Gem className="h-4 w-4 text-purple-400" />}
                 {expandedZone === 'lands' && <Library className="h-4 w-4 text-amber-400" />}
                 <span className="text-sm font-semibold capitalize">
-                  {expandedZone === 'other' ? 'Other Permanents' : expandedZone} ({
+                  {expandedZone === 'command' ? 'Command Zone' : expandedZone === 'other' ? 'Other Permanents' : expandedZone} ({
+                    expandedZone === 'command' ? commandZone.length :
                     expandedZone === 'creatures' ? creatures.length :
                     expandedZone === 'other' ? otherPermanents.length :
                     lands.length
@@ -717,6 +752,28 @@ function MobileBattlefield({
             {/* Scrollable card grid */}
             <div className="flex-1 overflow-y-auto p-3">
               <div className="flex flex-wrap gap-2 justify-center">
+                {/* Command zone expanded */}
+                {expandedZone === 'command' && commandZone.map(card => {
+                  const canCast = castableCommanderIds.has(card.instanceId);
+                  return (
+                    <div key={card.instanceId}>
+                      <CardView
+                        card={card}
+                        mode="art"
+                        onClick={(c) => {
+                          if (canCast) onCastCommander?.(c);
+                          else onCardClick?.(c);
+                        }}
+                        highlighted={canCast}
+                        interactive
+                        className={cn(
+                          canCast && 'ring-2 ring-green-500/60'
+                        )}
+                      />
+                    </div>
+                  );
+                })}
+
                 {expandedZone === 'creatures' && creatures.map(card => {
                   const isTarget = validTargetIds?.has(card.instanceId);
                   const canActivate = activatableIds.has(card.instanceId);
