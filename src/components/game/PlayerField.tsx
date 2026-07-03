@@ -79,8 +79,8 @@ export function PlayerField({
   onTapForManaPayment,
   className,
 }: PlayerFieldProps) {
-  // Detect mobile viewport for collapsible battlefield zones
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  // Detect compact viewport — triggers on mobile AND resized desktop windows
+  const isMobile = useMediaQuery('(max-width: 1024px)');
 
   // Track life changes for animation
   const prevLifeRef = useRef(player.life);
@@ -333,7 +333,7 @@ export function PlayerField({
           isEmpty={battlefield.length === 0}
         />
       ) : (
-      <div className="relative flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto">
+      <div className="relative flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
         {/* Creatures row */}
         {creatures.length > 0 && (
           <div>
