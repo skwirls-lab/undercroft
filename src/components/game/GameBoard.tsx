@@ -351,8 +351,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_20%,rgba(80,60,30,0.05),transparent)]" />
       </div>
 
-      {/* ─── TOP ZONE: phase tracker + opponents — capped height, never scrolls ─── */}
-      <div className="shrink-0 max-h-[40vh] overflow-hidden flex flex-col gap-2">
+      {/* ─── TOP ZONE: phase tracker + opponents — compact, never scrolls ─── */}
+      <div className="shrink-0 flex flex-col gap-2">
       {/* Phase tracker */}
       <PhaseTracker
         turn={gameState.turn}

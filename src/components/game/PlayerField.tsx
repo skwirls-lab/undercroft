@@ -162,7 +162,8 @@ export function PlayerField({
   return (
     <div
       className={cn(
-        'relative rounded-2xl border p-4 transition-all overflow-hidden flex flex-col',
+        'relative rounded-2xl border transition-all overflow-hidden flex flex-col',
+        isCurrentUser ? 'p-4' : 'p-2',
         isActivePlayer 
           ? 'border-gold/40 bg-gold/[0.03] shadow-[0_0_20px_rgba(212,169,68,0.08)] ring-1 ring-gold/20' 
           : isCurrentUser
@@ -273,8 +274,8 @@ export function PlayerField({
         </div>
       </div>
 
-      {/* Command zone */}
-      {!hideCommandZone && commandZone.length > 0 && (
+      {/* Command zone — for opponents, inline with info bar; for current user, separate row */}
+      {!hideCommandZone && commandZone.length > 0 && isCurrentUser && (
         <div className="relative mb-2">
           <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-primary/70">
             <Crown className="h-3 w-3" />
@@ -292,7 +293,7 @@ export function PlayerField({
                 >
                   <CardView
                     card={card}
-                    mode={isCurrentUser ? 'art' : 'pip'}
+                    mode="art"
                     highlighted={canCast}
                     interactive
                     className={cn(
@@ -333,15 +334,33 @@ export function PlayerField({
           isEmpty={battlefield.length === 0}
         />
       ) : (
-      <div className="relative flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      <div className={cn(
+        'relative flex-1 min-h-0 flex flex-col overflow-hidden',
+        isCurrentUser ? 'gap-3' : 'gap-1'
+      )}>
+        {/* Opponent inline command zone */}
+        {!hideCommandZone && commandZone.length > 0 && !isCurrentUser && (
+          <div className="flex items-center gap-1">
+            <Crown className="h-3 w-3 text-primary/50 shrink-0" />
+            <div className="flex gap-1 overflow-hidden">
+              {commandZone.map((card) => (
+                <CardView key={card.instanceId} card={card} mode="pip" interactive />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Creatures row */}
         {creatures.length > 0 && (
           <div>
-            <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+            <div className={cn(
+              'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50',
+              isCurrentUser ? 'mb-1.5' : 'mb-0.5'
+            )}>
               <Sword className="h-3 w-3" />
               Creatures ({creatures.length})
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className={cn('flex gap-1.5', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')}>
               <AnimatePresence>
               {creatures.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
@@ -381,11 +400,14 @@ export function PlayerField({
         {/* Other permanents row */}
         {otherPermanents.length > 0 && (
           <div>
-            <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+            <div className={cn(
+              'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50',
+              isCurrentUser ? 'mb-1.5' : 'mb-0.5'
+            )}>
               <Gem className="h-3 w-3" />
               Other ({otherPermanents.length})
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className={cn('flex gap-1.5', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')}>
               <AnimatePresence>
               {otherPermanents.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
@@ -426,12 +448,15 @@ export function PlayerField({
 
         {/* Lands row */}
         {lands.length > 0 && (
-          <div className="pt-2 border-t border-border/10">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+          <div className={cn(isCurrentUser && 'pt-2 border-t border-border/10')}>
+            <div className={cn(
+              'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50',
+              isCurrentUser ? 'mb-1' : 'mb-0.5'
+            )}>
               <Library className="h-3 w-3" />
               Lands ({lands.length})
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className={cn('flex gap-1', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')}>
               <AnimatePresence>
               {lands.map((card) => {
                 const isManaPaymentSource = manaPaymentSourceIds?.has(card.instanceId);
