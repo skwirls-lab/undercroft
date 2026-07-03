@@ -84,7 +84,7 @@ const krenkoGoblins: AIDeck = {
     // Lands (43 — includes utility lands)
     '1 Castle Embereth',
     '1 Nykthos, Shrine to Nyx',
-    '1 Skirk Ridge',
+    '1 Shinka, the Bloodsoaked Keep',
     '1 Goblin Burrows',
     '1 Forgotten Cave',
     '1 Great Furnace',
