@@ -152,7 +152,8 @@ export function PlayerField({
   );
 
   // Use pip mode for opponents, art mode for current user (forceArtMode overrides)
-  const cardMode = (isCurrentUser || forceArtMode) ? 'art' : 'pip';
+  const useFullLayout = isCurrentUser || !!forceArtMode;
+  const cardMode = useFullLayout ? 'art' : 'pip';
 
   // Commander art for backdrop
   const commanderCard = commandZone.find(c =>
@@ -175,7 +176,7 @@ export function PlayerField({
         player.hasLost && 'opacity-40 grayscale',
         className
       )}
-      style={{ padding: isCurrentUser ? 'clamp(10px,2vmin,1000px)' : 'clamp(6px,1vmin,1000px)' }}
+      style={{ padding: useFullLayout ? 'clamp(10px,2vmin,1000px)' : 'clamp(6px,1vmin,1000px)' }}
     >
       {/* Commander art backdrop */}
       {commanderArtUrl && (
@@ -281,7 +282,7 @@ export function PlayerField({
       </div>
 
       {/* Command zone — for opponents, inline with info bar; for current user, separate row */}
-      {!hideCommandZone && commandZone.length > 0 && isCurrentUser && (
+      {!hideCommandZone && commandZone.length > 0 && useFullLayout && (
         <div className="relative" style={{ marginBottom: 'clamp(6px,1vmin,1000px)' }}>
           <div className="flex items-center font-medium uppercase tracking-wider text-primary/70" style={{ marginBottom: 'clamp(3px,0.5vmin,1000px)', gap: 'clamp(3px,0.5vmin,1000px)', fontSize: 'clamp(9px,1.5vmin,1000px)' }}>
             <Crown style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
@@ -343,9 +344,9 @@ export function PlayerField({
           isEmpty={battlefield.length === 0}
         />
       ) : (
-      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden" style={{ gap: isCurrentUser ? 'clamp(8px,1.5vmin,1000px)' : 'clamp(4px,0.6vmin,1000px)' }}>
+      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden" style={{ gap: useFullLayout ? 'clamp(8px,1.5vmin,1000px)' : 'clamp(4px,0.6vmin,1000px)' }}>
         {/* Opponent inline command zone */}
-        {!hideCommandZone && commandZone.length > 0 && !isCurrentUser && (
+        {!hideCommandZone && commandZone.length > 0 && !useFullLayout && (
           <div className="flex items-center" style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
             <Crown className="text-primary/50 shrink-0" style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
             <div className="flex overflow-hidden" style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
@@ -363,7 +364,7 @@ export function PlayerField({
               <Sword style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
               Creatures ({creatures.length})
             </div>
-            <div className={cn('flex', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
+            <div className={cn('flex', useFullLayout ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
               <AnimatePresence>
               {creatures.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
@@ -407,7 +408,7 @@ export function PlayerField({
               <Gem style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
               Other ({otherPermanents.length})
             </div>
-            <div className={cn('flex', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
+            <div className={cn('flex', useFullLayout ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
               <AnimatePresence>
               {otherPermanents.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
@@ -448,12 +449,12 @@ export function PlayerField({
 
         {/* Lands row */}
         {lands.length > 0 && (
-          <div className={cn(isCurrentUser && 'pt-2 border-t border-border/10')}>
+          <div className={cn(useFullLayout && 'pt-2 border-t border-border/10')}>
             <div className="flex items-center font-semibold uppercase tracking-wider text-muted-foreground/50" style={{ gap: 'clamp(4px,0.6vmin,1000px)', fontSize: 'clamp(9px,1.5vmin,1000px)', marginBottom: 'clamp(3px,0.5vmin,1000px)' }}>
               <Library style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
               Lands ({lands.length})
             </div>
-            <div className={cn('flex', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
+            <div className={cn('flex', useFullLayout ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
               <AnimatePresence>
               {lands.map((card) => {
                 const isManaPaymentSource = manaPaymentSourceIds?.has(card.instanceId);
