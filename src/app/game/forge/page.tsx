@@ -201,32 +201,45 @@ export default function ForgeGamePage() {
             externalExpandedPlayerId={expandedPlayerId}
             onExpandedPlayerChange={setExpandedPlayerId}
             expandedHandContent={
-              <div>
-                <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
-                  <HandIcon className="text-muted-foreground" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
-                  <span className="font-semibold text-muted-foreground" style={{ fontSize: 'clamp(12px,2.2vmin,1000px)' }}>Hand · {handCards.length}{commandZoneCards.length > 0 ? ` · Cmd ${commandZoneCards.length}` : ''}</span>
-                </div>
-                <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                  {commandZoneCards.map(card => {
-                    const canCast = legalActions.some(
-                      a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
-                    );
-                    return (
-                      <CommanderCard
-                        key={card.instanceId}
-                        card={card}
-                        canCast={canCast}
-                        onPlay={() => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
-                      />
-                    );
-                  })}
-                  <Hand
-                    cards={handCards}
-                    legalActions={handLegalActions}
-                    onPlayCard={(card) => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
-                    isActive={!!hasPriority && !isGameOver}
-                    layout="grid"
-                  />
+              <div className="flex flex-col" style={{ gap: 'clamp(6px,1vmin,1000px)' }}>
+                {/* ── Command Zone section ── */}
+                {commandZoneCards.length > 0 && (
+                  <div className="rounded-lg border border-amber-500/25 bg-amber-500/5" style={{ padding: 'clamp(6px,1vmin,1000px)' }}>
+                    <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(4px,0.6vmin,1000px)' }}>
+                      <span className="font-bold uppercase tracking-wider text-amber-400/80" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>⚜ Command Zone</span>
+                    </div>
+                    <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                      {commandZoneCards.map(card => {
+                        const canCast = legalActions.some(
+                          a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
+                        );
+                        return (
+                          <CommanderCard
+                            key={card.instanceId}
+                            card={card}
+                            canCast={canCast}
+                            onPlay={() => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* ── Hand section ── */}
+                <div>
+                  <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(4px,0.6vmin,1000px)' }}>
+                    <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
+                    <span className="font-bold uppercase tracking-wider text-muted-foreground/60" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>Hand · {handCards.length}</span>
+                  </div>
+                  <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                    <Hand
+                      cards={handCards}
+                      legalActions={handLegalActions}
+                      onPlayCard={(card) => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
+                      isActive={!!hasPriority && !isGameOver}
+                      layout="grid"
+                    />
+                  </div>
                 </div>
               </div>
             }

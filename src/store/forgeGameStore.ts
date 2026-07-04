@@ -463,6 +463,8 @@ export function mapChoiceToUI(choiceType: string): UIChoiceType {
     case 'choose_permanents_sacrifice':
     case 'choose_permanents_destroy':
     case 'choose_discard':
+    case 'choose_cards_zone':
+    case 'choose_single_card_zone':
     case 'mulligan_tuck':
       return 'card_select';
     case 'confirm_action':

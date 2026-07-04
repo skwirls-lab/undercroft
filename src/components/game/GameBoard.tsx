@@ -641,8 +641,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   <X style={{ width: 'clamp(18px,3vmin,1000px)', height: 'clamp(18px,3vmin,1000px)' }} />
                 </button>
               </div>
-              {/* Full battlefield */}
-              <div className="flex-1 min-h-0 overflow-y-auto h-full" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
+              {/* Full battlefield — scrollable */}
+              <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
                 <PlayerField
                   player={ep}
                   battlefield={getCardsInZone(gameState, expandedPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
@@ -666,15 +666,14 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   validTargetIds={targeting?.validTargetIds}
                   onSelectTarget={targeting ? handleSelectTarget : undefined}
                   forceArtMode
-                  className="h-full"
                 />
-                {/* Hand section embedded in expanded battlefield for current player */}
-                {isMe && expandedHandContent && (
-                  <div className="border-t border-border/30" style={{ marginTop: 'clamp(8px,1.5vmin,1000px)', paddingTop: 'clamp(8px,1.5vmin,1000px)' }}>
-                    {expandedHandContent}
-                  </div>
-                )}
               </div>
+              {/* Hand section pinned at bottom — not inside scroll container */}
+              {isMe && expandedHandContent && (
+                <div className="shrink-0 border-t border-border/30 overflow-y-auto" style={{ padding: 'clamp(6px,1vmin,1000px) clamp(8px,1.5vmin,1000px)', maxHeight: '35vh' }}>
+                  {expandedHandContent}
+                </div>
+              )}
             </motion.div>
           );
         })()}

@@ -163,14 +163,14 @@ function ChoicePanel({ choice, onRespond }: {
     );
   }
 
-  // --- choose_cards / choose_discard / choose_permanents_sacrifice / choose_permanents_destroy / choose_single_entity / choose_entities / choose_cards_zone ---
+  // --- choose_cards / choose_discard / choose_permanents_sacrifice / choose_permanents_destroy / choose_single_entity / choose_single_card_zone / choose_entities / choose_cards_zone ---
   if (['choose_cards', 'choose_discard', 'choose_permanents_sacrifice',
-       'choose_permanents_destroy', 'choose_single_entity', 'choose_entities',
-       'choose_cards_zone'].includes(choiceType)) {
+       'choose_permanents_destroy', 'choose_single_entity', 'choose_single_card_zone',
+       'choose_entities', 'choose_cards_zone'].includes(choiceType)) {
     const cardOptions = (data.options || data.cards || []) as CardOption[];
     const min = (data.min as number) ?? (data.optional ? 0 : 1);
     const max = (data.max as number) ?? cardOptions.length;
-    const isSingle = choiceType === 'choose_single_entity';
+    const isSingle = choiceType === 'choose_single_entity' || choiceType === 'choose_single_card_zone';
     return (
       <CardSelectPanel
         prompt={prompt || `Choose ${isSingle ? 'one' : `${min}-${max}`}`}
