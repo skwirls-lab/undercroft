@@ -18,6 +18,7 @@ import { CardView } from '@/components/game/CardView';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { CardInstance } from '@/lib/gameTypes';
+import { PhaseTracker } from '@/components/game/PhaseTracker';
 import {
   ArrowLeft,
   Loader2,
@@ -27,6 +28,8 @@ import {
   Hand as HandIcon,
   ChevronUp,
   X,
+  ArrowRight,
+  FastForward,
 } from 'lucide-react';
 
 // ============================================================
@@ -51,7 +54,7 @@ export default function ForgeGamePage() {
     concede,
   } = useForgeGameStore();
 
-  const { gameState, legalActions, performAction } = useGameStore();
+  const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass } = useGameStore();
 
   // Hand data — derived from gameStore so the hand can live outside GameBoard
   const handCardIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'hand') : [];
@@ -109,6 +112,16 @@ export default function ForgeGamePage() {
   const isCompact = useMediaQuery('(max-height: 600px)');
   const [handExpanded, setHandExpanded] = useState(false);
 
+  // Action bar state
+  const hasPriorityForActions = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
+  const isMyTurn = gameState?.turn.activePlayerId === HUMAN_PLAYER_ID;
+  const inCombatPhase = gameState?.turn.phase === 'combat';
+
+  const handlePassPriority = useCallback(() => {
+    const action = legalActions.find((a: { type: string }) => a.type === 'PASS_PRIORITY');
+    if (action) performAction(action);
+  }, [legalActions, performAction]);
+
   // If not connected, redirect back to setup
   useEffect(() => {
     if (connectionStatus === 'disconnected' || connectionStatus === 'error') {
@@ -130,44 +143,83 @@ export default function ForgeGamePage() {
   return (
     <CardPreviewProvider>
       <div className="flex h-[100dvh] flex-col overflow-hidden">
-        {/* Top bar — collapses to icon-only on compact */}
-        <header className={cn(
-          'flex items-center justify-between border-b border-border/30 shrink-0',
-          isCompact ? 'px-2 py-0.5' : 'px-4 py-2'
-        )}>
-          <div className="flex items-center gap-2">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className={cn(isCompact && 'h-7 w-7 p-0')}>
-                <ArrowLeft className="h-3.5 w-3.5" />
-                {!isCompact && <span className="ml-1">Home</span>}
-              </Button>
-            </Link>
-            {!isCompact && (
-              <h2 className="text-sm font-semibold tracking-tight text-gold">
-                Undercroft
-              </h2>
+        {/* Unified header: nav | phase tracker | action buttons */}
+        <header className="flex items-center gap-1 border-b border-border/30 shrink-0 px-2 py-0.5 min-h-[36px]">
+          {/* Left: nav */}
+          <Link href="/" className="shrink-0">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Home">
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
+
+          {/* Center: phase tracker — takes remaining space */}
+          {gameState && (
+            <div className="flex-1 min-w-0 mx-1">
+              <PhaseTracker
+                turn={gameState.turn}
+                activePlayerName={gameState.players.find(p => p.id === gameState.turn.activePlayerId)?.name || '?'}
+                className="!rounded-lg !px-2 !py-0.5 !border-0 !bg-transparent !backdrop-blur-none !shadow-none"
+              />
+            </div>
+          )}
+
+          {/* Right: status + action buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Status indicator */}
+            {isProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin text-gold" />}
+            {hasPriorityForActions && !isProcessing && !isGameOver && (
+              <span className="text-[10px] font-semibold text-gold mr-0.5">
+                {isMyTurn ? (inCombatPhase ? 'Combat' : 'Your Turn') : 'Priority'}
+              </span>
             )}
-          </div>
-          <div className="flex items-center gap-1">
+            {!hasPriorityForActions && !isProcessing && !isGameOver && gameState && (
+              <span className="text-[10px] text-muted-foreground mr-0.5">
+                {gameState.players.find(p => p.id === gameState.priority.playerWithPriority)?.name}
+              </span>
+            )}
+            <Button
+              size="sm"
+              onClick={handlePassPriority}
+              disabled={!hasPriorityForActions || isGameOver}
+              className={cn(
+                'h-7 gap-1 px-2.5 text-[11px] font-semibold',
+                hasPriorityForActions && !isGameOver
+                  ? 'bg-gold text-gold-foreground hover:bg-gold/90'
+                  : ''
+              )}
+            >
+              <ArrowRight className="h-3 w-3" />
+              Pass
+            </Button>
+            <Button
+              size="sm"
+              variant={autoPassUntilNextTurn ? 'default' : 'outline'}
+              onClick={() => setAutoPass(!autoPassUntilNextTurn)}
+              className={cn(
+                'h-7 px-2 text-[11px]',
+                autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white'
+              )}
+              title="Auto-pass"
+            >
+              <FastForward className="h-3 w-3" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={concede}
-              className={cn('gap-1 text-red-400', isCompact && 'h-7 w-7 p-0')}
+              className="h-7 w-7 p-0 text-red-400"
               title="Concede"
             >
-              <Flag className="h-3.5 w-3.5" />
-              {!isCompact && 'Concede'}
+              <Flag className="h-3 w-3" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => { disconnect(); router.push('/game'); }}
-              className={cn('gap-1 text-muted-foreground', isCompact && 'h-7 w-7 p-0')}
+              className="h-7 w-7 p-0 text-muted-foreground"
               title="New Game"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              {!isCompact && 'New Game'}
+              <RotateCcw className="h-3 w-3" />
             </Button>
           </div>
         </header>
@@ -196,6 +248,8 @@ export default function ForgeGamePage() {
                 currentPlayerId={HUMAN_PLAYER_ID}
                 hideHand
                 hideCommandZone
+                hidePhaseTracker
+                hideActionBar
                 className="h-full"
                 manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
                 manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}

@@ -619,12 +619,21 @@ function MobileBattlefield({
           <span className="text-[10px] font-semibold text-primary/70 uppercase tracking-wide shrink-0">
             Command ({commandZone.length})
           </span>
-          <div className="flex-1 min-w-0 flex gap-1.5 overflow-hidden">
-            {commandZone.map((c, i) => (
-              <span key={i} className="text-[9px] font-mono px-1 py-0.5 rounded bg-primary/10 text-primary/80 shrink-0 truncate max-w-[100px]">
-                {c.cardData.name}
-              </span>
-            ))}
+          <div className="flex-1 min-w-0 flex gap-1.5 items-center overflow-hidden">
+            {commandZone.map((c, i) => {
+              const artUrl = c.cardData.imageUris?.artCrop || c.cardData.cardFaces?.[0]?.imageUris?.artCrop;
+              return (
+                <div key={i} className="flex items-center gap-1 shrink-0">
+                  {artUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={artUrl} alt={c.cardData.name} className="h-6 w-8 rounded object-cover border border-primary/20" />
+                  ) : (
+                    <span className="h-6 w-8 rounded bg-primary/10 flex items-center justify-center text-[8px] text-primary/60">?</span>
+                  )}
+                  <span className="text-[9px] font-medium text-primary/80 truncate max-w-[80px]">{c.cardData.name}</span>
+                </div>
+              );
+            })}
           </div>
           <ChevronRight className="h-3 w-3 text-primary/30 shrink-0" />
         </button>

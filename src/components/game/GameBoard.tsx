@@ -22,6 +22,8 @@ interface GameBoardProps {
   className?: string;
   hideHand?: boolean;
   hideCommandZone?: boolean;
+  hidePhaseTracker?: boolean;
+  hideActionBar?: boolean;
   // Forge-style mana payment: lands the player can tap to pay for a spell
   manaPaymentSourceIds?: Set<string>;
   manaPaymentInfo?: { manaCost: string; spellName: string };
@@ -37,7 +39,7 @@ interface TargetingState {
   validTargetIds: Set<string>; // Quick lookup of valid target IDs
 }
 
-export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZone, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
+export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZone, hidePhaseTracker, hideActionBar, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
   const { pendingChoice } = useForgeGameStore();
 
@@ -352,12 +354,14 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
       </div>
 
       {/* ─── TOP ZONE: phase tracker + opponents — compact, never scrolls ─── */}
-      <div className="shrink-0 flex flex-col gap-2">
-      {/* Phase tracker */}
-      <PhaseTracker
-        turn={gameState.turn}
-        activePlayerName={activePlayer?.name || 'Unknown'}
-      />
+      <div className="shrink-0 flex flex-col gap-1">
+      {/* Phase tracker — hidden when rendered externally (e.g. in page header) */}
+      {!hidePhaseTracker && (
+        <PhaseTracker
+          turn={gameState.turn}
+          activePlayerName={activePlayer?.name || 'Unknown'}
+        />
+      )}
 
       {/* Opponent fields (top) */}
       <div className={cn(
@@ -387,8 +391,9 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
       </div>
       </div>{/* end TOP ZONE */}
 
-      {/* ─── CENTER BAND: overlays + action bar ─── */}
-      <div className="shrink-0 flex flex-col gap-2 py-1">
+      {/* ─── FLOATING OVERLAYS: stack, targeting, mana payment, combat, mulligan ─── */}
+      {/* These are absolutely positioned so they don't consume vertical flow space */}
+      <div className="relative shrink-0 z-20">
 
       {/* Mulligan phase UI */}
       <AnimatePresence>
@@ -398,17 +403,17 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          className="flex flex-col items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-6 py-4 shadow-lg"
+          className="flex flex-col items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2 shadow-lg"
         >
-          <span className="text-sm font-semibold text-primary">
+          <span className="text-xs font-semibold text-primary">
             Mulligan Phase
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground">
             {currentPlayer && currentPlayer.mulliganCount > 0
-              ? `Mulligan #${currentPlayer.mulliganCount} — you will put ${currentPlayer.mulliganCount} card${currentPlayer.mulliganCount > 1 ? 's' : ''} on the bottom after keeping`
-              : 'Look at your opening hand. Keep or mulligan?'}
+              ? `Mulligan #${currentPlayer.mulliganCount} — put ${currentPlayer.mulliganCount} card${currentPlayer.mulliganCount > 1 ? 's' : ''} on bottom`
+              : 'Keep or mulligan?'}
           </span>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Button
               size="sm"
               variant="default"
@@ -416,9 +421,9 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                 const action = legalActions.find((a) => a.type === 'KEEP_HAND');
                 if (action) performAction(action);
               }}
-              className="px-4"
+              className="h-7 px-3 text-xs"
             >
-              Keep Hand ({7 - (currentPlayer?.mulliganCount || 0)} cards)
+              Keep ({7 - (currentPlayer?.mulliganCount || 0)})
             </Button>
             {legalActions.some((a) => a.type === 'MULLIGAN') && (
               <Button
@@ -428,7 +433,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   const action = legalActions.find((a) => a.type === 'MULLIGAN');
                   if (action) performAction(action);
                 }}
-                className="px-4"
+                className="h-7 px-3 text-xs"
               >
                 Mulligan
               </Button>
@@ -453,28 +458,28 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="flex items-center gap-3 rounded-xl border border-cyan-500/30 bg-cyan-950/40 backdrop-blur-sm px-4 py-2.5 shadow-[0_0_16px_rgba(6,182,212,0.1)]"
+            className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-950/40 backdrop-blur-sm px-3 py-1.5 shadow-[0_0_16px_rgba(6,182,212,0.1)]"
           >
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
             </span>
-            <span className="text-sm text-cyan-200">
-              Choose a target for <strong className="text-cyan-100">{targeting.cardName}</strong>
+            <span className="text-xs text-cyan-200">
+              Target: <strong className="text-cyan-100">{targeting.cardName}</strong>
             </span>
             <Button
               size="sm"
               variant="ghost"
               onClick={cancelTargeting}
-              className="ml-auto h-7 w-7 p-0 text-cyan-400 hover:text-cyan-200"
+              className="ml-auto h-6 w-6 p-0 text-cyan-400 hover:text-cyan-200"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Mana payment banner — Forge-style "tap lands to pay" */}
+      {/* Mana payment banner */}
       <AnimatePresence>
         {manaPaymentInfo && onCancelManaPayment && (
           <motion.div
@@ -482,29 +487,29 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 backdrop-blur-sm px-4 py-2.5 shadow-[0_0_16px_rgba(16,185,129,0.1)]"
+            className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/40 backdrop-blur-sm px-3 py-1.5 shadow-[0_0_16px_rgba(16,185,129,0.1)]"
           >
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
-            <span className="text-sm text-emerald-200">
-              Tap lands to pay <strong className="text-emerald-100 font-mono">{manaPaymentInfo.manaCost}</strong> for <strong className="text-emerald-100">{manaPaymentInfo.spellName}</strong>
+            <span className="text-xs text-emerald-200">
+              Pay <strong className="text-emerald-100 font-mono">{manaPaymentInfo.manaCost}</strong> for <strong className="text-emerald-100">{manaPaymentInfo.spellName}</strong>
             </span>
             <Button
               size="sm"
               variant="ghost"
               onClick={onCancelManaPayment}
-              className="ml-auto h-7 px-2 text-emerald-400 hover:text-emerald-200 text-xs"
+              className="ml-auto h-6 px-1.5 text-emerald-400 hover:text-emerald-200 text-[10px]"
             >
-              <X className="h-3.5 w-3.5 mr-1" />
+              <X className="h-3 w-3 mr-0.5" />
               Cancel
             </Button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Combat controls (shown during combat phase) */}
+      {/* Combat controls */}
       {showCombatControls && (
         <CombatControls
           gameState={gameState}
@@ -516,24 +521,26 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         />
       )}
 
-      {/* Action bar — prominent, contextual */}
+      </div>{/* end OVERLAYS */}
+
+      {/* Action bar — hidden when rendered externally (e.g. in page header) */}
+      {!hideActionBar && (
       <div className={cn(
-        'flex items-center gap-4 rounded-2xl border px-5 py-3 w-full max-w-3xl self-center mx-auto relative z-20 my-2 transition-all duration-300',
+        'shrink-0 flex items-center gap-3 rounded-xl border px-4 py-2 w-full max-w-3xl self-center mx-auto relative z-20 my-1 transition-all duration-300',
         hasPriority && !gameState.isGameOver
           ? 'border-gold/40 bg-gold/5 shadow-[0_0_24px_rgba(212,169,68,0.15)]'
           : 'border-border/30 bg-card/60 backdrop-blur-xl shadow-lg'
       )}>
-        {/* Status indicator */}
         <div className="flex items-center gap-2 min-w-0 shrink">
-          {isProcessing && <Loader2 className="h-4 w-4 animate-spin text-gold shrink-0" />}
+          {isProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin text-gold shrink-0" />}
           {hasPriority && !isProcessing && !gameState.isGameOver && (
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
+              <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
             </span>
           )}
           <span className={cn(
-            'text-sm font-medium',
+            'text-xs font-medium',
             gameState.isGameOver ? 'text-foreground' :
             hasPriority ? 'text-gold' : 'text-muted-foreground'
           )}>
@@ -542,58 +549,55 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   ? `${gameState.players.find((p) => p.id === gameState.winner)?.name} wins!`
                   : 'Draw')
               : isProcessing
-                ? 'AI is thinking...'
+                ? 'AI thinking...'
                 : hasPriority
                   ? (isMyTurn
-                      ? inCombatPhase ? 'Combat Phase' : 'Your Turn'
-                      : 'You have priority')
+                      ? inCombatPhase ? 'Combat' : 'Your Turn'
+                      : 'Priority')
                   : `${gameState.players.find((p) => p.id === gameState.priority.playerWithPriority)?.name}'s turn`}
           </span>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          {/* Primary action: Pass */}
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <Button
             size="sm"
             onClick={handlePassPriority}
             disabled={!hasPriority || gameState.isGameOver || showCombatControls}
             className={cn(
-              'h-8 gap-1.5 px-4 text-xs font-semibold transition-all',
+              'h-7 gap-1 px-3 text-xs font-semibold transition-all',
               hasPriority && !gameState.isGameOver && !showCombatControls
                 ? 'bg-gold text-gold-foreground hover:bg-gold/90 shadow-[0_0_12px_rgba(212,169,68,0.3)]'
                 : ''
             )}
           >
-            <ArrowRight className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3 w-3" />
             Pass
           </Button>
-          {/* Auto-pass */}
           <Button
             size="sm"
             variant={autoPassUntilNextTurn ? 'default' : 'outline'}
             onClick={() => setAutoPass(!autoPassUntilNextTurn)}
             className={cn(
-              'h-8 gap-1 px-3 text-xs',
+              'h-7 gap-1 px-2 text-xs',
               autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white'
             )}
             title="Auto-pass priority until your next turn"
           >
-            <FastForward className="h-3.5 w-3.5" />
+            <FastForward className="h-3 w-3" />
             Auto
           </Button>
-          {/* Concede */}
           <Button
             size="sm"
             variant="ghost"
             onClick={handleConcede}
             disabled={gameState.isGameOver}
-            className="h-8 gap-1 px-3 text-xs text-destructive/70 hover:text-destructive"
+            className="h-7 gap-1 px-2 text-xs text-destructive/70 hover:text-destructive"
           >
-            <Flag className="h-3.5 w-3.5" />
+            <Flag className="h-3 w-3" />
           </Button>
         </div>
       </div>
-      </div>{/* end CENTER BAND */}
+      )}
 
       {/* ─── BOTTOM ZONE: player field ─── */}
       <div className="flex-1 min-h-0 flex flex-col gap-2">
