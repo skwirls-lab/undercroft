@@ -619,6 +619,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   onTapForManaPayment={isMe ? onTapForManaPayment : undefined}
                   validTargetIds={targeting?.validTargetIds}
                   onSelectTarget={targeting ? handleSelectTarget : undefined}
+                  forceArtMode
                   className="h-full"
                 />
               </div>

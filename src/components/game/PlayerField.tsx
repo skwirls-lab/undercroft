@@ -42,6 +42,7 @@ interface PlayerFieldProps {
   manaPaymentSourceIds?: Set<string>;
   onTapForManaPayment?: (cardInstanceId: string) => void;
   hideCommandZone?: boolean;
+  forceArtMode?: boolean;
   className?: string;
 }
 
@@ -77,6 +78,7 @@ export function PlayerField({
   onSelectTarget,
   manaPaymentSourceIds,
   onTapForManaPayment,
+  forceArtMode,
   className,
 }: PlayerFieldProps) {
   // Detect compact viewport — triggers on narrow width OR short height (landscape mobile)
@@ -149,8 +151,8 @@ export function PlayerField({
       !attachedCardIds.has(c.instanceId)
   );
 
-  // Use pip mode for opponents, art mode for current user
-  const cardMode = isCurrentUser ? 'art' : 'pip';
+  // Use pip mode for opponents, art mode for current user (forceArtMode overrides)
+  const cardMode = (isCurrentUser || forceArtMode) ? 'art' : 'pip';
 
   // Commander art for backdrop
   const commanderCard = commandZone.find(c =>
@@ -165,7 +167,6 @@ export function PlayerField({
     <div
       className={cn(
         'relative rounded-2xl border transition-all overflow-hidden flex flex-col',
-        isCurrentUser ? 'p-4' : 'p-2',
         isActivePlayer 
           ? 'border-gold/40 bg-gold/[0.03] shadow-[0_0_20px_rgba(212,169,68,0.08)] ring-1 ring-gold/20' 
           : isCurrentUser
@@ -174,6 +175,7 @@ export function PlayerField({
         player.hasLost && 'opacity-40 grayscale',
         className
       )}
+      style={{ padding: isCurrentUser ? 'clamp(10px,2vmin,1000px)' : 'clamp(6px,1vmin,1000px)' }}
     >
       {/* Commander art backdrop */}
       {commanderArtUrl && (
@@ -195,46 +197,47 @@ export function PlayerField({
       {/* Player info bar */}
       <div
         className={cn(
-          'relative mb-3 flex items-center justify-between',
-          validTargetIds?.has(player.id) && 'cursor-crosshair rounded-xl ring-2 ring-cyan-500/60 bg-cyan-950/20 px-3 py-2 -mx-1 -my-1'
+          'relative flex items-center justify-between',
+          validTargetIds?.has(player.id) && 'cursor-crosshair rounded-xl ring-2 ring-cyan-500/60 bg-cyan-950/20 -mx-1 -my-1'
         )}
+        style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)', padding: validTargetIds?.has(player.id) ? 'clamp(6px,1vmin,1000px) clamp(8px,1.5vmin,1000px)' : undefined }}
         onClick={() => validTargetIds?.has(player.id) && onSelectTarget?.(player.id)}
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
           {/* Player name + AI badge */}
           <span className={cn(
-            'text-sm font-bold',
+            'font-bold',
             validTargetIds?.has(player.id) ? 'text-cyan-300' :
             isActivePlayer ? 'text-gold' : 'text-foreground'
-          )}>
+          )} style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>
             {player.name}
-            {validTargetIds?.has(player.id) && <span className="ml-1 text-[10px] text-cyan-400">(target)</span>}
+            {validTargetIds?.has(player.id) && <span className="ml-1 text-cyan-400" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>(target)</span>}
           </span>
           {player.isAI && (
-            <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground">
+            <span className="rounded-md bg-muted/60 font-semibold text-muted-foreground" style={{ fontSize: 'clamp(8px,1.3vmin,1000px)', padding: 'clamp(2px,0.3vmin,1000px) clamp(4px,0.6vmin,1000px)' }}>
               AI
             </span>
           )}
           {player.hasLost && (
-            <Skull className="h-4 w-4 text-destructive" />
+            <Skull className="text-destructive" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
           )}
 
           {/* Zone counters — inline with name */}
-          <div className="flex items-center gap-2.5 text-[10px] font-semibold text-muted-foreground/60 ml-1">
-            <span className="flex items-center gap-1" title="Library"><Library className="h-3 w-3" />{libraryCount}</span>
-            <span className="flex items-center gap-1" title="Graveyard"><ArchiveX className="h-3 w-3" />{graveyardCount}</span>
-            <span className="flex items-center gap-1" title="Exile"><ZapOff className="h-3 w-3" />{exileCount}</span>
+          <div className="flex items-center font-semibold text-muted-foreground/60 ml-1" style={{ gap: 'clamp(6px,1.2vmin,1000px)', fontSize: 'clamp(10px,1.8vmin,1000px)' }}>
+            <span className="flex items-center" style={{ gap: 'clamp(2px,0.4vmin,1000px)' }} title="Library"><Library style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />{libraryCount}</span>
+            <span className="flex items-center" style={{ gap: 'clamp(2px,0.4vmin,1000px)' }} title="Graveyard"><ArchiveX style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />{graveyardCount}</span>
+            <span className="flex items-center" style={{ gap: 'clamp(2px,0.4vmin,1000px)' }} title="Exile"><ZapOff style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />{exileCount}</span>
           </div>
         </div>
 
         {/* Life + counters + mana — right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center" style={{ gap: 'clamp(8px,1.5vmin,1000px)' }}>
           <ManaPoolDisplay manaPool={player.manaPool} compact />
 
           {player.poisonCounters > 0 && (
-            <div className="flex items-center gap-1 rounded-lg bg-green-900/30 px-2 py-0.5 text-green-400">
-              <Droplets className="h-3.5 w-3.5" />
-              <span className="text-xs font-bold">{player.poisonCounters}</span>
+            <div className="flex items-center rounded-lg bg-green-900/30 text-green-400" style={{ gap: 'clamp(3px,0.5vmin,1000px)', padding: 'clamp(2px,0.4vmin,1000px) clamp(6px,1vmin,1000px)' }}>
+              <Droplets style={{ width: 'clamp(14px,2.2vmin,1000px)', height: 'clamp(14px,2.2vmin,1000px)' }} />
+              <span className="font-bold" style={{ fontSize: 'clamp(11px,1.8vmin,1000px)' }}>{player.poisonCounters}</span>
             </div>
           )}
 
@@ -245,14 +248,15 @@ export function PlayerField({
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 500, damping: 20 }}
               className={cn(
-                'flex items-center gap-1.5 rounded-xl px-3 py-1',
+                'flex items-center rounded-xl',
                 player.life <= 10 ? 'bg-red-900/40 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.2)]' :
                 player.life <= 20 ? 'bg-amber-900/30 text-amber-400' :
                 'bg-muted/40 text-foreground'
               )}
+              style={{ gap: 'clamp(4px,0.8vmin,1000px)', padding: 'clamp(3px,0.5vmin,1000px) clamp(8px,1.5vmin,1000px)' }}
             >
-              <Heart className="h-4 w-4" />
-              <span className="text-base font-black tabular-nums">{player.life}</span>
+              <Heart style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
+              <span className="font-black tabular-nums" style={{ fontSize: 'clamp(14px,2.5vmin,1000px)' }}>{player.life}</span>
             </motion.div>
             {/* Life change delta badge */}
             <AnimatePresence>
@@ -264,7 +268,7 @@ export function PlayerField({
                   exit={{ opacity: 0 }}
                   transition={{ duration: 1 }}
                   className={cn(
-                    'absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-black pointer-events-none',
+                    'absolute -top-3 left-1/2 -translate-x-1/2 font-black pointer-events-none',
                     lifeDelta > 0 ? 'text-green-400' : 'text-red-400'
                   )}
                 >
@@ -278,12 +282,12 @@ export function PlayerField({
 
       {/* Command zone — for opponents, inline with info bar; for current user, separate row */}
       {!hideCommandZone && commandZone.length > 0 && isCurrentUser && (
-        <div className="relative mb-2">
-          <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-primary/70">
-            <Crown className="h-3 w-3" />
+        <div className="relative" style={{ marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+          <div className="flex items-center font-medium uppercase tracking-wider text-primary/70" style={{ marginBottom: 'clamp(3px,0.5vmin,1000px)', gap: 'clamp(3px,0.5vmin,1000px)', fontSize: 'clamp(9px,1.5vmin,1000px)' }}>
+            <Crown style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
             Command Zone
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.6vmin,1000px)' }}>
             {commandZone.map((card) => {
               const canCast = castableCommanderIds.has(card.instanceId);
               return (
@@ -339,15 +343,12 @@ export function PlayerField({
           isEmpty={battlefield.length === 0}
         />
       ) : (
-      <div className={cn(
-        'relative flex-1 min-h-0 flex flex-col overflow-hidden',
-        isCurrentUser ? 'gap-3' : 'gap-1'
-      )}>
+      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden" style={{ gap: isCurrentUser ? 'clamp(8px,1.5vmin,1000px)' : 'clamp(4px,0.6vmin,1000px)' }}>
         {/* Opponent inline command zone */}
         {!hideCommandZone && commandZone.length > 0 && !isCurrentUser && (
-          <div className="flex items-center gap-1">
-            <Crown className="h-3 w-3 text-primary/50 shrink-0" />
-            <div className="flex gap-1 overflow-hidden">
+          <div className="flex items-center" style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
+            <Crown className="text-primary/50 shrink-0" style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
+            <div className="flex overflow-hidden" style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
               {commandZone.map((card) => (
                 <CardView key={card.instanceId} card={card} mode="pip" interactive />
               ))}
@@ -358,14 +359,11 @@ export function PlayerField({
         {/* Creatures row */}
         {creatures.length > 0 && (
           <div>
-            <div className={cn(
-              'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50',
-              isCurrentUser ? 'mb-1.5' : 'mb-0.5'
-            )}>
-              <Sword className="h-3 w-3" />
+            <div className="flex items-center font-semibold uppercase tracking-wider text-muted-foreground/50" style={{ gap: 'clamp(4px,0.6vmin,1000px)', fontSize: 'clamp(9px,1.5vmin,1000px)', marginBottom: 'clamp(3px,0.5vmin,1000px)' }}>
+              <Sword style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
               Creatures ({creatures.length})
             </div>
-            <div className={cn('flex gap-1.5', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')}>
+            <div className={cn('flex', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
               <AnimatePresence>
               {creatures.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
@@ -405,14 +403,11 @@ export function PlayerField({
         {/* Other permanents row */}
         {otherPermanents.length > 0 && (
           <div>
-            <div className={cn(
-              'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50',
-              isCurrentUser ? 'mb-1.5' : 'mb-0.5'
-            )}>
-              <Gem className="h-3 w-3" />
+            <div className="flex items-center font-semibold uppercase tracking-wider text-muted-foreground/50" style={{ gap: 'clamp(4px,0.6vmin,1000px)', fontSize: 'clamp(9px,1.5vmin,1000px)', marginBottom: 'clamp(3px,0.5vmin,1000px)' }}>
+              <Gem style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
               Other ({otherPermanents.length})
             </div>
-            <div className={cn('flex gap-1.5', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')}>
+            <div className={cn('flex', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
               <AnimatePresence>
               {otherPermanents.map((card) => {
                 const isTarget = validTargetIds?.has(card.instanceId);
@@ -454,14 +449,11 @@ export function PlayerField({
         {/* Lands row */}
         {lands.length > 0 && (
           <div className={cn(isCurrentUser && 'pt-2 border-t border-border/10')}>
-            <div className={cn(
-              'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50',
-              isCurrentUser ? 'mb-1' : 'mb-0.5'
-            )}>
-              <Library className="h-3 w-3" />
+            <div className="flex items-center font-semibold uppercase tracking-wider text-muted-foreground/50" style={{ gap: 'clamp(4px,0.6vmin,1000px)', fontSize: 'clamp(9px,1.5vmin,1000px)', marginBottom: 'clamp(3px,0.5vmin,1000px)' }}>
+              <Library style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
               Lands ({lands.length})
             </div>
-            <div className={cn('flex gap-1', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')}>
+            <div className={cn('flex', isCurrentUser ? 'flex-wrap' : 'flex-nowrap overflow-hidden')} style={{ gap: 'clamp(3px,0.5vmin,1000px)' }}>
               <AnimatePresence>
               {lands.map((card) => {
                 const isManaPaymentSource = manaPaymentSourceIds?.has(card.instanceId);
@@ -525,7 +517,7 @@ export function PlayerField({
 
         {/* Empty battlefield */}
         {battlefield.length === 0 && (
-          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground/30 italic">
+          <div className="flex items-center justify-center text-muted-foreground/30 italic" style={{ padding: 'clamp(16px,3vmin,1000px) 0', fontSize: 'clamp(11px,1.8vmin,1000px)' }}>
             No permanents on the battlefield
           </div>
         )}
