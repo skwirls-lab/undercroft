@@ -37,16 +37,18 @@ interface StackDisplayProps {
 }
 
 export function StackDisplay({ stack, className }: StackDisplayProps) {
-  const { setPreviewCard } = useCardPreview();
+  const { previewCard, setPreviewCard } = useCardPreview();
 
-  const handleHover = useCallback((item: StackItem) => {
+  const handleClick = useCallback((item: StackItem) => {
     const preview = stackItemToPreviewCard(item);
-    if (preview) setPreviewCard(preview);
-  }, [setPreviewCard]);
-
-  const handleLeave = useCallback(() => {
-    setPreviewCard(null);
-  }, [setPreviewCard]);
+    if (!preview) return;
+    // Toggle: if already previewing this card, clear it
+    if (previewCard?.instanceId === preview.instanceId) {
+      setPreviewCard(null);
+    } else {
+      setPreviewCard(preview);
+    }
+  }, [previewCard, setPreviewCard]);
 
   if (stack.length === 0) return null;
 
@@ -57,18 +59,19 @@ export function StackDisplay({ stack, className }: StackDisplayProps) {
       exit={{ opacity: 0, y: -10 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className={cn(
-        'flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-950/30 backdrop-blur-sm px-4 py-2.5 shadow-[0_0_16px_rgba(245,158,11,0.1)]',
+        'flex items-center rounded-xl border border-amber-500/30 bg-amber-950/30 backdrop-blur-sm shadow-[0_0_16px_rgba(245,158,11,0.1)]',
         className
       )}
+      style={{ gap: 'clamp(8px,1.5vmin,1000px)', padding: 'clamp(6px,1vmin,1000px) clamp(10px,2vmin,1000px)' }}
     >
-      <div className="flex items-center gap-1.5 shrink-0">
-        <Layers className="h-4 w-4 text-amber-400" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70">
+      <div className="flex items-center shrink-0" style={{ gap: 'clamp(4px,0.6vmin,1000px)' }}>
+        <Layers className="text-amber-400" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
+        <span className="font-bold uppercase tracking-widest text-amber-400/70" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>
           Stack
         </span>
       </div>
-      <div className="h-4 w-px bg-amber-500/20 shrink-0" />
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="bg-amber-500/20 shrink-0" style={{ width: '1px', height: 'clamp(14px,2.5vmin,1000px)' }} />
+      <div className="flex items-center flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
         <AnimatePresence>
           {[...stack].reverse().map((item, i) => (
             <motion.div
@@ -79,13 +82,13 @@ export function StackDisplay({ stack, className }: StackDisplayProps) {
               transition={{ type: 'spring', stiffness: 500, damping: 30, delay: i * 0.05 }}
               layout
               className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-semibold cursor-pointer',
+                'rounded-md font-semibold cursor-pointer',
                 i === 0
                   ? 'bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
                   : 'bg-muted/20 text-muted-foreground/80'
               )}
-              onMouseEnter={() => handleHover(item)}
-              onMouseLeave={handleLeave}
+              style={{ padding: 'clamp(3px,0.5vmin,1000px) clamp(6px,1.2vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+              onClick={() => handleClick(item)}
             >
               {item.cardData?.name || 'Unknown'}
               {item.targets.length > 0 && (
