@@ -3,6 +3,10 @@
 import React, { useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { useForgeGameStore } from '@/store/forgeGameStore';
+import { useGameStore } from '@/store/gameStore';
+import { CardView } from './CardView';
+import { getCardsInZone } from '@/lib/ZoneManager';
+import type { CardInstance } from '@/lib/gameTypes';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
 
 // ============================================================
@@ -39,6 +43,15 @@ export function ForgeChoiceOverlay() {
   const { pendingChoice, respondToChoice } = useForgeGameStore();
 
   if (!pendingChoice) return null;
+
+  // Mulligan gets its own full-screen overlay
+  if (pendingChoice.choiceType === 'mulligan') {
+    return (
+      <div key={pendingChoice.requestId} className="pointer-events-auto">
+        <MulliganOverlay choice={pendingChoice} onRespond={respondToChoice} />
+      </div>
+    );
+  }
 
   // Render as a centered modal overlay for better visibility
   return (
@@ -113,42 +126,8 @@ function ChoicePanel({ choice, onRespond }: {
 
   // --- mulligan: keep / mulligan hand ---
   if (choiceType === 'mulligan') {
-    const cardsToReturn = (data.cardsToReturn as number) ?? 0;
-    const handCards = (data.hand || []) as CardOption[];
     return (
-      <div className="mb-3 flex flex-col items-center gap-4 rounded-xl border border-primary/40 bg-primary/5 px-6 py-4 max-w-2xl">
-        <span className="text-sm font-semibold text-primary">Mulligan Phase</span>
-        <span className="text-xs text-muted-foreground">
-          {cardsToReturn > 0
-            ? `Keep hand? You'll put ${cardsToReturn} card(s) on the bottom.`
-            : 'Review your opening hand below. Keep or mulligan?'}
-        </span>
-        {/* Display hand cards as preview */}
-        {handCards.length > 0 && (
-          <div className="w-full">
-            <p className="text-xs text-muted-foreground mb-2 text-center">Your Hand ({handCards.length} cards):</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {handCards.map((card) => (
-                <div
-                  key={card.id}
-                  className="rounded-lg border border-border/40 bg-card/80 px-3 py-2 text-xs shadow-sm"
-                >
-                  <div className="font-medium text-foreground">{card.name}</div>
-                  {card.type && <div className="text-[10px] text-muted-foreground">{card.type}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="flex gap-3">
-          <Button size="sm" onClick={() => onRespond(choice.requestId, { keep: true })} className="px-4 h-8 rounded-lg border bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90">
-            Keep Hand
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => onRespond(choice.requestId, { keep: false })} className="px-4 h-8 rounded-lg border bg-card/60 text-xs font-medium hover:border-primary/60">
-            Mulligan
-          </Button>
-        </div>
-      </div>
+      <MulliganOverlay choice={choice} onRespond={onRespond} />
     );
   }
 
@@ -405,6 +384,97 @@ function AutoSkipCombat({ requestId, onRespond }: {
   }, [requestId, onRespond]);
   
   return null; // Don't render anything
+}
+
+// ============================================================
+// MulliganOverlay — full-screen card art display for mulligan decisions
+// ============================================================
+
+function MulliganOverlay({ choice, onRespond }: {
+  choice: ForgeChoiceRequest;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const data = choice.data as Record<string, unknown>;
+  const cardsToReturn = (data.cardsToReturn as number) ?? 0;
+  const textHandCards = (data.hand || []) as CardOption[];
+
+  // Look up actual CardInstance objects from the game store for art display
+  const gameState = useGameStore((s) => s.gameState);
+  const resolvedCards = useMemo(() => {
+    if (!gameState) return [];
+    // Try to get hand cards from the adapted game state
+    const handIds = getCardsInZone(gameState, 'player-human', 'hand');
+    const instances = handIds
+      .map((id) => gameState.cardInstances.get(id))
+      .filter((c): c is CardInstance => !!c);
+    if (instances.length > 0) return instances;
+    // Fallback: match by name from all card instances
+    const nameSet = new Set(textHandCards.map((c) => c.name));
+    const matched: CardInstance[] = [];
+    for (const [, ci] of gameState.cardInstances) {
+      if (nameSet.has(ci.cardData.name) && matched.length < textHandCards.length) {
+        matched.push(ci);
+      }
+    }
+    return matched;
+  }, [gameState, textHandCards]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-md">
+      {/* Header */}
+      <div className="flex flex-col items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(12px,2.5vmin,1000px)' }}>
+        <span className="font-black text-primary tracking-wide" style={{ fontSize: 'clamp(20px,4vmin,1000px)' }}>
+          Opening Hand
+        </span>
+        <span className="text-muted-foreground" style={{ fontSize: 'clamp(12px,2vmin,1000px)' }}>
+          {cardsToReturn > 0
+            ? `Keep hand? You'll put ${cardsToReturn} card(s) on the bottom.`
+            : `${textHandCards.length} cards — Keep this hand or mulligan?`}
+        </span>
+      </div>
+
+      {/* Card grid */}
+      <div className="flex flex-wrap items-center justify-center" style={{ gap: 'clamp(8px,1.5vmin,1000px)', padding: '0 clamp(16px,3vmin,1000px)', marginBottom: 'clamp(16px,3vmin,1000px)' }}>
+        {resolvedCards.length > 0 ? (
+          resolvedCards.map((card) => (
+            <div key={card.instanceId}>
+              <CardView card={card} mode="art" interactive={false} />
+            </div>
+          ))
+        ) : (
+          // Fallback: text cards if no CardInstance data available
+          textHandCards.map((card) => (
+            <div
+              key={card.id}
+              className="rounded-xl border border-border/40 bg-card/80 shadow-sm flex flex-col items-center justify-center"
+              style={{ width: 'clamp(90px,12vmin,1000px)', height: 'clamp(126px,17vmin,1000px)', padding: 'clamp(6px,1vmin,1000px)' }}
+            >
+              <span className="font-semibold text-foreground text-center" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>{card.name}</span>
+              {card.type && <span className="text-muted-foreground text-center" style={{ fontSize: 'clamp(8px,1.2vmin,1000px)' }}>{card.type}</span>}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Buttons */}
+      <div className="flex items-center" style={{ gap: 'clamp(8px,1.5vmin,1000px)' }}>
+        <Button
+          variant="default"
+          style={{ height: 'clamp(36px,5.5vmin,1000px)', padding: '0 clamp(16px,3vmin,1000px)', fontSize: 'clamp(14px,2.5vmin,1000px)', borderRadius: 'clamp(8px,1.2vmin,1000px)' }}
+          onClick={() => onRespond(choice.requestId, { keep: true })}
+        >
+          Keep Hand
+        </Button>
+        <Button
+          variant="outline"
+          style={{ height: 'clamp(36px,5.5vmin,1000px)', padding: '0 clamp(16px,3vmin,1000px)', fontSize: 'clamp(14px,2.5vmin,1000px)', borderRadius: 'clamp(8px,1.2vmin,1000px)' }}
+          onClick={() => onRespond(choice.requestId, { keep: false })}
+        >
+          Mulligan
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
