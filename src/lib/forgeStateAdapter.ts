@@ -204,18 +204,33 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     waitingForResponse: false,
   };
 
-  // Stack
-  const stack: StackItem[] = (forgeState.stack ?? []).map((si, i) => ({
-    id: `stack-${i}`,
-    type: si.cardId != null ? 'spell' as const : 'ability' as const,
-    sourceInstanceId: si.cardId != null ? `forge-${si.cardId}` : `stack-src-${i}`,
-    controllerId: (() => {
-      const controllerPlayer = forgeState.players.find((p) => p.name === si.controller);
-      return controllerPlayer ? (playerIdMap.get(controllerPlayer.id) ?? activePlayerId) : activePlayerId;
-    })(),
-    cardData: si.cardName ? { name: si.cardName, typeLine: '', manaCost: '', cmc: 0, oracleText: si.description, colors: [], colorIdentity: [], keywords: [], scryfallId: '', oracleId: '', layout: 'normal', legalities: {} } as CardData : undefined,
-    targets: [],
-  }));
+  // Stack — try to use full cardData from cardInstances for image/oracle support
+  const stack: StackItem[] = (forgeState.stack ?? []).map((si, i) => {
+    const instanceId = si.cardId != null ? `forge-${si.cardId}` : undefined;
+    const existingInstance = instanceId ? cardInstances.get(instanceId) : undefined;
+    // If we found the card instance, use its full cardData (has imageUris, oracleText, etc.)
+    // Otherwise fall back to a minimal cardData from the stack description
+    const fullCardData = existingInstance?.cardData;
+    const fallbackCardData = si.cardName
+      ? { name: si.cardName, typeLine: '', manaCost: '', cmc: 0, oracleText: si.description, colors: [], colorIdentity: [], keywords: [], scryfallId: '', oracleId: '', layout: 'normal', legalities: {} } as CardData
+      : undefined;
+    // If fullCardData exists but has no oracleText and stack description is richer, merge
+    let cardData = fullCardData ?? fallbackCardData;
+    if (cardData && !cardData.oracleText && si.description) {
+      cardData = { ...cardData, oracleText: si.description };
+    }
+    return {
+      id: `stack-${i}`,
+      type: si.cardId != null ? 'spell' as const : 'ability' as const,
+      sourceInstanceId: instanceId ?? `stack-src-${i}`,
+      controllerId: (() => {
+        const controllerPlayer = forgeState.players.find((p) => p.name === si.controller);
+        return controllerPlayer ? (playerIdMap.get(controllerPlayer.id) ?? activePlayerId) : activePlayerId;
+      })(),
+      cardData,
+      targets: [],
+    };
+  });
 
   return {
     id: `forge-${forgeState.gameId ?? 0}`,

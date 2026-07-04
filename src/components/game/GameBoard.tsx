@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { PlayerField } from './PlayerField';
@@ -30,6 +30,11 @@ interface GameBoardProps {
   manaPaymentInfo?: { manaCost: string; spellName: string };
   onTapForManaPayment?: (cardInstanceId: string) => void;
   onCancelManaPayment?: () => void;
+  // External control of expanded player overlay
+  externalExpandedPlayerId?: string | null;
+  onExpandedPlayerChange?: (playerId: string | null) => void;
+  // Hand content to embed inside expanded battlefield for current player
+  expandedHandContent?: React.ReactNode;
 }
 
 // Targeting mode: player selected a spell that requires a target
@@ -40,7 +45,7 @@ interface TargetingState {
   validTargetIds: Set<string>; // Quick lookup of valid target IDs
 }
 
-export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZone, hidePhaseTracker, hideActionBar, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment }: GameBoardProps) {
+export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZone, hidePhaseTracker, hideActionBar, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment, externalExpandedPlayerId, onExpandedPlayerChange, expandedHandContent }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
   const { pendingChoice } = useForgeGameStore();
 
@@ -65,7 +70,13 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
   const [targeting, setTargeting] = useState<TargetingState | null>(null);
 
   // Expanded battlefield overlay — which player's field is being viewed
-  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [expandedPlayerIdInternal, setExpandedPlayerIdInternal] = useState<string | null>(null);
+  // Sync with external control: external prop takes precedence
+  const expandedPlayerId = externalExpandedPlayerId !== undefined ? externalExpandedPlayerId : expandedPlayerIdInternal;
+  const setExpandedPlayerId = useCallback((id: string | null) => {
+    setExpandedPlayerIdInternal(id);
+    onExpandedPlayerChange?.(id);
+  }, [onExpandedPlayerChange]);
 
   const handlePlayCard = useCallback(
     (card: CardInstance) => {
@@ -657,6 +668,12 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   forceArtMode
                   className="h-full"
                 />
+                {/* Hand section embedded in expanded battlefield for current player */}
+                {isMe && expandedHandContent && (
+                  <div className="border-t border-border/30" style={{ marginTop: 'clamp(8px,1.5vmin,1000px)', paddingTop: 'clamp(8px,1.5vmin,1000px)' }}>
+                    {expandedHandContent}
+                  </div>
+                )}
               </div>
             </motion.div>
           );

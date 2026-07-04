@@ -34,6 +34,13 @@ async function enrichAndUpdateImages(adapted: GameState) {
     if (!name || name === '???' || imageUrisCache.has(name)) continue;
     namesToFetch.push(name);
   }
+  // Also collect names from stack items that may not exist as card instances
+  for (const si of adapted.stack) {
+    const name = si.cardData?.name;
+    if (name && name !== '???' && !imageUrisCache.has(name)) {
+      namesToFetch.push(name);
+    }
+  }
 
   const uniqueNames = [...new Set(namesToFetch)];
   if (uniqueNames.length > 0) {
@@ -75,8 +82,19 @@ async function enrichAndUpdateImages(adapted: GameState) {
     }
   }
 
+  // Enrich stack items that are missing imageUris
+  const enrichedStack = adapted.stack.map((si) => {
+    if (!si.cardData || si.cardData.imageUris) return si;
+    const cachedUris = imageUrisCache.get(si.cardData.name);
+    if (cachedUris !== undefined) {
+      anyChanged = true;
+      return { ...si, cardData: { ...si.cardData, imageUris: cachedUris ?? undefined } };
+    }
+    return si;
+  });
+
   if (anyChanged) {
-    useGameStore.getState().setForgeState({ ...adapted, cardInstances: enrichedInstances });
+    useGameStore.getState().setForgeState({ ...adapted, cardInstances: enrichedInstances, stack: enrichedStack });
   }
 }
 

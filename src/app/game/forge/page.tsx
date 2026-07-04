@@ -26,7 +26,6 @@ import {
   Play,
   Hand as HandIcon,
   ChevronUp,
-  X,
   ArrowRight,
   FastForward,
 } from 'lucide-react';
@@ -107,7 +106,8 @@ export default function ForgeGamePage() {
     respondToChoice(manaPaymentData.requestId, { cancel: true });
   }, [manaPaymentData, respondToChoice]);
 
-  const [handExpanded, setHandExpanded] = useState(false);
+  // Unified expanded overlay: null = collapsed, playerId = expanded battlefield (with hand for current player)
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
   // Action bar state
   const hasPriorityForActions = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
@@ -198,6 +198,38 @@ export default function ForgeGamePage() {
             manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
             onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
             onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
+            externalExpandedPlayerId={expandedPlayerId}
+            onExpandedPlayerChange={setExpandedPlayerId}
+            expandedHandContent={
+              <div>
+                <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+                  <HandIcon className="text-muted-foreground" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
+                  <span className="font-semibold text-muted-foreground" style={{ fontSize: 'clamp(12px,2.2vmin,1000px)' }}>Hand · {handCards.length}{commandZoneCards.length > 0 ? ` · Cmd ${commandZoneCards.length}` : ''}</span>
+                </div>
+                <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                  {commandZoneCards.map(card => {
+                    const canCast = legalActions.some(
+                      a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
+                    );
+                    return (
+                      <CommanderCard
+                        key={card.instanceId}
+                        card={card}
+                        canCast={canCast}
+                        onPlay={() => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
+                      />
+                    );
+                  })}
+                  <Hand
+                    cards={handCards}
+                    legalActions={handLegalActions}
+                    onPlayCard={(card) => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
+                    isActive={!!hasPriority && !isGameOver}
+                    layout="grid"
+                  />
+                </div>
+              </div>
+            }
           />
           <ForgeChoiceOverlay />
         </div>
@@ -248,7 +280,7 @@ export default function ForgeGamePage() {
         <div
           className="shrink-0 border-t border-border/20 bg-background/95 backdrop-blur-xl shadow-[0_-4px_16px_rgba(0,0,0,0.3)] flex items-center cursor-pointer"
           style={{ height: 'clamp(36px, 6vh, 1000px)', padding: '0 clamp(8px,2vmin,1000px)' }}
-          onClick={() => setHandExpanded(true)}
+          onClick={() => setExpandedPlayerId(HUMAN_PLAYER_ID)}
         >
           <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)', marginRight: 'clamp(6px,1.2vmin,1000px)' }} />
           <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider" style={{ fontSize: 'clamp(10px,2.2vmin,1000px)' }}>
@@ -261,55 +293,7 @@ export default function ForgeGamePage() {
         </div>
       </div>
 
-      {/* ─── HAND OVERLAY: full-screen, commander + hand in one row ─── */}
-      <AnimatePresence>
-        {handExpanded && (
-          <motion.div
-            initial={{ opacity: 0, y: '100%' }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md"
-          >
-            <div className="flex items-center justify-between border-b border-border/30 shrink-0" style={{ padding: 'clamp(6px,1vmin,1000px) clamp(10px,2vmin,1000px)' }}>
-              <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                <HandIcon className="text-muted-foreground" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
-                <span className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Hand · {handCards.length + commandZoneCards.length}</span>
-              </div>
-              <button onClick={() => setHandExpanded(false)} className="rounded-lg bg-muted/30 text-muted-foreground hover:bg-muted/50" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
-                <X style={{ width: 'clamp(18px,3vmin,1000px)', height: 'clamp(18px,3vmin,1000px)' }} />
-              </button>
-            </div>
-            {/* All cards in ONE scrollable row: commander(s) + hand */}
-            <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 'clamp(8px,1.5vmin,1000px)' }}>
-              <div className="flex flex-wrap justify-center items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                {commandZoneCards.map(card => {
-                  const canCast = legalActions.some(
-                    a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
-                  );
-                  return (
-                    <CommanderCard
-                      key={card.instanceId}
-                      card={card}
-                      canCast={canCast}
-                      onPlay={() => { handleForgePlayCard(card); setHandExpanded(false); }}
-                    />
-                  );
-                })}
-                <Hand
-                  cards={handCards}
-                  legalActions={handLegalActions}
-                  onPlayCard={(card) => { handleForgePlayCard(card); setHandExpanded(false); }}
-                  isActive={!!hasPriority && !isGameOver}
-                  layout="grid"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <CardPreviewFloating handExpanded={handExpanded} />
+      <CardPreviewFloating />
     </CardPreviewProvider>
   );
 }
@@ -380,7 +364,7 @@ function CommanderCard({
 // ============================================================
 // CardPreviewFloating — fixed overlay, no layout impact
 // ============================================================
-function CardPreviewFloating({ handExpanded }: { handExpanded?: boolean }) {
+function CardPreviewFloating() {
   const { previewCard, setPreviewCard } = useCardPreview();
   const imageUrl = previewCard?.cardData.imageUris?.normal
     ?? previewCard?.cardData.cardFaces?.[0]?.imageUris?.normal;
