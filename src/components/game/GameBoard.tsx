@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { PlayerField } from './PlayerField';
 import { Hand } from './Hand';
+import { CardView } from './CardView';
 import { PhaseTracker } from './PhaseTracker';
 import { CombatControls } from './CombatControls';
 import { StackDisplay } from './StackDisplay';
@@ -491,31 +492,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
 
       {/* ─── INLINE OVERLAYS: stack, targeting, mana, combat, mulligan ─── */}
       <div className="shrink-0 z-20 flex flex-col gap-1 px-[clamp(6px,1.5vmin,20px)]">
-        <AnimatePresence>
-          {gameState.mulliganPhase && hasPriority && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="flex items-center rounded-lg border border-primary/40 bg-primary/5" style={{ gap: 'clamp(6px,1.2vmin,1000px)', padding: 'clamp(6px,1vmin,1000px) clamp(8px,1.5vmin,1000px)' }}
-            >
-              <span className="font-semibold text-primary" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>Mulligan</span>
-              <span className="text-muted-foreground" style={{ fontSize: 'clamp(10px,1.8vmin,1000px)' }}>
-                {currentPlayer && currentPlayer.mulliganCount > 0 ? `#${currentPlayer.mulliganCount}` : 'Keep or mulligan?'}
-              </span>
-              <div className="ml-auto flex" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
-                <Button size="sm" variant="default" style={{ height: 'clamp(24px,3.5vh,1000px)', padding: '0 clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(10px,1.8vmin,1000px)' }} onClick={() => { const a = legalActions.find(a => a.type === 'KEEP_HAND'); if (a) performAction(a); }}>
-                  Keep ({7 - (currentPlayer?.mulliganCount || 0)})
-                </Button>
-                {legalActions.some(a => a.type === 'MULLIGAN') && (
-                  <Button size="sm" variant="outline" style={{ height: 'clamp(24px,3.5vh,1000px)', padding: '0 clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(10px,1.8vmin,1000px)' }} onClick={() => { const a = legalActions.find(a => a.type === 'MULLIGAN'); if (a) performAction(a); }}>
-                    Mull
-                  </Button>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Mulligan overlay is rendered as a full-screen modal below */}
         <AnimatePresence>
           {gameState.stack.length > 0 && <StackDisplay stack={gameState.stack} />}
         </AnimatePresence>
@@ -569,6 +546,64 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           />
         </div>
       )}
+
+      {/* ─── MULLIGAN OVERLAY ─── */}
+      <AnimatePresence>
+        {gameState.mulliganPhase && hasPriority && (
+          <motion.div
+            key="mulligan-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-md"
+          >
+            {/* Header */}
+            <div className="flex flex-col items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(12px,2.5vmin,1000px)' }}>
+              <span className="font-black text-primary tracking-wide" style={{ fontSize: 'clamp(20px,4vmin,1000px)' }}>
+                {currentPlayer && currentPlayer.mulliganCount > 0 ? `Mulligan #${currentPlayer.mulliganCount}` : 'Opening Hand'}
+              </span>
+              <span className="text-muted-foreground" style={{ fontSize: 'clamp(12px,2vmin,1000px)' }}>
+                {7 - (currentPlayer?.mulliganCount || 0)} cards — Keep this hand or mulligan?
+              </span>
+            </div>
+
+            {/* Card grid */}
+            <div className="flex flex-wrap items-center justify-center" style={{ gap: 'clamp(8px,1.5vmin,1000px)', padding: '0 clamp(16px,3vmin,1000px)', marginBottom: 'clamp(16px,3vmin,1000px)' }}>
+              {handCards.map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c).map((card) => (
+                <motion.div
+                  key={card.instanceId}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                >
+                  <CardView card={card} mode="art" interactive={false} />
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center" style={{ gap: 'clamp(8px,1.5vmin,1000px)' }}>
+              <Button
+                variant="default"
+                style={{ height: 'clamp(36px,5.5vmin,1000px)', padding: '0 clamp(16px,3vmin,1000px)', fontSize: 'clamp(14px,2.5vmin,1000px)', borderRadius: 'clamp(8px,1.2vmin,1000px)' }}
+                onClick={() => { const a = legalActions.find(a => a.type === 'KEEP_HAND'); if (a) performAction(a); }}
+              >
+                Keep ({7 - (currentPlayer?.mulliganCount || 0)})
+              </Button>
+              {legalActions.some(a => a.type === 'MULLIGAN') && (
+                <Button
+                  variant="outline"
+                  style={{ height: 'clamp(36px,5.5vmin,1000px)', padding: '0 clamp(16px,3vmin,1000px)', fontSize: 'clamp(14px,2.5vmin,1000px)', borderRadius: 'clamp(8px,1.2vmin,1000px)' }}
+                  onClick={() => { const a = legalActions.find(a => a.type === 'MULLIGAN'); if (a) performAction(a); }}
+                >
+                  Mulligan
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ─── EXPANDED BATTLEFIELD OVERLAY ─── */}
       <AnimatePresence>
