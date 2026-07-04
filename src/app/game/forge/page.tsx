@@ -8,15 +8,14 @@ import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { GameBoard } from '@/components/game/GameBoard';
 import { Hand } from '@/components/game/Hand';
-import { GameLog } from '@/components/game/GameLog';
 import { CardPreviewProvider, useCardPreview } from '@/components/game/CardPreviewContext';
 import { ForgeChoiceOverlay } from '@/components/game/ForgeChoiceOverlay';
+import { EventTicker } from '@/components/game/EventTicker';
 import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { cn } from '@/lib/utils';
 import { CardView } from '@/components/game/CardView';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { CardInstance } from '@/lib/gameTypes';
 import { PhaseTracker } from '@/components/game/PhaseTracker';
 import {
@@ -108,8 +107,6 @@ export default function ForgeGamePage() {
     respondToChoice(manaPaymentData.requestId, { cancel: true });
   }, [manaPaymentData, respondToChoice]);
 
-  // Compact layout detection — short height (landscape mobile, small windows)
-  const isCompact = useMediaQuery('(max-height: 600px)');
   const [handExpanded, setHandExpanded] = useState(false);
 
   // Action bar state
@@ -139,20 +136,17 @@ export default function ForgeGamePage() {
     );
   }
 
-  // Game in progress — uses existing GameBoard + sidebar
+  // Game in progress — unified layout for all screen sizes
   return (
     <CardPreviewProvider>
       <div className="flex h-[100dvh] flex-col overflow-hidden">
-        {/* Unified header: nav | phase tracker | action buttons */}
+        {/* ─── HEADER: nav | phase tracker | nav buttons ─── */}
         <header className="flex items-center gap-1 border-b border-border/30 shrink-0 px-2 py-0.5 min-h-[36px]">
-          {/* Left: nav */}
           <Link href="/" className="shrink-0">
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Home">
               <ArrowLeft className="h-3.5 w-3.5" />
             </Button>
           </Link>
-
-          {/* Center: phase tracker — takes remaining space */}
           {gameState && (
             <div className="flex-1 min-w-0 mx-1">
               <PhaseTracker
@@ -162,193 +156,112 @@ export default function ForgeGamePage() {
               />
             </div>
           )}
-
-          {/* Right: status + action buttons */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Status indicator */}
-            {isProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin text-gold" />}
-            {hasPriorityForActions && !isProcessing && !isGameOver && (
-              <span className="text-[10px] font-semibold text-gold mr-0.5">
-                {isMyTurn ? (inCombatPhase ? 'Combat' : 'Your Turn') : 'Priority'}
-              </span>
-            )}
-            {!hasPriorityForActions && !isProcessing && !isGameOver && gameState && (
-              <span className="text-[10px] text-muted-foreground mr-0.5">
-                {gameState.players.find(p => p.id === gameState.priority.playerWithPriority)?.name}
-              </span>
-            )}
-            <Button
-              size="sm"
-              onClick={handlePassPriority}
-              disabled={!hasPriorityForActions || isGameOver}
-              className={cn(
-                'h-7 gap-1 px-2.5 text-[11px] font-semibold',
-                hasPriorityForActions && !isGameOver
-                  ? 'bg-gold text-gold-foreground hover:bg-gold/90'
-                  : ''
-              )}
-            >
-              <ArrowRight className="h-3 w-3" />
-              Pass
-            </Button>
-            <Button
-              size="sm"
-              variant={autoPassUntilNextTurn ? 'default' : 'outline'}
-              onClick={() => setAutoPass(!autoPassUntilNextTurn)}
-              className={cn(
-                'h-7 px-2 text-[11px]',
-                autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white'
-              )}
-              title="Auto-pass"
-            >
-              <FastForward className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={concede}
-              className="h-7 w-7 p-0 text-red-400"
-              title="Concede"
-            >
+            <Button variant="ghost" size="sm" onClick={concede} className="h-7 w-7 p-0 text-red-400" title="Concede">
               <Flag className="h-3 w-3" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { disconnect(); router.push('/game'); }}
-              className="h-7 w-7 p-0 text-muted-foreground"
-              title="New Game"
-            >
+            <Button variant="ghost" size="sm" onClick={() => { disconnect(); router.push('/game'); }} className="h-7 w-7 p-0 text-muted-foreground" title="New Game">
               <RotateCcw className="h-3 w-3" />
             </Button>
           </div>
         </header>
 
-        {/* Full-width main area — no sidebar */}
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {/* ─── EVENT TICKER: recent events, click for full log ─── */}
+        <EventTicker
+          events={gameEvents.map((e, i) => ({
+            type: String(e.eventType) as 'CARD_PLAYED',
+            data: e as Record<string, unknown>,
+            timestamp: Date.now() - (gameEvents.length - i) * 100,
+            id: `f${i}`,
+          }))}
+          currentPlayerId={HUMAN_PLAYER_ID}
+        />
 
-            {/* Game Over banner */}
-            {isGameOver && (
-              <div className={cn(
-                'shrink-0 mx-2 mt-2 rounded-xl border border-gold/30 bg-gold/10 text-center',
-                isCompact ? 'p-2' : 'p-4'
-              )}>
-                <h2 className={cn(isCompact ? 'text-base' : 'text-xl', 'font-bold text-gold')}>Game Over</h2>
-                <p className="mt-1 text-sm">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`}</p>
-                <Button size="sm" className="mt-2" onClick={() => { disconnect(); router.push('/game'); }}>
-                  New Game
-                </Button>
-              </div>
-            )}
-
-            {/* Board — overflow-hidden, NO scroll at all — gets ALL remaining space */}
-            <div className="flex-1 min-h-0 overflow-hidden p-1">
-              <GameBoard
-                currentPlayerId={HUMAN_PLAYER_ID}
-                hideHand
-                hideCommandZone
-                hidePhaseTracker
-                hideActionBar
-                className="h-full"
-                manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
-                manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
-                onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
-                onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
-              />
-              <ForgeChoiceOverlay />
+        {/* ─── MAIN: stat boxes (via GameBoard) ─── */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {/* Game Over banner */}
+          {isGameOver && (
+            <div className="shrink-0 mx-2 mt-1 rounded-xl border border-gold/30 bg-gold/10 text-center p-2">
+              <h2 className="text-base font-bold text-gold">Game Over</h2>
+              <p className="text-xs mt-0.5">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`}</p>
+              <Button size="sm" className="mt-1 h-7 text-xs" onClick={() => { disconnect(); router.push('/game'); }}>New Game</Button>
             </div>
+          )}
+          <GameBoard
+            currentPlayerId={HUMAN_PLAYER_ID}
+            hideHand
+            hideCommandZone
+            hidePhaseTracker
+            hideActionBar
+            className="h-full"
+            manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
+            manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
+            onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
+            onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
+          />
+          <ForgeChoiceOverlay />
+        </div>
 
-            {/* Bottom bar — full on tall viewports, peek strip on compact */}
-            {isCompact ? (
-              /* ===== COMPACT: peek strip ===== */
-              <div
-                className="shrink-0 h-[40px] border-t border-border/20 bg-background/95 backdrop-blur-xl shadow-[0_-4px_16px_rgba(0,0,0,0.3)] flex items-center px-3 cursor-pointer"
-                onClick={() => setHandExpanded(true)}
-              >
-                <HandIcon className="h-4 w-4 text-muted-foreground/60 mr-2" />
-                <span className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                  Hand · {handCards.length}
-                </span>
-                {commandZoneCards.length > 0 && (
-                  <span className="text-[11px] text-muted-foreground/40 ml-2">· Cmd {commandZoneCards.length}</span>
-                )}
-                {hasPriority && !isGameOver && (
-                  <span className="ml-auto text-[10px] text-emerald-400/60 font-medium">Your turn</span>
-                )}
-                <ChevronUp className="h-4 w-4 text-muted-foreground/40 ml-2" />
-              </div>
-            ) : (
-              /* ===== FULL: standard bottom bar ===== */
-              <div className="shrink-0 h-[186px] border-t border-border/20 bg-background/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)] flex items-stretch overflow-hidden">
-
-                {/* Center: Commander (if any) + Hand */}
-                <div className="flex-1 min-w-0 px-2 pt-1 pb-1 flex flex-col">
-                  <div className="mb-0.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
-                        Hand · {handCards.length}
-                      </span>
-                      {commandZoneCards.length > 0 && (
-                        <span className="text-[10px] text-muted-foreground/30 uppercase tracking-widest font-semibold">
-                          · Commander
-                        </span>
-                      )}
-                    </div>
-                    {hasPriority && !isGameOver && (
-                      <span className="text-[10px] text-muted-foreground/40 italic">tap · play</span>
-                    )}
-                  </div>
-                  <div className="flex items-end gap-2">
-                    {/* Commander zone cards */}
-                    {commandZoneCards.map(card => {
-                      const canCast = legalActions.some(
-                        a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
-                      );
-                      return (
-                        <CommanderCard
-                          key={card.instanceId}
-                          card={card}
-                          canCast={canCast}
-                          onPlay={() => handleForgePlayCard(card)}
-                        />
-                      );
-                    })}
-                    {/* Hand */}
-                    <div className="flex-1 min-w-0">
-                      <Hand
-                        cards={handCards}
-                        legalActions={handLegalActions}
-                        onPlayCard={handleForgePlayCard}
-                        isActive={!!hasPriority && !isGameOver}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Game Log (desktop only) */}
-                <div className="hidden lg:flex lg:flex-col w-[220px] shrink-0 border-l border-border/20 overflow-hidden">
-                  <GameLog
-                    events={gameEvents.map((e, i) => ({
-                      type: String(e.eventType) as 'CARD_PLAYED',
-                      data: e as Record<string, unknown>,
-                      timestamp: Date.now() - (gameEvents.length - i) * 100,
-                      id: `f${i}`,
-                    }))}
-                    currentPlayerId={HUMAN_PLAYER_ID}
-                    collapsible={false}
-                    className="h-full rounded-none border-0"
-                  />
-                </div>
-              </div>
+        {/* ─── PRIORITY BAR: centered above hand ─── */}
+        <div className={cn(
+          'shrink-0 flex items-center justify-center gap-2 px-3 py-1 border-t border-border/20',
+          hasPriorityForActions && !isGameOver ? 'bg-gold/5' : 'bg-card/30'
+        )}>
+          {isProcessing && <Loader2 className="h-3 w-3 animate-spin text-gold" />}
+          {hasPriorityForActions && !isProcessing && !isGameOver && (
+            <span className="relative flex h-2 w-2">
+              <span className="absolute h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
+              <span className="relative h-2 w-2 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
+            </span>
+          )}
+          <span className={cn('text-[11px] font-medium', hasPriorityForActions ? 'text-gold' : 'text-muted-foreground/60')}>
+            {isGameOver ? 'Game Over'
+              : isProcessing ? 'AI thinking...'
+              : hasPriorityForActions ? (isMyTurn ? (inCombatPhase ? 'Combat Phase' : 'Your Turn') : 'You have priority')
+              : `${gameState?.players.find(p => p.id === gameState?.priority.playerWithPriority)?.name}'s turn`}
+          </span>
+          <Button
+            size="sm"
+            onClick={handlePassPriority}
+            disabled={!hasPriorityForActions || isGameOver}
+            className={cn(
+              'h-6 gap-1 px-2.5 text-[10px] font-semibold',
+              hasPriorityForActions && !isGameOver ? 'bg-gold text-gold-foreground hover:bg-gold/90' : ''
             )}
-          </main>
+          >
+            <ArrowRight className="h-2.5 w-2.5" /> Pass
+          </Button>
+          <Button
+            size="sm"
+            variant={autoPassUntilNextTurn ? 'default' : 'outline'}
+            onClick={() => setAutoPass(!autoPassUntilNextTurn)}
+            className={cn('h-6 px-2 text-[10px]', autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white')}
+            title="Auto-pass"
+          >
+            <FastForward className="h-2.5 w-2.5" />
+          </Button>
+        </div>
+
+        {/* ─── COLLAPSED HAND: peek strip, tap to expand ─── */}
+        <div
+          className="shrink-0 border-t border-border/20 bg-background/95 backdrop-blur-xl shadow-[0_-4px_16px_rgba(0,0,0,0.3)] flex items-center px-3 cursor-pointer"
+          style={{ height: 'clamp(32px, 5vh, 44px)' }}
+          onClick={() => setHandExpanded(true)}
+        >
+          <HandIcon className="h-3.5 w-3.5 text-muted-foreground/60 mr-2" />
+          <span className="text-[clamp(9px,1.2vmin,12px)] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+            Hand · {handCards.length}
+          </span>
+          {commandZoneCards.length > 0 && (
+            <span className="text-[clamp(9px,1.2vmin,12px)] text-muted-foreground/40 ml-2">· Cmd {commandZoneCards.length}</span>
+          )}
+          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground/40 ml-auto" />
         </div>
       </div>
 
-      {/* Compact hand overlay — full-screen when expanded */}
+      {/* ─── HAND OVERLAY: full-screen, commander + hand in one row ─── */}
       <AnimatePresence>
-        {isCompact && handExpanded && (
+        {handExpanded && (
           <motion.div
             initial={{ opacity: 0, y: '100%' }}
             animate={{ opacity: 1, y: 0 }}
@@ -359,42 +272,28 @@ export default function ForgeGamePage() {
             <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 shrink-0">
               <div className="flex items-center gap-2">
                 <HandIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Hand · {handCards.length}</span>
-                {commandZoneCards.length > 0 && (
-                  <span className="text-xs text-muted-foreground/50">· Commander</span>
-                )}
+                <span className="text-sm font-semibold">Hand · {handCards.length + commandZoneCards.length}</span>
               </div>
-              <button
-                onClick={() => setHandExpanded(false)}
-                className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50"
-              >
+              <button onClick={() => setHandExpanded(false)} className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              {/* Commander cards */}
-              {commandZoneCards.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Commander</p>
-                  <div className="flex flex-wrap gap-2">
-                    {commandZoneCards.map(card => {
-                      const canCast = legalActions.some(
-                        a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
-                      );
-                      return (
-                        <CommanderCard
-                          key={card.instanceId}
-                          card={card}
-                          canCast={canCast}
-                          onPlay={() => { handleForgePlayCard(card); setHandExpanded(false); }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {/* Hand cards */}
-              <div className="flex flex-wrap gap-2 justify-center">
+            {/* All cards in ONE scrollable row: commander(s) + hand */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-3">
+              <div className="flex flex-wrap gap-2 justify-center items-end">
+                {commandZoneCards.map(card => {
+                  const canCast = legalActions.some(
+                    a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
+                  );
+                  return (
+                    <CommanderCard
+                      key={card.instanceId}
+                      card={card}
+                      canCast={canCast}
+                      onPlay={() => { handleForgePlayCard(card); setHandExpanded(false); }}
+                    />
+                  );
+                })}
                 <Hand
                   cards={handCards}
                   legalActions={handLegalActions}
@@ -407,7 +306,7 @@ export default function ForgeGamePage() {
         )}
       </AnimatePresence>
 
-      <CardPreviewFloating isCompact={isCompact} handExpanded={handExpanded} />
+      <CardPreviewFloating handExpanded={handExpanded} />
     </CardPreviewProvider>
   );
 }
@@ -478,7 +377,7 @@ function CommanderCard({
 // ============================================================
 // CardPreviewFloating — fixed overlay, no layout impact
 // ============================================================
-function CardPreviewFloating({ isCompact, handExpanded }: { isCompact?: boolean; handExpanded?: boolean }) {
+function CardPreviewFloating({ handExpanded }: { handExpanded?: boolean }) {
   const { previewCard, setPreviewCard } = useCardPreview();
   const imageUrl = previewCard?.cardData.imageUris?.normal
     ?? previewCard?.cardData.cardFaces?.[0]?.imageUris?.normal;
@@ -515,10 +414,7 @@ function CardPreviewFloating({ isCompact, handExpanded }: { isCompact?: boolean;
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 6 }}
           transition={{ duration: 0.12 }}
-          className={cn(
-            'fixed left-1/2 -translate-x-1/2 z-30 flex items-start gap-2',
-            isCompact ? 'bottom-[48px]' : 'bottom-[194px]'
-          )}
+          className="fixed left-1/2 -translate-x-1/2 z-[60] flex items-start gap-2 bottom-[80px]"
         style={{ pointerEvents: 'none' }}
         >
           {/* Card image — non-interactive */}

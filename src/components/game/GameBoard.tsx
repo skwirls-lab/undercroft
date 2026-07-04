@@ -15,7 +15,7 @@ import { useForgeGameStore } from '@/store/forgeGameStore';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { getZoneCardCount } from '@/lib/ZoneManager';
 import type { CardInstance, GameAction, ManaColor } from '@/lib/gameTypes';
-import { ArrowRight, Flag, Loader2, FastForward, X } from 'lucide-react';
+import { ArrowRight, Flag, Loader2, FastForward, X, Heart, BookOpen, Skull, Ban, Crown, Swords, Sparkles, TreePine, ChevronRight } from 'lucide-react';
 
 interface GameBoardProps {
   currentPlayerId: string;
@@ -62,6 +62,9 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
 
   // Targeting mode state
   const [targeting, setTargeting] = useState<TargetingState | null>(null);
+
+  // Expanded battlefield overlay — which player's field is being viewed
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
   const handlePlayCard = useCallback(
     (card: CardInstance) => {
@@ -353,293 +356,211 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_20%,rgba(80,60,30,0.05),transparent)]" />
       </div>
 
-      {/* ─── TOP ZONE: phase tracker + opponents — compact, never scrolls ─── */}
-      <div className="shrink-0 flex flex-col gap-1">
-      {/* Phase tracker — hidden when rendered externally (e.g. in page header) */}
+      {/* ─── TOP: phase tracker (when not hidden) ─── */}
       {!hidePhaseTracker && (
-        <PhaseTracker
-          turn={gameState.turn}
-          activePlayerName={activePlayer?.name || 'Unknown'}
-        />
-      )}
-
-      {/* Opponent fields (top) */}
-      <div className={cn(
-        'grid gap-2',
-        opponents.length === 1 && 'grid-cols-1',
-        opponents.length === 2 && 'grid-cols-2',
-        opponents.length >= 3 && 'grid-cols-3'
-      )}>
-        {opponents.map((opp) => (
-          <PlayerField
-            key={opp.id}
-            player={opp}
-            battlefield={getCardsInZone(gameState, opp.id, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
-            commandZone={getCardsInZone(gameState, opp.id, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c).filter(c => { const tl = (c.cardData.typeLine || '').toLowerCase(); return tl.includes('legendary') || tl.includes('planeswalker'); })}
-            graveyardCount={getZoneCardCount(gameState, opp.id, 'graveyard')}
-            exileCount={getZoneCardCount(gameState, opp.id, 'exile')}
-            libraryCount={getZoneCardCount(gameState, opp.id, 'library')}
-            isActivePlayer={gameState.turn.activePlayerId === opp.id}
-            isCurrentUser={false}
-            legalActions={[]}
-            combat={combat}
-            onTapLand={() => {}}
-            validTargetIds={targeting?.validTargetIds}
-            onSelectTarget={targeting ? handleSelectTarget : undefined}
+        <div className="shrink-0">
+          <PhaseTracker
+            turn={gameState.turn}
+            activePlayerName={activePlayer?.name || 'Unknown'}
           />
-        ))}
-      </div>
-      </div>{/* end TOP ZONE */}
+        </div>
+      )}
 
-      {/* ─── FLOATING OVERLAYS: stack, targeting, mana payment, combat, mulligan ─── */}
-      {/* These are absolutely positioned so they don't consume vertical flow space */}
-      <div className="relative shrink-0 z-20">
+      {/* ─── STAT BOXES: all players ─── */}
+      <div className="flex-1 min-h-0 flex flex-col gap-[clamp(4px,0.8vmin,8px)] p-[clamp(4px,0.8vmin,8px)] overflow-hidden">
 
-      {/* Mulligan phase UI */}
-      <AnimatePresence>
-      {gameState.mulliganPhase && hasPriority && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          className="flex flex-col items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2 shadow-lg"
-        >
-          <span className="text-xs font-semibold text-primary">
-            Mulligan Phase
-          </span>
-          <span className="text-[10px] text-muted-foreground">
-            {currentPlayer && currentPlayer.mulliganCount > 0
-              ? `Mulligan #${currentPlayer.mulliganCount} — put ${currentPlayer.mulliganCount} card${currentPlayer.mulliganCount > 1 ? 's' : ''} on bottom`
-              : 'Keep or mulligan?'}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={() => {
-                const action = legalActions.find((a) => a.type === 'KEEP_HAND');
-                if (action) performAction(action);
-              }}
-              className="h-7 px-3 text-xs"
-            >
-              Keep ({7 - (currentPlayer?.mulliganCount || 0)})
-            </Button>
-            {legalActions.some((a) => a.type === 'MULLIGAN') && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const action = legalActions.find((a) => a.type === 'MULLIGAN');
-                  if (action) performAction(action);
-                }}
-                className="h-7 px-3 text-xs"
+        {/* Opponent stat boxes */}
+        <div className={cn(
+          'grid gap-[clamp(4px,0.8vmin,8px)]',
+          opponents.length === 1 && 'grid-cols-1',
+          opponents.length === 2 && 'grid-cols-2',
+          opponents.length >= 3 && 'grid-cols-3'
+        )}>
+          {opponents.map((opp) => {
+            const oppBf = getCardsInZone(gameState, opp.id, 'battlefield' as any)
+              .map(id => gameState.cardInstances.get(id))
+              .filter((c): c is CardInstance => !!c);
+            const oppCmd = getCardsInZone(gameState, opp.id, 'command' as any)
+              .map(id => gameState.cardInstances.get(id))
+              .filter((c): c is CardInstance => !!c);
+            const creatureCount = oppBf.filter(c => (c.cardData.typeLine || '').toLowerCase().includes('creature')).length;
+            const landCount = oppBf.filter(c => (c.cardData.typeLine || '').toLowerCase().includes('land')).length;
+            const otherCount = oppBf.length - creatureCount - landCount;
+            const cmdOnField = oppCmd.length === 0; // empty command zone = commander is on battlefield
+            const cmdArt = oppCmd[0]?.cardData.imageUris?.artCrop || oppCmd[0]?.cardData.cardFaces?.[0]?.imageUris?.artCrop;
+
+            return (
+              <button
+                key={opp.id}
+                onClick={() => setExpandedPlayerId(opp.id)}
+                className={cn(
+                  'rounded-[clamp(6px,1vmin,12px)] border transition-all text-left',
+                  'p-[clamp(4px,0.6vmin,10px)] flex flex-col gap-[clamp(2px,0.3vmin,4px)]',
+                  'hover:bg-card/60 active:scale-[0.98]',
+                  gameState.turn.activePlayerId === opp.id
+                    ? 'border-gold/40 bg-gold/5 shadow-[0_0_12px_rgba(212,169,68,0.1)]'
+                    : 'border-border/20 bg-card/30'
+                )}
               >
-                Mulligan
-              </Button>
+                {/* Row 1: name + life + commander */}
+                <div className="flex items-center gap-[clamp(3px,0.5vmin,6px)]">
+                  <span className="text-[clamp(9px,1.2vmin,13px)] font-semibold text-foreground truncate flex-1">
+                    {opp.name}
+                  </span>
+                  <div className="flex items-center gap-[clamp(2px,0.3vmin,4px)]">
+                    <Heart className="text-red-400 shrink-0" style={{ width: 'clamp(10px,1.4vmin,16px)', height: 'clamp(10px,1.4vmin,16px)' }} />
+                    <span className="text-[clamp(10px,1.4vmin,16px)] font-bold text-red-300">{opp.life}</span>
+                  </div>
+                  <Crown
+                    className={cn('shrink-0', cmdOnField ? 'text-green-400' : 'text-muted-foreground/30')}
+                    style={{ width: 'clamp(10px,1.3vmin,15px)', height: 'clamp(10px,1.3vmin,15px)' }}
+                  />
+                </div>
+                {/* Row 2: zone counts */}
+                <div className="flex items-center gap-[clamp(4px,0.8vmin,10px)] text-muted-foreground/60">
+                  <StatIcon icon={BookOpen} count={getZoneCardCount(gameState, opp.id, 'library')} label="Lib" />
+                  <StatIcon icon={Skull} count={getZoneCardCount(gameState, opp.id, 'graveyard')} label="GY" />
+                  <StatIcon icon={Ban} count={getZoneCardCount(gameState, opp.id, 'exile')} label="Ex" />
+                  <span className="text-border/20">|</span>
+                  <StatIcon icon={Swords} count={creatureCount} label="Crt" />
+                  <StatIcon icon={Sparkles} count={otherCount} label="Oth" />
+                  <StatIcon icon={TreePine} count={landCount} label="Lnd" />
+                  <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(10px,1.2vmin,14px)', height: 'clamp(10px,1.2vmin,14px)' }} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Player stat box */}
+        {currentPlayer && (
+          <button
+            onClick={() => setExpandedPlayerId(currentPlayerId)}
+            className={cn(
+              'rounded-[clamp(8px,1.2vmin,14px)] border transition-all text-left',
+              'p-[clamp(6px,1vmin,14px)] flex flex-col gap-[clamp(3px,0.5vmin,6px)]',
+              'hover:bg-card/60 active:scale-[0.99]',
+              hasPriority && !gameState.isGameOver
+                ? 'border-gold/40 bg-gold/5 shadow-[0_0_16px_rgba(212,169,68,0.12)]'
+                : 'border-border/20 bg-card/30'
             )}
-          </div>
-        </motion.div>
-      )}
-      </AnimatePresence>
-
-      {/* Stack display */}
-      <AnimatePresence>
-        {gameState.stack.length > 0 && (
-          <StackDisplay stack={gameState.stack} />
-        )}
-      </AnimatePresence>
-
-      {/* Targeting overlay banner */}
-      <AnimatePresence>
-        {targeting && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-950/40 backdrop-blur-sm px-3 py-1.5 shadow-[0_0_16px_rgba(6,182,212,0.1)]"
           >
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
-            </span>
-            <span className="text-xs text-cyan-200">
-              Target: <strong className="text-cyan-100">{targeting.cardName}</strong>
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={cancelTargeting}
-              className="ml-auto h-6 w-6 p-0 text-cyan-400 hover:text-cyan-200"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </motion.div>
+            {(() => {
+              const myBf = getCardsInZone(gameState, currentPlayerId, 'battlefield' as any)
+                .map(id => gameState.cardInstances.get(id))
+                .filter((c): c is CardInstance => !!c);
+              const myCmd = getCardsInZone(gameState, currentPlayerId, 'command' as any)
+                .map(id => gameState.cardInstances.get(id))
+                .filter((c): c is CardInstance => !!c);
+              const myCreatures = myBf.filter(c => (c.cardData.typeLine || '').toLowerCase().includes('creature')).length;
+              const myLands = myBf.filter(c => (c.cardData.typeLine || '').toLowerCase().includes('land')).length;
+              const myOther = myBf.length - myCreatures - myLands;
+              const myCmdOnField = myCmd.length === 0;
+
+              return (
+                <>
+                  <div className="flex items-center gap-[clamp(4px,0.8vmin,8px)]">
+                    <span className="text-[clamp(10px,1.5vmin,15px)] font-semibold text-foreground truncate flex-1">
+                      {currentPlayer.name}
+                    </span>
+                    <div className="flex items-center gap-[clamp(3px,0.4vmin,5px)]">
+                      <Heart className="text-red-400 shrink-0" style={{ width: 'clamp(12px,1.6vmin,18px)', height: 'clamp(12px,1.6vmin,18px)' }} />
+                      <span className="text-[clamp(12px,1.8vmin,20px)] font-bold text-red-300">{currentPlayer.life}</span>
+                    </div>
+                    <Crown
+                      className={cn('shrink-0', myCmdOnField ? 'text-green-400' : 'text-muted-foreground/30')}
+                      style={{ width: 'clamp(12px,1.5vmin,17px)', height: 'clamp(12px,1.5vmin,17px)' }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-[clamp(6px,1.2vmin,14px)] text-muted-foreground/60">
+                    <StatIcon icon={BookOpen} count={getZoneCardCount(gameState, currentPlayerId, 'library')} label="Lib" size="lg" />
+                    <StatIcon icon={Skull} count={getZoneCardCount(gameState, currentPlayerId, 'graveyard')} label="GY" size="lg" />
+                    <StatIcon icon={Ban} count={getZoneCardCount(gameState, currentPlayerId, 'exile')} label="Ex" size="lg" />
+                    <span className="text-border/20">|</span>
+                    <StatIcon icon={Swords} count={myCreatures} label="Crt" size="lg" />
+                    <StatIcon icon={Sparkles} count={myOther} label="Oth" size="lg" />
+                    <StatIcon icon={TreePine} count={myLands} label="Lnd" size="lg" />
+                    <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(12px,1.4vmin,16px)', height: 'clamp(12px,1.4vmin,16px)' }} />
+                  </div>
+                </>
+              );
+            })()}
+          </button>
         )}
-      </AnimatePresence>
+      </div>{/* end STAT BOXES */}
 
-      {/* Mana payment banner */}
-      <AnimatePresence>
-        {manaPaymentInfo && onCancelManaPayment && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/40 backdrop-blur-sm px-3 py-1.5 shadow-[0_0_16px_rgba(16,185,129,0.1)]"
-          >
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            <span className="text-xs text-emerald-200">
-              Pay <strong className="text-emerald-100 font-mono">{manaPaymentInfo.manaCost}</strong> for <strong className="text-emerald-100">{manaPaymentInfo.spellName}</strong>
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onCancelManaPayment}
-              className="ml-auto h-6 px-1.5 text-emerald-400 hover:text-emerald-200 text-[10px]"
+      {/* ─── INLINE OVERLAYS: stack, targeting, mana, combat, mulligan ─── */}
+      <div className="shrink-0 z-20 flex flex-col gap-1 px-[clamp(4px,0.8vmin,8px)]">
+        <AnimatePresence>
+          {gameState.mulliganPhase && hasPriority && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5"
             >
-              <X className="h-3 w-3 mr-0.5" />
-              Cancel
-            </Button>
-          </motion.div>
+              <span className="text-xs font-semibold text-primary">Mulligan</span>
+              <span className="text-[10px] text-muted-foreground">
+                {currentPlayer && currentPlayer.mulliganCount > 0 ? `#${currentPlayer.mulliganCount}` : 'Keep or mulligan?'}
+              </span>
+              <div className="ml-auto flex gap-1.5">
+                <Button size="sm" variant="default" className="h-6 px-2 text-[10px]" onClick={() => { const a = legalActions.find(a => a.type === 'KEEP_HAND'); if (a) performAction(a); }}>
+                  Keep ({7 - (currentPlayer?.mulliganCount || 0)})
+                </Button>
+                {legalActions.some(a => a.type === 'MULLIGAN') && (
+                  <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => { const a = legalActions.find(a => a.type === 'MULLIGAN'); if (a) performAction(a); }}>
+                    Mull
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {gameState.stack.length > 0 && <StackDisplay stack={gameState.stack} />}
+        </AnimatePresence>
+        <AnimatePresence>
+          {targeting && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-950/40 px-3 py-1">
+              <span className="relative flex h-2 w-2"><span className="absolute h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" /><span className="relative h-2 w-2 rounded-full bg-cyan-400" /></span>
+              <span className="text-[11px] text-cyan-200">Target: <strong>{targeting.cardName}</strong></span>
+              <Button size="sm" variant="ghost" onClick={cancelTargeting} className="ml-auto h-5 w-5 p-0 text-cyan-400"><X className="h-3 w-3" /></Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {manaPaymentInfo && onCancelManaPayment && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/40 px-3 py-1">
+              <span className="text-[11px] text-emerald-200">Pay <strong className="font-mono">{manaPaymentInfo.manaCost}</strong> for <strong>{manaPaymentInfo.spellName}</strong></span>
+              <Button size="sm" variant="ghost" onClick={onCancelManaPayment} className="ml-auto h-5 px-1 text-emerald-400 text-[10px]"><X className="h-3 w-3" /> Cancel</Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {showCombatControls && (
+          <CombatControls gameState={gameState} currentPlayerId={currentPlayerId} legalActions={legalActions}
+            onDeclareAttackers={handleDeclareAttackers} onDeclareBlockers={handleDeclareBlockers} onSkipCombat={handleSkipCombat} />
         )}
-      </AnimatePresence>
-
-      {/* Combat controls */}
-      {showCombatControls && (
-        <CombatControls
-          gameState={gameState}
-          currentPlayerId={currentPlayerId}
-          legalActions={legalActions}
-          onDeclareAttackers={handleDeclareAttackers}
-          onDeclareBlockers={handleDeclareBlockers}
-          onSkipCombat={handleSkipCombat}
-        />
-      )}
-
-      </div>{/* end OVERLAYS */}
+      </div>
 
       {/* Action bar — hidden when rendered externally (e.g. in page header) */}
       {!hideActionBar && (
-      <div className={cn(
-        'shrink-0 flex items-center gap-3 rounded-xl border px-4 py-2 w-full max-w-3xl self-center mx-auto relative z-20 my-1 transition-all duration-300',
-        hasPriority && !gameState.isGameOver
-          ? 'border-gold/40 bg-gold/5 shadow-[0_0_24px_rgba(212,169,68,0.15)]'
-          : 'border-border/30 bg-card/60 backdrop-blur-xl shadow-lg'
-      )}>
-        <div className="flex items-center gap-2 min-w-0 shrink">
-          {isProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin text-gold shrink-0" />}
-          {hasPriority && !isProcessing && !gameState.isGameOver && (
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
-              <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
-            </span>
-          )}
-          <span className={cn(
-            'text-xs font-medium',
-            gameState.isGameOver ? 'text-foreground' :
-            hasPriority ? 'text-gold' : 'text-muted-foreground'
-          )}>
-            {gameState.isGameOver
-              ? (gameState.winner
-                  ? `${gameState.players.find((p) => p.id === gameState.winner)?.name} wins!`
-                  : 'Draw')
-              : isProcessing
-                ? 'AI thinking...'
-                : hasPriority
-                  ? (isMyTurn
-                      ? inCombatPhase ? 'Combat' : 'Your Turn'
-                      : 'Priority')
-                  : `${gameState.players.find((p) => p.id === gameState.priority.playerWithPriority)?.name}'s turn`}
+        <div className={cn(
+          'shrink-0 flex items-center gap-3 rounded-xl border px-4 py-2 mx-auto my-1 z-20',
+          hasPriority && !gameState.isGameOver ? 'border-gold/40 bg-gold/5' : 'border-border/30 bg-card/60'
+        )}>
+          <span className={cn('text-xs font-medium', hasPriority ? 'text-gold' : 'text-muted-foreground')}>
+            {hasPriority ? (isMyTurn ? 'Your Turn' : 'Priority') : `${gameState.players.find(p => p.id === gameState.priority.playerWithPriority)?.name}'s turn`}
           </span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button size="sm" onClick={handlePassPriority} disabled={!hasPriority || gameState.isGameOver} className="h-7 gap-1 px-3 text-xs"><ArrowRight className="h-3 w-3" />Pass</Button>
+            <Button size="sm" variant={autoPassUntilNextTurn ? 'default' : 'outline'} onClick={() => setAutoPass(!autoPassUntilNextTurn)} className={cn('h-7 px-2 text-xs', autoPassUntilNextTurn && 'bg-amber-600 text-white')}><FastForward className="h-3 w-3" /></Button>
+          </div>
         </div>
-
-        <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          <Button
-            size="sm"
-            onClick={handlePassPriority}
-            disabled={!hasPriority || gameState.isGameOver || showCombatControls}
-            className={cn(
-              'h-7 gap-1 px-3 text-xs font-semibold transition-all',
-              hasPriority && !gameState.isGameOver && !showCombatControls
-                ? 'bg-gold text-gold-foreground hover:bg-gold/90 shadow-[0_0_12px_rgba(212,169,68,0.3)]'
-                : ''
-            )}
-          >
-            <ArrowRight className="h-3 w-3" />
-            Pass
-          </Button>
-          <Button
-            size="sm"
-            variant={autoPassUntilNextTurn ? 'default' : 'outline'}
-            onClick={() => setAutoPass(!autoPassUntilNextTurn)}
-            className={cn(
-              'h-7 gap-1 px-2 text-xs',
-              autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white'
-            )}
-            title="Auto-pass priority until your next turn"
-          >
-            <FastForward className="h-3 w-3" />
-            Auto
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleConcede}
-            disabled={gameState.isGameOver}
-            className="h-7 gap-1 px-2 text-xs text-destructive/70 hover:text-destructive"
-          >
-            <Flag className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-      )}
-
-      {/* ─── BOTTOM ZONE: player field ─── */}
-      <div className="flex-1 min-h-0 flex flex-col gap-2">
-
-      {/* Current player field — flex-1 so it expands to fill the bottom zone */}
-      {currentPlayer && (
-        <PlayerField
-          className="flex-1 min-h-0"
-          player={currentPlayer}
-          battlefield={getCardsInZone(gameState, currentPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
-          commandZone={getCardsInZone(gameState, currentPlayerId, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
-          graveyardCount={getZoneCardCount(gameState, currentPlayerId, 'graveyard')}
-          exileCount={getZoneCardCount(gameState, currentPlayerId, 'exile')}
-          libraryCount={getZoneCardCount(gameState, currentPlayerId, 'library')}
-          isActivePlayer={isMyTurn}
-          isCurrentUser
-          legalActions={hasPriority ? filteredLegalActions : []}
-          combat={combat}
-          onTapLand={handleTapLand}
-          onUntapLand={handleUntapLand}
-          onCastCommander={handleCastCommander}
-          onEquipClick={handleEquipClick}
-          onActivateAbility={handleActivateAbility}
-          pendingManaChoice={pendingManaChoice}
-          onManaColorPicked={handleManaColorPicked}
-          manaPaymentSourceIds={manaPaymentSourceIds}
-          onTapForManaPayment={onTapForManaPayment}
-          hideCommandZone={hideCommandZone}
-        />
       )}
 
       {/* Hand — rendered here only if forge page is NOT handling it externally */}
       {!hideHand && (
-        <div className="border-t border-border/20 bg-background/90 backdrop-blur-xl px-2 pt-2 pb-1">
-          <div className="mb-1 flex items-center justify-between px-2">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
-              Hand · {handCards.length}
-            </span>
-            {hasPriority && !gameState.isGameOver && (
-              <span className="text-[10px] text-muted-foreground/40 italic">Tap a card to select</span>
-            )}
-          </div>
+        <div className="shrink-0 border-t border-border/20 bg-background/90 px-2 pt-1 pb-1">
           <Hand
             cards={handCards.map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
             legalActions={hasPriority ? filteredLegalActions : []}
@@ -648,7 +569,62 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           />
         </div>
       )}
-      </div>{/* end BOTTOM ZONE */}
+
+      {/* ─── EXPANDED BATTLEFIELD OVERLAY ─── */}
+      <AnimatePresence>
+        {expandedPlayerId && (() => {
+          const ep = gameState.players.find(p => p.id === expandedPlayerId);
+          if (!ep) return null;
+          const isMe = expandedPlayerId === currentPlayerId;
+          return (
+            <motion.div
+              key={expandedPlayerId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-40 flex flex-col bg-background/95 backdrop-blur-md"
+            >
+              {/* Overlay header */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{ep.name}</span>
+                  <span className="text-xs text-red-400 flex items-center gap-1"><Heart className="h-3 w-3" /> {ep.life}</span>
+                </div>
+                <button onClick={() => setExpandedPlayerId(null)} className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              {/* Full battlefield */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-2">
+                <PlayerField
+                  player={ep}
+                  battlefield={getCardsInZone(gameState, expandedPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
+                  commandZone={getCardsInZone(gameState, expandedPlayerId, 'command' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c).filter(c => { const tl = (c.cardData.typeLine || '').toLowerCase(); return tl.includes('legendary') || tl.includes('planeswalker'); })}
+                  graveyardCount={getZoneCardCount(gameState, expandedPlayerId, 'graveyard')}
+                  exileCount={getZoneCardCount(gameState, expandedPlayerId, 'exile')}
+                  libraryCount={getZoneCardCount(gameState, expandedPlayerId, 'library')}
+                  isActivePlayer={gameState.turn.activePlayerId === expandedPlayerId}
+                  isCurrentUser={isMe}
+                  legalActions={isMe && hasPriority ? filteredLegalActions : []}
+                  combat={combat}
+                  onTapLand={isMe ? handleTapLand : () => {}}
+                  onUntapLand={isMe ? handleUntapLand : undefined}
+                  onCastCommander={isMe ? handleCastCommander : undefined}
+                  onEquipClick={isMe ? handleEquipClick : undefined}
+                  onActivateAbility={isMe ? handleActivateAbility : undefined}
+                  pendingManaChoice={isMe ? pendingManaChoice : undefined}
+                  onManaColorPicked={isMe ? handleManaColorPicked : undefined}
+                  manaPaymentSourceIds={isMe ? manaPaymentSourceIds : undefined}
+                  onTapForManaPayment={isMe ? onTapForManaPayment : undefined}
+                  validTargetIds={targeting?.validTargetIds}
+                  onSelectTarget={targeting ? handleSelectTarget : undefined}
+                />
+              </div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* Game over overlay */}
       <AnimatePresence>
@@ -778,6 +754,23 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
             />
           )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** Compact icon + count for stat boxes */
+function StatIcon({ icon: Icon, count, label, size = 'sm' }: {
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  count: number;
+  label: string;
+  size?: 'sm' | 'lg';
+}) {
+  const iconSize = size === 'lg' ? 'clamp(11px,1.4vmin,15px)' : 'clamp(9px,1.1vmin,13px)';
+  const textSize = size === 'lg' ? 'text-[clamp(10px,1.3vmin,14px)]' : 'text-[clamp(8px,1vmin,11px)]';
+  return (
+    <div className="flex items-center gap-[clamp(1px,0.2vmin,3px)]" title={label}>
+      <Icon style={{ width: iconSize, height: iconSize }} className="shrink-0" />
+      <span className={cn(textSize, 'font-medium tabular-nums')}>{count}</span>
     </div>
   );
 }
