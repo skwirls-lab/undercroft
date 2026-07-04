@@ -596,7 +596,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                 </button>
               </div>
               {/* Full battlefield */}
-              <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
+              <div className="flex-1 min-h-0 overflow-y-auto h-full" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
                 <PlayerField
                   player={ep}
                   battlefield={getCardsInZone(gameState, expandedPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
@@ -619,6 +619,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   onTapForManaPayment={isMe ? onTapForManaPayment : undefined}
                   validTargetIds={targeting?.validTargetIds}
                   onSelectTarget={targeting ? handleSelectTarget : undefined}
+                  className="h-full"
                 />
               </div>
             </motion.div>

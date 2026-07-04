@@ -105,7 +105,8 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
   return (
     <div
       className={cn(
-        'flex h-8 items-center gap-1.5 rounded-md border px-1 text-[10px] font-medium leading-none transition-all',
+        'flex items-center rounded-md border font-medium leading-none transition-all',
+        'h-[clamp(28px,4vmin,1000px)] gap-[clamp(4px,0.6vmin,1000px)] px-[clamp(4px,0.5vmin,1000px)] text-[clamp(9px,1.4vmin,1000px)]',
         getCardColorClass(card),
         isTapped ? 'rotate-3 opacity-60' : '',
         'bg-card/90 backdrop-blur-sm',
@@ -114,7 +115,7 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
     >
       {/* Mini art thumbnail */}
       {artCropUrl && !isLand ? (
-        <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded">
+        <div className="relative shrink-0 overflow-hidden rounded" style={{ width: 'clamp(20px,3vmin,1000px)', height: 'clamp(20px,3vmin,1000px)' }}>
           <Image src={artCropUrl} alt="" fill sizes="24px" className="object-cover" unoptimized />
         </div>
       ) : (
@@ -139,30 +140,30 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
       <div className="ml-auto flex items-center gap-1 shrink-0">
         {/* Counters */}
         {(card.counters['+1/+1'] || 0) > 0 && (
-          <span className="text-[8px] font-bold text-green-400">+{card.counters['+1/+1']}</span>
+          <span className="font-bold text-green-400" style={{ fontSize: 'clamp(7px,1vmin,1000px)' }}>+{card.counters['+1/+1']}</span>
         )}
         {/* Attachments */}
         {card.attachmentNames.length > 0 && (
-          <span className="text-[7px] font-bold text-amber-400" title={card.attachmentNames.join(', ')}>
+          <span className="font-bold text-amber-400" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)' }} title={card.attachmentNames.join(', ')}>
             {card.attachmentNames.length}x⚔
           </span>
         )}
         {/* Token */}
         {isToken(card) && (
-          <span className="text-[7px] font-bold text-purple-400">TKN</span>
+          <span className="font-bold text-purple-400" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)' }}>TKN</span>
         )}
         {/* Damage */}
         {card.damage > 0 && (
-          <span className="text-[9px] font-bold text-red-400">-{card.damage}</span>
+          <span className="font-bold text-red-400" style={{ fontSize: 'clamp(8px,1.2vmin,1000px)' }}>-{card.damage}</span>
         )}
         {/* P/T */}
         {isCreature && card.cardData.power && (() => {
           const pt = getDisplayPT(card);
           return (
             <span className={cn(
-              'rounded px-1 py-0.5 text-[9px] font-bold',
+              'rounded font-bold',
               pt.boosted ? 'bg-green-900/60 text-green-300' : 'bg-black/40 text-white'
-            )}>
+            )} style={{ fontSize: 'clamp(8px,1.2vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)' }}>
               {pt.power}/{pt.toughness}
             </span>
           );
@@ -186,9 +187,9 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
         'relative overflow-hidden rounded-lg border-2 transition-all group',
         getCardColorClass(card),
         isTapped ? 'rotate-[4deg] brightness-75' : '',
-        'h-[132px] w-[96px]',
         className
       )}
+      style={{ width: 'clamp(72px,10vmin,1000px)', height: 'clamp(100px,14vmin,1000px)' }}
     >
       {artCropUrl ? (
         <Image
@@ -206,15 +207,15 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
       )}
 
       {/* Top dark strip for mana cost */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 bg-gradient-to-b from-black/60 to-transparent px-1 pt-0.5 pb-3">
+      <div className="absolute inset-x-0 top-0 flex items-center justify-end bg-gradient-to-b from-black/60 to-transparent" style={{ gap: 'clamp(2px,0.3vmin,1000px)', padding: 'clamp(2px,0.3vmin,1000px) clamp(3px,0.4vmin,1000px) clamp(8px,1.2vmin,1000px)' }}>
         {parseManaSymbols(face.manaCost).slice(0, 5).map((sym, i) => (
           <ManaSymbol key={i} symbol={sym} size="xs" className="shadow-sm" />
         ))}
       </div>
 
       {/* Name overlay at bottom */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent px-1.5 pb-1 pt-5">
-        <p className="truncate text-[10px] font-semibold leading-tight text-white drop-shadow-md">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent" style={{ padding: 'clamp(12px,2vmin,1000px) clamp(4px,0.6vmin,1000px) clamp(3px,0.4vmin,1000px)' }}>
+        <p className="truncate font-semibold leading-tight text-white drop-shadow-md" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>
           {face.name}
         </p>
       </div>
@@ -224,9 +225,9 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
         const pt = getDisplayPT(card);
         return (
           <div className={cn(
-            'absolute right-0 bottom-0 rounded-tl-md px-1.5 py-0.5 text-[11px] font-black shadow-lg',
+            'absolute right-0 bottom-0 rounded-tl-md font-black shadow-lg',
             pt.boosted ? 'bg-green-800 text-green-200' : 'bg-black/80 text-white'
-          )}>
+          )} style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(4px,0.6vmin,1000px)' }}>
             {pt.power}/{pt.toughness}
           </div>
         );
@@ -234,21 +235,21 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
 
       {/* Token badge */}
       {isToken(card) && (
-        <div className="absolute left-0 bottom-3.5 rounded-r bg-purple-600/90 px-1 py-0.5 text-[7px] font-bold text-purple-100 shadow">
+        <div className="absolute left-0 bottom-3.5 rounded-r bg-purple-600/90 font-bold text-purple-100 shadow" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)' }}>
           TOKEN
         </div>
       )}
 
       {/* Attachments indicator */}
       {card.attachmentNames.length > 0 && (
-        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 px-1 py-0.5 text-[7px] font-bold text-amber-100 shadow max-w-[70px] truncate" title={card.attachmentNames.join(', ')}>
+        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 font-bold text-amber-100 shadow truncate" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)', maxWidth: 'clamp(50px,8vmin,1000px)' }} title={card.attachmentNames.join(', ')}>
           {card.attachmentNames.length === 1 ? card.attachmentNames[0] : `${card.attachmentNames.length} attached`}
         </div>
       )}
 
       {/* Damage indicator */}
       {card.damage > 0 && (
-        <div className="absolute left-0 top-0.5 rounded-r bg-red-600/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
+        <div className="absolute left-0 top-0.5 rounded-r bg-red-600/90 font-bold text-white shadow" style={{ fontSize: 'clamp(9px,1.3vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(4px,0.6vmin,1000px)' }}>
           -{card.damage}
         </div>
       )}
@@ -265,7 +266,7 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
             .filter((k) => ['Flying', 'Deathtouch', 'Lifelink', 'Trample', 'First Strike', 'Double Strike', 'Vigilance', 'Reach', 'Defender', 'Haste', 'Flash', 'Hexproof', 'Indestructible', 'Menace'].includes(k))
             .slice(0, 3)
             .map((kw) => (
-              <span key={kw} className="rounded bg-black/70 px-1 text-[7px] font-semibold text-amber-300 leading-tight shadow-sm">
+              <span key={kw} className="rounded bg-black/70 font-semibold text-amber-300 leading-tight shadow-sm" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(0px,0.1vmin,1000px) clamp(2px,0.3vmin,1000px)' }}>
                 {kw}
               </span>
             ))}
@@ -299,9 +300,9 @@ function FullView({ card, className }: { card: CardInstance; className?: string 
       className={cn(
         'relative overflow-hidden rounded-xl border-2 shadow-lg transition-all',
         getCardColorClass(card),
-        'h-[264px] w-[190px]',
         className
       )}
+      style={{ width: 'clamp(140px,20vmin,1000px)', height: 'clamp(196px,28vmin,1000px)' }}
     >
       {imageUrl ? (
         <Image

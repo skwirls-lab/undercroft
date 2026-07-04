@@ -301,6 +301,7 @@ export default function ForgeGamePage() {
                   legalActions={handLegalActions}
                   onPlayCard={(card) => { handleForgePlayCard(card); setHandExpanded(false); }}
                   isActive={!!hasPriority && !isGameOver}
+                  layout="grid"
                 />
               </div>
             </div>
@@ -404,8 +405,7 @@ function CardPreviewFloating({ handExpanded }: { handExpanded?: boolean }) {
     };
   }, [previewCard?.instanceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hide preview when hand overlay is open
-  if (handExpanded) return null;
+  // Card preview is always visible (z-[60] ensures it floats above everything)
 
   return (
     <AnimatePresence>
