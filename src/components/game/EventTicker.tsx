@@ -141,22 +141,23 @@ export function EventTicker({ events, currentPlayerId, className }: EventTickerP
       <button
         onClick={() => setLogOpen(true)}
         className={cn(
-          'flex items-center gap-2 px-2 py-0.5 text-left w-full shrink-0 border-b border-border/10',
-          'bg-card/30 hover:bg-card/50 transition-colors min-h-[22px]',
+          'flex items-center text-left w-full shrink-0 border-b border-border/10',
+          'bg-card/30 hover:bg-card/50 transition-colors',
           className
         )}
+        style={{ padding: 'clamp(2px,0.5vmin,8px) clamp(6px,1vmin,16px)', gap: 'clamp(4px,0.8vmin,12px)', minHeight: 'clamp(22px,3.5vh,44px)' }}
       >
-        <ScrollText className="h-3 w-3 text-gold/40 shrink-0" />
-        <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+        <ScrollText className="text-gold/40 shrink-0" style={{ width: 'clamp(12px,1.8vmin,22px)', height: 'clamp(12px,1.8vmin,22px)' }} />
+        <div className="flex-1 min-w-0 flex items-center overflow-hidden" style={{ gap: 'clamp(4px,0.8vmin,12px)' }}>
           {tickerLines.length > 0 ? (
             tickerLines.map((line, i) => (
-              <span key={i} className="text-[10px] text-muted-foreground/70 shrink-0 whitespace-nowrap">
+              <span key={i} className="text-muted-foreground/70 shrink-0 whitespace-nowrap" style={{ fontSize: 'clamp(9px,1.5vmin,16px)' }}>
                 {line}
-                {i < tickerLines.length - 1 && <span className="text-border/30 ml-2">·</span>}
+                {i < tickerLines.length - 1 && <span className="text-border/30" style={{ marginLeft: 'clamp(4px,0.6vmin,10px)' }}>·</span>}
               </span>
             ))
           ) : (
-            <span className="text-[10px] text-muted-foreground/30 italic">No events yet</span>
+            <span className="text-muted-foreground/30 italic" style={{ fontSize: 'clamp(9px,1.5vmin,16px)' }}>No events yet</span>
           )}
         </div>
       </button>
