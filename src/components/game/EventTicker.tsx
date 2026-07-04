@@ -145,19 +145,19 @@ export function EventTicker({ events, currentPlayerId, className }: EventTickerP
           'bg-card/30 hover:bg-card/50 transition-colors',
           className
         )}
-        style={{ padding: 'clamp(2px,0.5vmin,8px) clamp(6px,1vmin,16px)', gap: 'clamp(4px,0.8vmin,12px)', minHeight: 'clamp(22px,3.5vh,44px)' }}
+        style={{ padding: 'clamp(2px,0.5vmin,1000px) clamp(6px,1.5vmin,1000px)', gap: 'clamp(4px,1vmin,1000px)', minHeight: 'clamp(22px,3.5vh,1000px)' }}
       >
-        <ScrollText className="text-gold/40 shrink-0" style={{ width: 'clamp(12px,1.8vmin,22px)', height: 'clamp(12px,1.8vmin,22px)' }} />
-        <div className="flex-1 min-w-0 flex items-center overflow-hidden" style={{ gap: 'clamp(4px,0.8vmin,12px)' }}>
+        <ScrollText className="text-gold/40 shrink-0" style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
+        <div className="flex-1 min-w-0 flex items-center overflow-hidden" style={{ gap: 'clamp(4px,1vmin,1000px)' }}>
           {tickerLines.length > 0 ? (
             tickerLines.map((line, i) => (
-              <span key={i} className="text-muted-foreground/70 shrink-0 whitespace-nowrap" style={{ fontSize: 'clamp(9px,1.5vmin,16px)' }}>
+              <span key={i} className="text-muted-foreground/70 shrink-0 whitespace-nowrap" style={{ fontSize: 'clamp(9px,2vmin,1000px)' }}>
                 {line}
-                {i < tickerLines.length - 1 && <span className="text-border/30" style={{ marginLeft: 'clamp(4px,0.6vmin,10px)' }}>·</span>}
+                {i < tickerLines.length - 1 && <span className="text-border/30" style={{ marginLeft: 'clamp(4px,0.8vmin,1000px)' }}>·</span>}
               </span>
             ))
           ) : (
-            <span className="text-muted-foreground/30 italic" style={{ fontSize: 'clamp(9px,1.5vmin,16px)' }}>No events yet</span>
+            <span className="text-muted-foreground/30 italic" style={{ fontSize: 'clamp(9px,2vmin,1000px)' }}>No events yet</span>
           )}
         </div>
       </button>

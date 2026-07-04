@@ -141,10 +141,10 @@ export default function ForgeGamePage() {
     <CardPreviewProvider>
       <div className="flex h-[100dvh] flex-col overflow-hidden">
         {/* ─── HEADER: nav | phase tracker | nav buttons ─── */}
-        <header className="flex items-center gap-[clamp(4px,0.8vmin,12px)] border-b border-border/30 shrink-0 px-[clamp(6px,1vmin,16px)] py-[clamp(2px,0.4vmin,6px)]" style={{ minHeight: 'clamp(32px,5vh,56px)' }}>
+        <header className="flex items-center border-b border-border/30 shrink-0" style={{ gap: 'clamp(4px,1vmin,1000px)', padding: 'clamp(2px,0.5vmin,1000px) clamp(6px,1.5vmin,1000px)', minHeight: 'clamp(32px,5vh,1000px)' }}>
           <Link href="/" className="shrink-0">
-            <Button variant="ghost" size="sm" className="p-0" style={{ width: 'clamp(28px,4vh,48px)', height: 'clamp(28px,4vh,48px)' }} title="Home">
-              <ArrowLeft style={{ width: 'clamp(14px,2vmin,22px)', height: 'clamp(14px,2vmin,22px)' }} />
+            <Button variant="ghost" size="sm" className="p-0" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Home">
+              <ArrowLeft style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
             </Button>
           </Link>
           {gameState && (
@@ -156,12 +156,12 @@ export default function ForgeGamePage() {
               />
             </div>
           )}
-          <div className="flex items-center gap-[clamp(2px,0.5vmin,8px)] shrink-0">
-            <Button variant="ghost" size="sm" onClick={concede} className="p-0 text-red-400" style={{ width: 'clamp(28px,4vh,48px)', height: 'clamp(28px,4vh,48px)' }} title="Concede">
-              <Flag style={{ width: 'clamp(12px,1.8vmin,20px)', height: 'clamp(12px,1.8vmin,20px)' }} />
+          <div className="flex items-center shrink-0" style={{ gap: 'clamp(2px,0.5vmin,1000px)' }}>
+            <Button variant="ghost" size="sm" onClick={concede} className="p-0 text-red-400" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Concede">
+              <Flag style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => { disconnect(); router.push('/game'); }} className="p-0 text-muted-foreground" style={{ width: 'clamp(28px,4vh,48px)', height: 'clamp(28px,4vh,48px)' }} title="New Game">
-              <RotateCcw style={{ width: 'clamp(12px,1.8vmin,20px)', height: 'clamp(12px,1.8vmin,20px)' }} />
+            <Button variant="ghost" size="sm" onClick={() => { disconnect(); router.push('/game'); }} className="p-0 text-muted-foreground" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="New Game">
+              <RotateCcw style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
           </div>
         </header>
@@ -206,15 +206,15 @@ export default function ForgeGamePage() {
         <div className={cn(
           'shrink-0 flex items-center justify-center border-t border-border/20',
           hasPriorityForActions && !isGameOver ? 'bg-gold/5' : 'bg-card/30'
-        )} style={{ gap: 'clamp(6px,1.2vmin,16px)', padding: 'clamp(4px,0.8vmin,12px) clamp(8px,1.5vmin,20px)' }}>
-          {isProcessing && <Loader2 className="animate-spin text-gold" style={{ width: 'clamp(14px,2vmin,24px)', height: 'clamp(14px,2vmin,24px)' }} />}
+        )} style={{ gap: 'clamp(6px,1.5vmin,1000px)', padding: 'clamp(6px,1.2vmin,1000px) clamp(8px,2vmin,1000px)' }}>
+          {isProcessing && <Loader2 className="animate-spin text-gold" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />}
           {hasPriorityForActions && !isProcessing && !isGameOver && (
-            <span className="relative" style={{ width: 'clamp(8px,1.2vmin,14px)', height: 'clamp(8px,1.2vmin,14px)' }}>
+            <span className="relative" style={{ width: 'clamp(8px,1.5vmin,1000px)', height: 'clamp(8px,1.5vmin,1000px)' }}>
               <span className="absolute inset-0 animate-ping rounded-full opacity-75" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
               <span className="absolute inset-0 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
             </span>
           )}
-          <span className={cn('font-semibold', hasPriorityForActions ? 'text-gold' : 'text-muted-foreground/60')} style={{ fontSize: 'clamp(11px,2vmin,22px)' }}>
+          <span className={cn('font-semibold', hasPriorityForActions ? 'text-gold' : 'text-muted-foreground/60')} style={{ fontSize: 'clamp(11px,2.5vmin,1000px)' }}>
             {isGameOver ? 'Game Over'
               : isProcessing ? 'AI thinking...'
               : hasPriorityForActions ? (isMyTurn ? (inCombatPhase ? 'Combat Phase' : 'Your Turn') : 'You have priority')
@@ -228,36 +228,36 @@ export default function ForgeGamePage() {
               'font-semibold',
               hasPriorityForActions && !isGameOver ? 'bg-gold text-gold-foreground hover:bg-gold/90' : ''
             )}
-            style={{ height: 'clamp(28px,4vh,48px)', padding: '0 clamp(10px,1.8vmin,24px)', fontSize: 'clamp(10px,1.8vmin,18px)', gap: 'clamp(3px,0.5vmin,8px)' }}
+            style={{ height: 'clamp(28px,4.5vh,1000px)', padding: '0 clamp(10px,2vmin,1000px)', fontSize: 'clamp(10px,2vmin,1000px)', gap: 'clamp(3px,0.6vmin,1000px)' }}
           >
-            <ArrowRight style={{ width: 'clamp(12px,1.8vmin,20px)', height: 'clamp(12px,1.8vmin,20px)' }} /> Pass
+            <ArrowRight style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} /> Pass
           </Button>
           <Button
             size="sm"
             variant={autoPassUntilNextTurn ? 'default' : 'outline'}
             onClick={() => setAutoPass(!autoPassUntilNextTurn)}
             className={cn(autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white')}
-            style={{ height: 'clamp(28px,4vh,48px)', padding: '0 clamp(8px,1.5vmin,20px)', fontSize: 'clamp(10px,1.8vmin,18px)' }}
+            style={{ height: 'clamp(28px,4.5vh,1000px)', padding: '0 clamp(8px,2vmin,1000px)', fontSize: 'clamp(10px,2vmin,1000px)' }}
             title="Auto-pass"
           >
-            <FastForward style={{ width: 'clamp(12px,1.8vmin,20px)', height: 'clamp(12px,1.8vmin,20px)' }} />
+            <FastForward style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
           </Button>
         </div>
 
         {/* ─── COLLAPSED HAND: peek strip, tap to expand ─── */}
         <div
           className="shrink-0 border-t border-border/20 bg-background/95 backdrop-blur-xl shadow-[0_-4px_16px_rgba(0,0,0,0.3)] flex items-center cursor-pointer"
-          style={{ height: 'clamp(36px, 6vh, 64px)', padding: '0 clamp(8px,1.5vmin,20px)' }}
+          style={{ height: 'clamp(36px, 6vh, 1000px)', padding: '0 clamp(8px,2vmin,1000px)' }}
           onClick={() => setHandExpanded(true)}
         >
-          <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(14px,2.2vmin,26px)', height: 'clamp(14px,2.2vmin,26px)', marginRight: 'clamp(6px,1vmin,14px)' }} />
-          <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider" style={{ fontSize: 'clamp(10px,1.8vmin,20px)' }}>
+          <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)', marginRight: 'clamp(6px,1.2vmin,1000px)' }} />
+          <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider" style={{ fontSize: 'clamp(10px,2.2vmin,1000px)' }}>
             Hand · {handCards.length}
           </span>
           {commandZoneCards.length > 0 && (
-            <span className="text-muted-foreground/40" style={{ fontSize: 'clamp(10px,1.8vmin,20px)', marginLeft: 'clamp(4px,0.8vmin,12px)' }}>· Cmd {commandZoneCards.length}</span>
+            <span className="text-muted-foreground/40" style={{ fontSize: 'clamp(10px,2.2vmin,1000px)', marginLeft: 'clamp(4px,1vmin,1000px)' }}>· Cmd {commandZoneCards.length}</span>
           )}
-          <ChevronUp className="text-muted-foreground/40 ml-auto" style={{ width: 'clamp(14px,2.2vmin,26px)', height: 'clamp(14px,2.2vmin,26px)' }} />
+          <ChevronUp className="text-muted-foreground/40 ml-auto" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
         </div>
       </div>
 

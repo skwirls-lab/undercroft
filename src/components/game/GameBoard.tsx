@@ -367,14 +367,14 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
       )}
 
       {/* ─── STAT BOXES: all players ─── */}
-      <div className="flex-1 min-h-0 flex flex-col gap-[clamp(6px,1.5vmin,20px)] p-[clamp(6px,1.5vmin,20px)] overflow-hidden justify-center">
+      <div className="flex-1 min-h-0 flex flex-col gap-[clamp(6px,1.5vmin,1000px)] p-[clamp(6px,1.5vmin,1000px)] overflow-hidden">
 
         {/* Opponent stat boxes */}
         <div className={cn(
-          'grid gap-[clamp(6px,1.5vmin,20px)]',
-          opponents.length === 1 && 'grid-cols-1',
-          opponents.length === 2 && 'grid-cols-2',
-          opponents.length >= 3 && 'grid-cols-3'
+          'grid flex-1 min-h-0 gap-[clamp(6px,1.5vmin,1000px)]',
+          opponents.length === 1 && 'grid-cols-1 grid-rows-1',
+          opponents.length === 2 && 'grid-cols-2 grid-rows-1',
+          opponents.length >= 3 && 'grid-cols-3 grid-rows-1'
         )}>
           {opponents.map((opp) => {
             const oppBf = getCardsInZone(gameState, opp.id, 'battlefield' as any)
@@ -394,8 +394,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                 key={opp.id}
                 onClick={() => setExpandedPlayerId(opp.id)}
                 className={cn(
-                  'rounded-[clamp(8px,1.5vmin,24px)] border transition-all text-left',
-                  'p-[clamp(8px,1.5vmin,24px)] flex flex-col gap-[clamp(4px,0.8vmin,12px)]',
+                  'rounded-[clamp(8px,1.5vmin,1000px)] border transition-all text-left',
+                  'p-[clamp(8px,2vmin,1000px)] flex flex-col justify-center gap-[clamp(4px,1vmin,1000px)]',
                   'hover:bg-card/60 active:scale-[0.98]',
                   gameState.turn.activePlayerId === opp.id
                     ? 'border-gold/40 bg-gold/5 shadow-[0_0_12px_rgba(212,169,68,0.1)]'
@@ -403,29 +403,29 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                 )}
               >
                 {/* Row 1: name + life + commander */}
-                <div className="flex items-center gap-[clamp(4px,1vmin,14px)]">
-                  <span className="text-[clamp(11px,2vmin,24px)] font-semibold text-foreground truncate flex-1">
+                <div className="flex items-center" style={{ gap: 'clamp(4px,1.5vmin,1000px)' }}>
+                  <span style={{ fontSize: 'clamp(11px,2.5vmin,1000px)' }} className="font-semibold text-foreground truncate flex-1">
                     {opp.name}
                   </span>
-                  <div className="flex items-center gap-[clamp(3px,0.6vmin,8px)]">
-                    <Heart className="text-red-400 shrink-0" style={{ width: 'clamp(12px,2.2vmin,28px)', height: 'clamp(12px,2.2vmin,28px)' }} />
-                    <span className="text-[clamp(12px,2.4vmin,30px)] font-bold text-red-300">{opp.life}</span>
+                  <div className="flex items-center" style={{ gap: 'clamp(3px,0.8vmin,1000px)' }}>
+                    <Heart className="text-red-400 shrink-0" style={{ width: 'clamp(12px,3vmin,1000px)', height: 'clamp(12px,3vmin,1000px)' }} />
+                    <span style={{ fontSize: 'clamp(12px,3.5vmin,1000px)' }} className="font-bold text-red-300">{opp.life}</span>
                   </div>
                   <Crown
                     className={cn('shrink-0', cmdOnField ? 'text-green-400' : 'text-muted-foreground/30')}
-                    style={{ width: 'clamp(12px,2vmin,26px)', height: 'clamp(12px,2vmin,26px)' }}
+                    style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }}
                   />
                 </div>
                 {/* Row 2: zone counts */}
-                <div className="flex items-center gap-[clamp(6px,1.5vmin,20px)] text-muted-foreground/60">
+                <div className="flex items-center text-muted-foreground/60" style={{ gap: 'clamp(6px,2vmin,1000px)' }}>
                   <StatIcon icon={BookOpen} count={getZoneCardCount(gameState, opp.id, 'library')} label="Lib" />
                   <StatIcon icon={Skull} count={getZoneCardCount(gameState, opp.id, 'graveyard')} label="GY" />
                   <StatIcon icon={Ban} count={getZoneCardCount(gameState, opp.id, 'exile')} label="Ex" />
-                  <span className="text-[clamp(8px,1.5vmin,20px)] text-border/20">|</span>
+                  <span className="text-border/20" style={{ fontSize: 'clamp(8px,2vmin,1000px)' }}>|</span>
                   <StatIcon icon={Swords} count={creatureCount} label="Crt" />
                   <StatIcon icon={Sparkles} count={otherCount} label="Oth" />
                   <StatIcon icon={TreePine} count={landCount} label="Lnd" />
-                  <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(12px,2vmin,24px)', height: 'clamp(12px,2vmin,24px)' }} />
+                  <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
                 </div>
               </button>
             );
@@ -437,8 +437,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           <button
             onClick={() => setExpandedPlayerId(currentPlayerId)}
             className={cn(
-              'rounded-[clamp(10px,2vmin,28px)] border transition-all text-left',
-              'p-[clamp(10px,2vmin,28px)] flex flex-col gap-[clamp(6px,1vmin,14px)]',
+              'rounded-[clamp(10px,2vmin,1000px)] border transition-all text-left flex-1 min-h-0',
+              'p-[clamp(10px,2.5vmin,1000px)] flex flex-col justify-center gap-[clamp(6px,1.5vmin,1000px)]',
               'hover:bg-card/60 active:scale-[0.99]',
               hasPriority && !gameState.isGameOver
                 ? 'border-gold/40 bg-gold/5 shadow-[0_0_16px_rgba(212,169,68,0.12)]'
@@ -459,28 +459,28 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
 
               return (
                 <>
-                  <div className="flex items-center gap-[clamp(6px,1.5vmin,16px)]">
-                    <span className="text-[clamp(12px,2.5vmin,28px)] font-semibold text-foreground truncate flex-1">
+                  <div className="flex items-center" style={{ gap: 'clamp(6px,2vmin,1000px)' }}>
+                    <span style={{ fontSize: 'clamp(13px,3.5vmin,1000px)' }} className="font-semibold text-foreground truncate flex-1">
                       {currentPlayer.name}
                     </span>
-                    <div className="flex items-center gap-[clamp(4px,0.8vmin,10px)]">
-                      <Heart className="text-red-400 shrink-0" style={{ width: 'clamp(14px,2.8vmin,34px)', height: 'clamp(14px,2.8vmin,34px)' }} />
-                      <span className="text-[clamp(14px,3vmin,36px)] font-bold text-red-300">{currentPlayer.life}</span>
+                    <div className="flex items-center" style={{ gap: 'clamp(4px,1vmin,1000px)' }}>
+                      <Heart className="text-red-400 shrink-0" style={{ width: 'clamp(14px,4vmin,1000px)', height: 'clamp(14px,4vmin,1000px)' }} />
+                      <span style={{ fontSize: 'clamp(14px,4.5vmin,1000px)' }} className="font-bold text-red-300">{currentPlayer.life}</span>
                     </div>
                     <Crown
                       className={cn('shrink-0', myCmdOnField ? 'text-green-400' : 'text-muted-foreground/30')}
-                      style={{ width: 'clamp(14px,2.5vmin,30px)', height: 'clamp(14px,2.5vmin,30px)' }}
+                      style={{ width: 'clamp(14px,3.5vmin,1000px)', height: 'clamp(14px,3.5vmin,1000px)' }}
                     />
                   </div>
-                  <div className="flex items-center gap-[clamp(8px,2vmin,24px)] text-muted-foreground/60">
+                  <div className="flex items-center text-muted-foreground/60" style={{ gap: 'clamp(8px,2.5vmin,1000px)' }}>
                     <StatIcon icon={BookOpen} count={getZoneCardCount(gameState, currentPlayerId, 'library')} label="Lib" size="lg" />
                     <StatIcon icon={Skull} count={getZoneCardCount(gameState, currentPlayerId, 'graveyard')} label="GY" size="lg" />
                     <StatIcon icon={Ban} count={getZoneCardCount(gameState, currentPlayerId, 'exile')} label="Ex" size="lg" />
-                    <span className="text-[clamp(10px,2vmin,24px)] text-border/20">|</span>
+                    <span className="text-border/20" style={{ fontSize: 'clamp(10px,3vmin,1000px)' }}>|</span>
                     <StatIcon icon={Swords} count={myCreatures} label="Crt" size="lg" />
                     <StatIcon icon={Sparkles} count={myOther} label="Oth" size="lg" />
                     <StatIcon icon={TreePine} count={myLands} label="Lnd" size="lg" />
-                    <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(14px,2.5vmin,28px)', height: 'clamp(14px,2.5vmin,28px)' }} />
+                    <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(14px,3.5vmin,1000px)', height: 'clamp(14px,3.5vmin,1000px)' }} />
                   </div>
                 </>
               );
@@ -765,10 +765,10 @@ function StatIcon({ icon: Icon, count, label, size = 'sm' }: {
   label: string;
   size?: 'sm' | 'lg';
 }) {
-  const iconSize = size === 'lg' ? 'clamp(14px,2.5vmin,30px)' : 'clamp(11px,1.8vmin,22px)';
-  const textSize = size === 'lg' ? 'text-[clamp(12px,2.2vmin,26px)]' : 'text-[clamp(10px,1.6vmin,20px)]';
+  const iconSize = size === 'lg' ? 'clamp(14px,3.5vmin,1000px)' : 'clamp(11px,2.5vmin,1000px)';
+  const textSize = size === 'lg' ? 'text-[clamp(12px,3vmin,1000px)]' : 'text-[clamp(10px,2.2vmin,1000px)]';
   return (
-    <div className="flex items-center gap-[clamp(2px,0.4vmin,6px)]" title={label}>
+    <div className="flex items-center" style={{ gap: 'clamp(2px,0.5vmin,1000px)' }} title={label}>
       <Icon style={{ width: iconSize, height: iconSize }} className="shrink-0" />
       <span className={cn(textSize, 'font-medium tabular-nums')}>{count}</span>
     </div>
