@@ -271,18 +271,18 @@ export default function ForgeGamePage() {
             transition={{ type: 'spring', damping: 30, stiffness: 400 }}
             className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md"
           >
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 shrink-0">
-              <div className="flex items-center gap-2">
-                <HandIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Hand · {handCards.length + commandZoneCards.length}</span>
+            <div className="flex items-center justify-between border-b border-border/30 shrink-0" style={{ padding: 'clamp(6px,1vmin,1000px) clamp(10px,2vmin,1000px)' }}>
+              <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                <HandIcon className="text-muted-foreground" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
+                <span className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Hand · {handCards.length + commandZoneCards.length}</span>
               </div>
-              <button onClick={() => setHandExpanded(false)} className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50">
-                <X className="h-5 w-5" />
+              <button onClick={() => setHandExpanded(false)} className="rounded-lg bg-muted/30 text-muted-foreground hover:bg-muted/50" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
+                <X style={{ width: 'clamp(18px,3vmin,1000px)', height: 'clamp(18px,3vmin,1000px)' }} />
               </button>
             </div>
             {/* All cards in ONE scrollable row: commander(s) + hand */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3">
-              <div className="flex flex-wrap gap-2 justify-center items-end">
+            <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 'clamp(8px,1.5vmin,1000px)' }}>
+              <div className="flex flex-wrap justify-center items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
                 {commandZoneCards.map(card => {
                   const canCast = legalActions.some(
                     a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
@@ -345,11 +345,11 @@ function CommanderCard({
   };
 
   return (
-    <div className="shrink-0 flex flex-col items-center gap-0.5">
+    <div className="shrink-0 flex flex-col items-center" style={{ gap: 'clamp(2px,0.3vmin,1000px)' }}>
       <span className={cn(
-        'text-[8px] font-bold uppercase tracking-wider',
+        'font-bold uppercase tracking-wider',
         canCast ? 'text-gold' : 'text-muted-foreground/30'
-      )}>⚜ Cmd</span>
+      )} style={{ fontSize: 'clamp(8px,1.2vmin,1000px)' }}>⚜ Cmd</span>
       <div
         onClick={handleTap}
         className={cn(
@@ -363,10 +363,10 @@ function CommanderCard({
         {isSelected && canCast && (
           <div className="absolute inset-x-0 bottom-1 flex justify-center pointer-events-none">
             <button
-              className="pointer-events-auto bg-green-500 hover:bg-green-400 active:bg-green-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-green-900/60 flex items-center gap-1 touch-manipulation"
+              className="pointer-events-auto bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold rounded-full shadow-lg shadow-green-900/60 flex items-center touch-manipulation" style={{ fontSize: 'clamp(10px,1.8vmin,1000px)', padding: 'clamp(3px,0.5vmin,1000px) clamp(8px,1.5vmin,1000px)', gap: 'clamp(2px,0.4vmin,1000px)' }}
               onClick={handlePlay}
             >
-              <Play className="h-2.5 w-2.5" />
+              <Play style={{ width: 'clamp(10px,1.5vmin,1000px)', height: 'clamp(10px,1.5vmin,1000px)' }} />
               Play
             </button>
           </div>
@@ -416,49 +416,49 @@ function CardPreviewFloating({ handExpanded }: { handExpanded?: boolean }) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 6 }}
           transition={{ duration: 0.12 }}
-          className="fixed left-1/2 -translate-x-1/2 z-[60] flex items-start gap-2 bottom-[80px]"
-        style={{ pointerEvents: 'none' }}
+          className="fixed left-1/2 -translate-x-1/2 z-[60] flex items-start"
+        style={{ pointerEvents: 'none', bottom: 'clamp(60px,10vh,1000px)', gap: 'clamp(6px,1vmin,1000px)' }}
         >
           {/* Card image — non-interactive */}
-          <div className="w-[220px] shrink-0 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10" style={{ pointerEvents: 'none' }}>
+          <div className="shrink-0 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10" style={{ width: 'clamp(180px,22vmin,1000px)', pointerEvents: 'none' }}>
             {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt={previewCard.cardData.name} className="w-full" />
             ) : (
-              <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center p-3">
-                <p className="text-xs text-center text-muted-foreground">{previewCard.cardData.name}</p>
+              <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center" style={{ padding: 'clamp(6px,1vmin,1000px)' }}>
+                <p className="text-center text-muted-foreground" style={{ fontSize: 'clamp(11px,1.8vmin,1000px)' }}>{previewCard.cardData.name}</p>
               </div>
             )}
           </div>
           {/* Card details text panel — pointer-events-auto so oracle text is scrollable */}
           <div
             data-card-preview-safe
-            className="w-[220px] shrink-0 rounded-xl bg-black/85 border border-white/10 p-3 flex flex-col gap-1.5 shadow-2xl backdrop-blur-sm"
-            style={{ pointerEvents: 'auto' }}
+            className="shrink-0 rounded-xl bg-black/85 border border-white/10 flex flex-col shadow-2xl backdrop-blur-sm"
+            style={{ pointerEvents: 'auto', width: 'clamp(180px,22vmin,1000px)', padding: 'clamp(8px,1.5vmin,1000px)', gap: 'clamp(4px,0.8vmin,1000px)' }}
           >
-            <div className="font-bold text-sm text-white leading-tight">{previewCard.cardData.name}</div>
+            <div className="font-bold text-white leading-tight" style={{ fontSize: 'clamp(12px,2vmin,1000px)' }}>{previewCard.cardData.name}</div>
             {previewCard.cardData.manaCost && (
               <div className="flex items-center gap-0.5">
                 <ManaCostDisplay manaCost={previewCard.cardData.manaCost} size="md" />
               </div>
             )}
             {previewCard.cardData.typeLine && (
-              <div className="text-sky-300/70 text-[11px] italic border-b border-white/10 pb-1.5">
+              <div className="text-sky-300/70 italic border-b border-white/10" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', paddingBottom: 'clamp(4px,0.6vmin,1000px)' }}>
                 {previewCard.cardData.typeLine}
               </div>
             )}
             {previewCard.cardData.oracleText && (
-              <div className="text-white/80 text-[11px] max-h-[140px] overflow-y-auto">
+              <div className="text-white/80 overflow-y-auto" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', maxHeight: 'clamp(100px,16vmin,1000px)' }}>
                 <OracleText text={previewCard.cardData.oracleText} />
               </div>
             )}
             {previewCard.cardData.power !== undefined && (
-              <div className="mt-auto pt-1.5 border-t border-white/10 text-right font-bold text-sm text-white/90">
+              <div className="mt-auto border-t border-white/10 text-right font-bold text-white/90" style={{ fontSize: 'clamp(12px,2vmin,1000px)', paddingTop: 'clamp(4px,0.6vmin,1000px)' }}>
                 {previewCard.cardData.power}/{previewCard.cardData.toughness}
               </div>
             )}
             {!previewCard.cardData.oracleText && !previewCard.cardData.typeLine && (
-              <div className="text-muted-foreground/50 text-[11px] italic">No card data</div>
+              <div className="text-muted-foreground/50 italic" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>No card data</div>
             )}
           </div>
         </motion.div>

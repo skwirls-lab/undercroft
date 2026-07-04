@@ -171,37 +171,39 @@ export function EventTicker({ events, currentPlayerId, className }: EventTickerP
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md"
           >
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 shrink-0">
-              <div className="flex items-center gap-2">
-                <ScrollText className="h-4 w-4 text-gold/60" />
-                <span className="text-sm font-semibold">Game Log</span>
-                <span className="text-xs text-muted-foreground/50">({events.length})</span>
+            <div className="flex items-center justify-between border-b border-border/30 shrink-0" style={{ padding: 'clamp(6px,1vmin,1000px) clamp(10px,2vmin,1000px)' }}>
+              <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                <ScrollText className="text-gold/60" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
+                <span className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Game Log</span>
+                <span className="text-muted-foreground/50" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>({events.length})</span>
               </div>
               <button
                 onClick={() => setLogOpen(false)}
-                className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50"
+                className="rounded-lg bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}
               >
-                <X className="h-5 w-5" />
+                <X style={{ width: 'clamp(18px,3vmin,1000px)', height: 'clamp(18px,3vmin,1000px)' }} />
               </button>
             </div>
             <ScrollArea className="flex-1 min-h-0">
-              <div className="flex flex-col gap-0.5 p-3">
+              <div className="flex flex-col" style={{ gap: 'clamp(2px,0.3vmin,1000px)', padding: 'clamp(6px,1.2vmin,1000px)' }}>
                 {displayEvents.map((event, i) => (
                   <div
                     key={event.id || i}
                     className={cn(
-                      'text-[11px] leading-relaxed',
-                      event.type === 'TURN_STARTED' && 'mt-2 font-semibold text-foreground border-t border-border/10 pt-1',
+                      'leading-relaxed',
+                      event.type === 'TURN_STARTED' && 'font-semibold text-foreground border-t border-border/10',
                       event.type === 'PLAYER_WON' && 'font-bold text-primary',
                       event.type === 'PLAYER_LOST' && 'text-destructive',
                       event.type !== 'TURN_STARTED' && event.type !== 'PLAYER_WON' && event.type !== 'PLAYER_LOST' && 'text-muted-foreground'
                     )}
+                    style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginTop: event.type === 'TURN_STARTED' ? 'clamp(6px,1vmin,1000px)' : undefined, paddingTop: event.type === 'TURN_STARTED' ? 'clamp(4px,0.6vmin,1000px)' : undefined }}
                   >
                     {formatEventFull(event)}
                   </div>
                 ))}
                 {displayEvents.length === 0 && (
-                  <div className="py-8 text-center text-xs text-muted-foreground/50">
+                  <div className="text-center text-muted-foreground/50" style={{ padding: 'clamp(20px,4vmin,1000px) 0', fontSize: 'clamp(11px,2vmin,1000px)' }}>
                     Game log will appear here
                   </div>
                 )}

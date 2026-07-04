@@ -23,11 +23,11 @@ export function PhaseTracker({ turn, activePlayerName, className }: PhaseTracker
 
   return (
     <div className={cn(
-      'flex items-center justify-between gap-3 rounded-xl border border-border/30 bg-card/60 backdrop-blur-md px-4 py-2',
+      'flex items-center justify-between rounded-xl border border-border/30 bg-card/60 backdrop-blur-md',
       className
-    )}>
+    )} style={{ gap: 'clamp(6px,1.5vmin,1000px)', padding: 'clamp(4px,0.6vmin,1000px) clamp(8px,1.5vmin,1000px)' }}>
       {/* Turn info — left side */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center shrink-0" style={{ gap: 'clamp(4px,1vmin,1000px)' }}>
         <AnimatePresence mode="wait">
           <motion.span
             key={turn.turnNumber}
@@ -35,16 +35,16 @@ export function PhaseTracker({ turn, activePlayerName, className }: PhaseTracker
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2 }}
-            className="text-[10px] font-semibold uppercase tracking-widest text-gold/80"
+            className="font-semibold uppercase tracking-widest text-gold/80" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}
           >
             Turn {turn.turnNumber}
           </motion.span>
         </AnimatePresence>
-        <span className="text-xs font-bold text-foreground">{activePlayerName}</span>
+        <span className="font-bold text-foreground" style={{ fontSize: 'clamp(11px,1.8vmin,1000px)' }}>{activePlayerName}</span>
       </div>
 
       {/* Phase gems — center */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center" style={{ gap: 'clamp(2px,0.4vmin,1000px)' }}>
         {PHASES.map((phase, i) => {
           const isActive = i === activeIndex;
           const isPast = i < activeIndex;
@@ -53,7 +53,8 @@ export function PhaseTracker({ turn, activePlayerName, className }: PhaseTracker
             <div key={phase.key} className="flex items-center">
               <div
                 className={cn(
-                  'relative flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors duration-200',
+                  'relative flex items-center rounded-md font-semibold transition-colors duration-200',
+                  `gap-[clamp(2px,0.4vmin,1000px)] px-[clamp(4px,1vmin,1000px)] py-[clamp(2px,0.4vmin,1000px)]`,
                   isPast && 'text-muted-foreground/70',
                   isActive && 'text-gold',
                   !isActive && !isPast && 'text-muted-foreground/30'
@@ -72,21 +73,21 @@ export function PhaseTracker({ turn, activePlayerName, className }: PhaseTracker
                   <div className="absolute inset-0 rounded-md bg-muted/40" />
                 )}
                 <span className={cn(
-                  'relative text-xs',
+                  'relative',
                   isActive && 'text-gold',
                   isPast && 'text-muted-foreground/50'
-                )}>
+                )} style={{ fontSize: 'clamp(10px,1.5vmin,1000px)' }}>
                   {phase.icon}
                 </span>
-                <span className="relative hidden sm:inline">{phase.label}</span>
-                <span className="relative sm:hidden">{phase.short}</span>
+                <span className="relative hidden sm:inline" style={{ fontSize: 'clamp(9px,1.3vmin,1000px)' }}>{phase.label}</span>
+                <span className="relative sm:hidden" style={{ fontSize: 'clamp(9px,1.3vmin,1000px)' }}>{phase.short}</span>
               </div>
               {/* Connector line between phases */}
               {i < PHASES.length - 1 && (
-                <div className={cn(
-                  'h-px w-2 mx-0.5 transition-colors duration-300',
-                  i < activeIndex ? 'bg-gold/40' : 'bg-border/20'
-                )} />
+                <div
+                  className={cn('transition-colors duration-300', i < activeIndex ? 'bg-gold/40' : 'bg-border/20')}
+                  style={{ height: '1px', width: 'clamp(4px,0.6vmin,1000px)', margin: '0 clamp(1px,0.2vmin,1000px)' }}
+                />
               )}
             </div>
           );
@@ -101,7 +102,7 @@ export function PhaseTracker({ turn, activePlayerName, className }: PhaseTracker
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -6 }}
           transition={{ duration: 0.15 }}
-          className="text-[10px] font-medium text-muted-foreground capitalize shrink-0"
+          className="font-medium text-muted-foreground capitalize shrink-0" style={{ fontSize: 'clamp(9px,1.3vmin,1000px)' }}
         >
           {turn.step.replace(/_/g, ' ')}
         </motion.div>

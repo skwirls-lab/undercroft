@@ -497,18 +497,18 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5"
+              className="flex items-center rounded-lg border border-primary/40 bg-primary/5" style={{ gap: 'clamp(6px,1.2vmin,1000px)', padding: 'clamp(6px,1vmin,1000px) clamp(8px,1.5vmin,1000px)' }}
             >
-              <span className="text-xs font-semibold text-primary">Mulligan</span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="font-semibold text-primary" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>Mulligan</span>
+              <span className="text-muted-foreground" style={{ fontSize: 'clamp(10px,1.8vmin,1000px)' }}>
                 {currentPlayer && currentPlayer.mulliganCount > 0 ? `#${currentPlayer.mulliganCount}` : 'Keep or mulligan?'}
               </span>
-              <div className="ml-auto flex gap-1.5">
-                <Button size="sm" variant="default" className="h-6 px-2 text-[10px]" onClick={() => { const a = legalActions.find(a => a.type === 'KEEP_HAND'); if (a) performAction(a); }}>
+              <div className="ml-auto flex" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
+                <Button size="sm" variant="default" style={{ height: 'clamp(24px,3.5vh,1000px)', padding: '0 clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(10px,1.8vmin,1000px)' }} onClick={() => { const a = legalActions.find(a => a.type === 'KEEP_HAND'); if (a) performAction(a); }}>
                   Keep ({7 - (currentPlayer?.mulliganCount || 0)})
                 </Button>
                 {legalActions.some(a => a.type === 'MULLIGAN') && (
-                  <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => { const a = legalActions.find(a => a.type === 'MULLIGAN'); if (a) performAction(a); }}>
+                  <Button size="sm" variant="outline" style={{ height: 'clamp(24px,3.5vh,1000px)', padding: '0 clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(10px,1.8vmin,1000px)' }} onClick={() => { const a = legalActions.find(a => a.type === 'MULLIGAN'); if (a) performAction(a); }}>
                     Mull
                   </Button>
                 )}
@@ -521,18 +521,18 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         </AnimatePresence>
         <AnimatePresence>
           {targeting && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-950/40 px-3 py-1">
-              <span className="relative flex h-2 w-2"><span className="absolute h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" /><span className="relative h-2 w-2 rounded-full bg-cyan-400" /></span>
-              <span className="text-[11px] text-cyan-200">Target: <strong>{targeting.cardName}</strong></span>
-              <Button size="sm" variant="ghost" onClick={cancelTargeting} className="ml-auto h-5 w-5 p-0 text-cyan-400"><X className="h-3 w-3" /></Button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center rounded-lg border border-cyan-500/30 bg-cyan-950/40" style={{ gap: 'clamp(6px,1.2vmin,1000px)', padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)' }}>
+              <span className="relative" style={{ width: 'clamp(8px,1.2vmin,1000px)', height: 'clamp(8px,1.2vmin,1000px)' }}><span className="absolute inset-0 animate-ping rounded-full bg-cyan-400 opacity-75" /><span className="absolute inset-0 rounded-full bg-cyan-400" /></span>
+              <span className="text-cyan-200" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>Target: <strong>{targeting.cardName}</strong></span>
+              <Button size="sm" variant="ghost" onClick={cancelTargeting} className="ml-auto p-0 text-cyan-400" style={{ width: 'clamp(20px,3vh,1000px)', height: 'clamp(20px,3vh,1000px)' }}><X style={{ width: 'clamp(12px,1.8vmin,1000px)', height: 'clamp(12px,1.8vmin,1000px)' }} /></Button>
             </motion.div>
           )}
         </AnimatePresence>
         <AnimatePresence>
           {manaPaymentInfo && onCancelManaPayment && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/40 px-3 py-1">
-              <span className="text-[11px] text-emerald-200">Pay <strong className="font-mono">{manaPaymentInfo.manaCost}</strong> for <strong>{manaPaymentInfo.spellName}</strong></span>
-              <Button size="sm" variant="ghost" onClick={onCancelManaPayment} className="ml-auto h-5 px-1 text-emerald-400 text-[10px]"><X className="h-3 w-3" /> Cancel</Button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center rounded-lg border border-emerald-500/30 bg-emerald-950/40" style={{ gap: 'clamp(6px,1.2vmin,1000px)', padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)' }}>
+              <span className="text-emerald-200" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>Pay <strong className="font-mono">{manaPaymentInfo.manaCost}</strong> for <strong>{manaPaymentInfo.spellName}</strong></span>
+              <Button size="sm" variant="ghost" onClick={onCancelManaPayment} className="ml-auto text-emerald-400" style={{ height: 'clamp(20px,3vh,1000px)', padding: '0 clamp(4px,0.6vmin,1000px)', fontSize: 'clamp(10px,1.8vmin,1000px)' }}><X style={{ width: 'clamp(12px,1.8vmin,1000px)', height: 'clamp(12px,1.8vmin,1000px)' }} /> Cancel</Button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -586,17 +586,17 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
               className="fixed inset-0 z-40 flex flex-col bg-background/95 backdrop-blur-md"
             >
               {/* Overlay header */}
-              <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{ep.name}</span>
-                  <span className="text-xs text-red-400 flex items-center gap-1"><Heart className="h-3 w-3" /> {ep.life}</span>
+              <div className="flex items-center justify-between border-b border-border/30 shrink-0" style={{ padding: 'clamp(6px,1vmin,1000px) clamp(10px,2vmin,1000px)' }}>
+                <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                  <span className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>{ep.name}</span>
+                  <span className="text-red-400 flex items-center" style={{ fontSize: 'clamp(11px,2vmin,1000px)', gap: 'clamp(3px,0.5vmin,1000px)' }}><Heart style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} /> {ep.life}</span>
                 </div>
-                <button onClick={() => setExpandedPlayerId(null)} className="rounded-lg bg-muted/30 p-1.5 text-muted-foreground hover:bg-muted/50">
-                  <X className="h-5 w-5" />
+                <button onClick={() => setExpandedPlayerId(null)} className="rounded-lg bg-muted/30 text-muted-foreground hover:bg-muted/50" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
+                  <X style={{ width: 'clamp(18px,3vmin,1000px)', height: 'clamp(18px,3vmin,1000px)' }} />
                 </button>
               </div>
               {/* Full battlefield */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-2">
+              <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
                 <PlayerField
                   player={ep}
                   battlefield={getCardsInZone(gameState, expandedPlayerId, 'battlefield' as any).map(id => gameState.cardInstances.get(id)).filter((c): c is CardInstance => !!c)}
@@ -639,7 +639,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
-              className="flex flex-col items-center gap-4 rounded-2xl border border-gold/40 bg-card/95 px-10 py-8 shadow-2xl"
+              className="flex flex-col items-center rounded-2xl border border-gold/40 bg-card/95 shadow-2xl"
+              style={{ gap: 'clamp(12px,2.5vmin,1000px)', padding: 'clamp(20px,4vmin,1000px) clamp(30px,6vmin,1000px)' }}
             >
               {gameState.winner === currentPlayerId ? (
                 <>
@@ -647,12 +648,12 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 15, delay: 0.8 }}
-                    className="text-5xl"
+                    style={{ fontSize: 'clamp(36px,8vmin,1000px)' }}
                   >
                     👑
                   </motion.div>
-                  <h2 className="text-2xl font-black tracking-tight text-gold">Victory!</h2>
-                  <p className="text-sm text-muted-foreground">You have won the game</p>
+                  <h2 className="font-black tracking-tight text-gold" style={{ fontSize: 'clamp(18px,4vmin,1000px)' }}>Victory!</h2>
+                  <p className="text-muted-foreground" style={{ fontSize: 'clamp(12px,2vmin,1000px)' }}>You have won the game</p>
                 </>
               ) : (
                 <>
@@ -660,12 +661,12 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 15, delay: 0.8 }}
-                    className="text-5xl"
+                    style={{ fontSize: 'clamp(36px,8vmin,1000px)' }}
                   >
                     💀
                   </motion.div>
-                  <h2 className="text-2xl font-black tracking-tight text-destructive">Defeat</h2>
-                  <p className="text-sm text-muted-foreground">
+                  <h2 className="font-black tracking-tight text-destructive" style={{ fontSize: 'clamp(18px,4vmin,1000px)' }}>Defeat</h2>
+                  <p className="text-muted-foreground" style={{ fontSize: 'clamp(12px,2vmin,1000px)' }}>
                     {gameState.winner
                       ? `${gameState.players.find((p) => p.id === gameState.winner)?.name} wins`
                       : 'The game ended in a draw'}
@@ -674,13 +675,13 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
               )}
 
               {/* Game stats */}
-              <div className="flex gap-6 mt-2 text-xs text-muted-foreground">
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-lg font-bold text-foreground">{gameState.turn.turnNumber}</span>
+              <div className="flex text-muted-foreground" style={{ gap: 'clamp(16px,4vmin,1000px)', marginTop: 'clamp(6px,1vmin,1000px)', fontSize: 'clamp(11px,1.8vmin,1000px)' }}>
+                <div className="flex flex-col items-center" style={{ gap: 'clamp(2px,0.4vmin,1000px)' }}>
+                  <span className="font-bold text-foreground" style={{ fontSize: 'clamp(16px,3vmin,1000px)' }}>{gameState.turn.turnNumber}</span>
                   <span>Turns</span>
                 </div>
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-lg font-bold text-foreground">{currentPlayer?.life ?? 0}</span>
+                <div className="flex flex-col items-center" style={{ gap: 'clamp(2px,0.4vmin,1000px)' }}>
+                  <span className="font-bold text-foreground" style={{ fontSize: 'clamp(16px,3vmin,1000px)' }}>{currentPlayer?.life ?? 0}</span>
                   <span>Life</span>
                 </div>
               </div>
@@ -703,10 +704,11 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
-                className="flex flex-col items-center gap-4 rounded-xl border border-amber-500/30 bg-card/95 px-8 py-6 shadow-2xl"
+                className="flex flex-col items-center rounded-xl border border-amber-500/30 bg-card/95 shadow-2xl"
+                style={{ gap: 'clamp(12px,2.5vmin,1000px)', padding: 'clamp(16px,3vmin,1000px) clamp(24px,5vmin,1000px)' }}
               >
-                <h3 className="text-sm font-semibold text-foreground">{gameState.pendingChoice.prompt}</h3>
-                <div className="flex gap-3">
+                <h3 className="font-semibold text-foreground" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>{gameState.pendingChoice.prompt}</h3>
+                <div className="flex" style={{ gap: 'clamp(8px,1.5vmin,1000px)' }}>
                   <Button
                     size="sm"
                     variant="outline"
@@ -717,6 +719,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                       timestamp: Date.now(),
                     })}
                     className="border-border/30 text-muted-foreground hover:bg-muted/20"
+                    style={{ height: 'clamp(28px,4vh,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
                   >
                     Cancel
                   </Button>
@@ -729,6 +732,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                       timestamp: Date.now(),
                     })}
                     className="bg-amber-600 text-white hover:bg-amber-700"
+                    style={{ height: 'clamp(28px,4vh,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
                   >
                     Sacrifice
                   </Button>
