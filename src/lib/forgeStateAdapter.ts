@@ -109,6 +109,14 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
         const instanceId = `forge-${fc.id}`;
         cardIds.push(instanceId);
 
+        // Debug: log raw Forge card data for cards with counters or unusual P/T
+        if (fc.counters && Object.keys(fc.counters).length > 0) {
+          console.log(`[ForgeAdapter] Card "${fc.name}" (id:${fc.id}) raw counters:`, JSON.stringify(fc.counters), 'power:', fc.power, 'basePower:', fc.basePower, 'toughness:', fc.toughness, 'baseToughness:', fc.baseToughness);
+        }
+        if (zoneType === 'battlefield' && fc.power != null && fc.basePower != null && fc.power !== fc.basePower) {
+          console.log(`[ForgeAdapter] Card "${fc.name}" P/T mismatch — net:${fc.power}/${fc.toughness} base:${fc.basePower}/${fc.baseToughness} counters:`, JSON.stringify(fc.counters ?? {}));
+        }
+
         const cardData = forgeCardToCardData(fc);
         const cardInstance: CardInstance = {
           instanceId,

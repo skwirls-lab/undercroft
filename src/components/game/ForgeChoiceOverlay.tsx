@@ -338,6 +338,22 @@ function ChoicePanel({ choice, onRespond }: {
     );
   }
 
+  // --- scry: choose cards to put on bottom ---
+  if (choiceType === 'scry') {
+    const cards = (data.cards || []) as CardOption[];
+    return (
+      <CardSelectPanel
+        prompt={prompt || 'Scry: Choose cards to put on bottom'}
+        options={cards}
+        min={0}
+        max={cards.length}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+        responseKey="selectedIds"
+      />
+    );
+  }
+
   // --- mana_payment: interactive land selection for mana cost ---
   if (choiceType === 'mana_payment') {
     const manaCost = (data.manaCost as string) || '?';

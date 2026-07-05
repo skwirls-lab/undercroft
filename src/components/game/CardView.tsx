@@ -259,32 +259,27 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
         <div className="absolute inset-0 bg-black/20" />
       )}
 
-      {/* Keyword badges (combat-relevant) */}
-      {isCreature && card.cardData.keywords.length > 0 && (
-        <div className="absolute left-0.5 top-5 flex flex-col gap-0.5">
-          {card.cardData.keywords
-            .filter((k) => ['Flying', 'Deathtouch', 'Lifelink', 'Trample', 'First Strike', 'Double Strike', 'Vigilance', 'Reach', 'Defender', 'Haste', 'Flash', 'Hexproof', 'Indestructible', 'Menace'].includes(k))
-            .slice(0, 3)
-            .map((kw) => (
-              <span key={kw} className="rounded bg-black/70 font-semibold text-amber-300 leading-tight shadow-sm" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(0px,0.1vmin,1000px) clamp(2px,0.3vmin,1000px)' }}>
-                {kw}
+      {/* Modifier indicator — single icon when card has keywords or counters */}
+      {(() => {
+        const hasKeywords = card.cardData.keywords.length > 0;
+        const hasCounters = Object.keys(card.counters).length > 0;
+        if (!hasKeywords && !hasCounters) return null;
+        const counterCount = Object.values(card.counters).reduce((s, v) => s + v, 0);
+        return (
+          <div className="absolute left-0 top-5 flex flex-col" style={{ gap: 'clamp(1px,0.2vmin,1000px)' }}>
+            {hasKeywords && (
+              <span className="rounded-r bg-amber-600/90 font-bold text-amber-100 shadow" style={{ fontSize: 'clamp(7px,1vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(3px,0.4vmin,1000px)' }} title={card.cardData.keywords.join(', ')}>
+                ★{card.cardData.keywords.length}
               </span>
-            ))}
-        </div>
-      )}
-
-      {/* Counter badges */}
-      {Object.entries(card.counters).length > 0 && (
-        <div className="absolute left-0.5 bottom-4 flex gap-0.5">
-          {Object.entries(card.counters).map(([type, count]) => (
-            <span key={type} className={cn('rounded px-1 text-[8px] font-bold text-white shadow-sm',
-              type === '+1/+1' ? 'bg-green-600/90' : 'bg-purple-600/90'
-            )}>
-              {count > 1 ? `${count}x` : ''}{type}
-            </span>
-          ))}
-        </div>
-      )}
+            )}
+            {hasCounters && (
+              <span className="rounded-r bg-green-600/90 font-bold text-green-100 shadow" style={{ fontSize: 'clamp(7px,1vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(3px,0.4vmin,1000px)' }} title={Object.entries(card.counters).map(([t,c]) => `${c}x ${t}`).join(', ')}>
+                ◆{counterCount}
+              </span>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
