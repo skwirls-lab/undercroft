@@ -119,7 +119,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
           tapped: fc.tapped ?? false,
           flipped: fc.flipped ?? false,
           faceDown: fc.faceDown ?? false,
-          counters: fc.counters ?? {},
+          counters: normalizeCounters(fc.counters),
           attachedTo: fc.attachedTo ? `forge-${fc.attachedTo.id}` : undefined,
           attachedToName: fc.attachedTo?.name,
           attachments: [],
@@ -247,6 +247,46 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     isGameOver: forgeState.isGameOver ?? false,
     mulliganPhase: false, // Forge mulligan handled by ChoicePanel, not GameBoard's built-in UI
   };
+}
+
+/**
+ * Normalize Forge counter key names to standard display names.
+ * Forge may send keys like "P1P1", "+1/+1", "LOYALTY", etc.
+ */
+const COUNTER_NAME_MAP: Record<string, string> = {
+  'P1P1': '+1/+1',
+  'M1M1': '-1/-1',
+  'p1p1': '+1/+1',
+  'm1m1': '-1/-1',
+  'LOYALTY': 'loyalty',
+  'CHARGE': 'charge',
+  'LORE': 'lore',
+  'QUEST': 'quest',
+  'STUDY': 'study',
+  'VERSE': 'verse',
+  'AGE': 'age',
+  'FADE': 'fade',
+  'FEATHER': 'feather',
+  'DEPLETION': 'depletion',
+  'DIVINITY': 'divinity',
+  'MINING': 'mining',
+  'STORAGE': 'storage',
+  'TIME': 'time',
+  'WISH': 'wish',
+};
+
+function normalizeCounters(raw?: Record<string, number>): Record<string, number> {
+  if (!raw) return {};
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === 0) continue;
+    const normalized = COUNTER_NAME_MAP[key] ?? key;
+    result[normalized] = (result[normalized] ?? 0) + value;
+  }
+  if (Object.keys(result).length > 0) {
+    console.log('[ForgeAdapter] counters:', result);
+  }
+  return result;
 }
 
 /**

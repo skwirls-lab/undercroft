@@ -59,7 +59,7 @@ export function ForgeChoiceOverlay() {
       {/* Semi-transparent backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" />
       {/* Modal content - key forces re-mount when requestId changes */}
-      <div key={pendingChoice.requestId} className="relative z-10 w-full mx-4 pointer-events-auto" style={{ maxWidth: 'clamp(400px,60vmin,1000px)' }}>
+      <div key={pendingChoice.requestId} className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto" style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}>
         <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
       </div>
     </div>
@@ -198,6 +198,7 @@ function ChoicePanel({ choice, onRespond }: {
         requestId={choice.requestId}
         onRespond={onRespond}
         responseKey="targetIds"
+        canCancel
       />
     );
   }
@@ -629,7 +630,7 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
 // Used for discard, sacrifice, search, targets, etc.
 // ============================================================
 
-function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, responseKey, formatResponse }: {
+function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, responseKey, formatResponse, canCancel }: {
   prompt: string;
   options: CardOption[];
   min: number;
@@ -638,23 +639,33 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
   onRespond: (requestId: string, payload: Record<string, unknown>) => void;
   responseKey: string;
   formatResponse?: (ids: number[]) => Record<string, unknown>;
+  canCancel?: boolean;
 }) {
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
+  const [previewId, setPreviewId] = React.useState<number | null>(null);
   const isSingle = max === 1;
 
   // Keys that the server expects as arrays even for single selection
   const arrayKeys = new Set(['selectedIds', 'entityIds', 'targetIds', 'attackerCardIds']);
 
+  // Resolve card options to CardInstance objects for art display
+  const gameState = useGameStore((s) => s.gameState);
+  const resolvedCards = useMemo(() => {
+    if (!gameState) return new Map<number, CardInstance>();
+    const map = new Map<number, CardInstance>();
+    for (const opt of options) {
+      if (opt.type === 'player') continue;
+      const instanceId = `forge-${opt.id}`;
+      const instance = gameState.cardInstances.get(instanceId);
+      if (instance) map.set(opt.id, instance);
+    }
+    return map;
+  }, [gameState, options]);
+
   const toggle = (id: number) => {
     if (isSingle) {
-      // Single-select: respond immediately
-      if (formatResponse) {
-        onRespond(requestId, formatResponse([id]));
-      } else {
-        // Send as array for list-type keys, single value for entity keys
-        const value = arrayKeys.has(responseKey) ? [id] : id;
-        onRespond(requestId, { [responseKey]: value });
-      }
+      // Single-select: highlight first, don't auto-respond
+      setPreviewId(previewId === id ? null : id);
       return;
     }
     setSelected((prev) => {
@@ -662,6 +673,16 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
       if (next.has(id)) { next.delete(id); } else if (next.size < max) { next.add(id); }
       return next;
     });
+  };
+
+  const confirmSingle = () => {
+    if (previewId == null) return;
+    if (formatResponse) {
+      onRespond(requestId, formatResponse([previewId]));
+    } else {
+      const value = arrayKeys.has(responseKey) ? [previewId] : previewId;
+      onRespond(requestId, { [responseKey]: value });
+    }
   };
 
   const confirm = () => {
@@ -673,7 +694,6 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
     }
   };
 
-  // separate named function to avoid stale closure lint warnings
   const skipOrCancel = () => {
     if (formatResponse) {
       onRespond(requestId, formatResponse([]));
@@ -684,6 +704,8 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
 
   const canSkip = min === 0;
   const hasOptions = options.length > 0;
+  const previewCard = previewId != null ? resolvedCards.get(previewId) : null;
+  const previewOpt = previewId != null ? options.find(o => o.id === previewId) : null;
 
   return (
     <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
@@ -692,34 +714,56 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
         <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>Select {min === max ? min : `${min}-${max}`} · {selected.size} selected</p>
       )}
       {hasOptions ? (
-        <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-          {options.map((opt) => (
-          <Button
-            key={opt.id}
-            onClick={() => toggle(opt.id)}
-            className={`rounded-lg border text-left transition-colors ${
-              selected.has(opt.id)
-                ? 'border-gold/60 bg-gold/15 text-gold'
-                : 'border-border/40 bg-card/60 hover:border-border text-foreground'
-            }`}
-            style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
-          >
-            {opt.name}
-            {opt.power !== undefined && <span className="ml-1 text-muted-foreground">{opt.power}/{opt.toughness}</span>}
-            {opt.type === 'player' && <span className="ml-1 text-muted-foreground">(Life: {opt.life})</span>}
-          </Button>
-          ))}
+        <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+          {options.map((opt) => {
+            const resolved = resolvedCards.get(opt.id);
+            const isActive = isSingle ? previewId === opt.id : selected.has(opt.id);
+            return (
+              <div
+                key={opt.id}
+                onClick={() => toggle(opt.id)}
+                className={`relative rounded-lg cursor-pointer transition-all duration-150 ${
+                  isActive
+                    ? 'ring-2 ring-gold/60 scale-105 z-10 shadow-[0_0_12px_rgba(212,169,68,0.3)]'
+                    : 'hover:ring-1 hover:ring-border/60'
+                }`}
+              >
+                {resolved ? (
+                  <CardView card={resolved} mode="art" interactive={false} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-card/60" style={{ width: 'clamp(80px,12vmin,200px)', height: 'clamp(110px,17vmin,280px)', padding: 'clamp(4px,0.6vmin,1000px)' }}>
+                    <span className="font-semibold text-center leading-tight" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>{opt.name}</span>
+                    {opt.power !== undefined && <span className="text-muted-foreground" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>{opt.power}/{opt.toughness}</span>}
+                    {opt.type === 'player' && <span className="text-muted-foreground" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>Life: {opt.life}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <p className="text-amber-400" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>No valid options available.</p>
       )}
+      {/* Preview info for selected card */}
+      {isSingle && previewCard && previewOpt && (
+        <div className="rounded-lg border border-gold/30 bg-gold/5 flex items-center" style={{ padding: 'clamp(6px,1vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)', gap: 'clamp(6px,1vmin,1000px)' }}>
+          <span className="font-semibold text-gold" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>{previewOpt.name}</span>
+          {previewCard.cardData.typeLine && <span className="text-muted-foreground" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>— {previewCard.cardData.typeLine}</span>}
+          {previewCard.cardData.oracleText && <span className="text-foreground/70 hidden sm:inline" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>| {previewCard.cardData.oracleText.slice(0, 80)}{previewCard.cardData.oracleText.length > 80 ? '...' : ''}</span>}
+        </div>
+      )}
       <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+        {isSingle && (
+          <Button disabled={previewId == null} onClick={confirmSingle} className="rounded-lg border bg-gold font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
+            Select{previewOpt ? `: ${previewOpt.name}` : ''}
+          </Button>
+        )}
         {!isSingle && (
           <Button disabled={selected.size < min} onClick={confirm} className="rounded-lg border bg-gold font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
             Confirm ({selected.size})
           </Button>
         )}
-        {(canSkip || !hasOptions) && (
+        {(canSkip || canCancel || !hasOptions) && (
           <Button variant="outline" onClick={skipOrCancel} className="rounded-lg border bg-card/60 font-medium hover:border-border/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
             {canSkip ? 'Skip' : 'Cancel'}
           </Button>
