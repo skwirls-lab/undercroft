@@ -242,7 +242,7 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
 
       {/* Attachments indicator */}
       {card.attachmentNames.length > 0 && (
-        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 font-bold text-amber-100 shadow truncate" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)', maxWidth: 'clamp(50px,8vmin,1000px)' }} title={card.attachmentNames.join(', ')}>
+        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 font-bold text-amber-100 shadow truncate" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)', maxWidth: 'clamp(50px,8vmin,1000px)' }}>
           {card.attachmentNames.length === 1 ? card.attachmentNames[0] : `${card.attachmentNames.length} attached`}
         </div>
       )}
@@ -259,27 +259,10 @@ function ArtView({ card, className }: { card: CardInstance; className?: string }
         <div className="absolute inset-0 bg-black/20" />
       )}
 
-      {/* Modifier indicator — single icon when card has keywords or counters */}
-      {(() => {
-        const hasKeywords = card.cardData.keywords.length > 0;
-        const hasCounters = Object.keys(card.counters).length > 0;
-        if (!hasKeywords && !hasCounters) return null;
-        const counterCount = Object.values(card.counters).reduce((s, v) => s + v, 0);
-        return (
-          <div className="absolute left-0 top-5 flex flex-col" style={{ gap: 'clamp(1px,0.2vmin,1000px)' }}>
-            {hasKeywords && (
-              <span className="rounded-r bg-amber-600/90 font-bold text-amber-100 shadow" style={{ fontSize: 'clamp(7px,1vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(3px,0.4vmin,1000px)' }} title={card.cardData.keywords.join(', ')}>
-                ★{card.cardData.keywords.length}
-              </span>
-            )}
-            {hasCounters && (
-              <span className="rounded-r bg-green-600/90 font-bold text-green-100 shadow" style={{ fontSize: 'clamp(7px,1vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(3px,0.4vmin,1000px)' }} title={Object.entries(card.counters).map(([t,c]) => `${c}x ${t}`).join(', ')}>
-                ◆{counterCount}
-              </span>
-            )}
-          </div>
-        );
-      })()}
+      {/* Modifier dot — single indicator when card has keywords, counters, or attachments */}
+      {(card.cardData.keywords.length > 0 || Object.keys(card.counters).length > 0) && (
+        <div className="absolute left-0.5 top-5 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.6)]" style={{ width: 'clamp(6px,0.9vmin,1000px)', height: 'clamp(6px,0.9vmin,1000px)' }} />
+      )}
     </div>
   );
 }
