@@ -14,7 +14,6 @@ import { EventTicker } from '@/components/game/EventTicker';
 import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { cn } from '@/lib/utils';
-import { CardView } from '@/components/game/CardView';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
 import type { CardInstance } from '@/lib/gameTypes';
 import { PhaseTracker } from '@/components/game/PhaseTracker';
@@ -23,7 +22,6 @@ import {
   Loader2,
   Flag,
   RotateCcw,
-  Play,
   Hand as HandIcon,
   ChevronUp,
   ArrowRight,
@@ -201,45 +199,19 @@ export default function ForgeGamePage() {
             externalExpandedPlayerId={expandedPlayerId}
             onExpandedPlayerChange={setExpandedPlayerId}
             expandedHandContent={
-              <div className="flex flex-col" style={{ gap: 'clamp(6px,1vmin,1000px)' }}>
-                {/* ── Command Zone section ── */}
-                {commandZoneCards.length > 0 && (
-                  <div className="rounded-lg border border-amber-500/25 bg-amber-500/5" style={{ padding: 'clamp(6px,1vmin,1000px)' }}>
-                    <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(4px,0.6vmin,1000px)' }}>
-                      <span className="font-bold uppercase tracking-wider text-amber-400/80" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>⚜ Command Zone</span>
-                    </div>
-                    <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                      {commandZoneCards.map(card => {
-                        const canCast = legalActions.some(
-                          a => a.type === 'CAST_SPELL' && (a.payload as Record<string,unknown>).cardInstanceId === card.instanceId
-                        );
-                        return (
-                          <CommanderCard
-                            key={card.instanceId}
-                            card={card}
-                            canCast={canCast}
-                            onPlay={() => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {/* ── Hand section ── */}
-                <div>
-                  <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(4px,0.6vmin,1000px)' }}>
-                    <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
-                    <span className="font-bold uppercase tracking-wider text-muted-foreground/60" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>Hand · {handCards.length}</span>
-                  </div>
-                  <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                    <Hand
-                      cards={handCards}
-                      legalActions={handLegalActions}
-                      onPlayCard={(card) => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
-                      isActive={!!hasPriority && !isGameOver}
-                      layout="grid"
-                    />
-                  </div>
+              <div>
+                <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(4px,0.6vmin,1000px)' }}>
+                  <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
+                  <span className="font-bold uppercase tracking-wider text-muted-foreground/60" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>Hand · {handCards.length}</span>
+                </div>
+                <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                  <Hand
+                    cards={handCards}
+                    legalActions={handLegalActions}
+                    onPlayCard={(card) => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
+                    isActive={!!hasPriority && !isGameOver}
+                    layout="grid"
+                  />
                 </div>
               </div>
             }
@@ -308,69 +280,6 @@ export default function ForgeGamePage() {
 
       <CardPreviewFloating />
     </CardPreviewProvider>
-  );
-}
-
-// ============================================================
-// CommanderCard — needs useCardPreview() so must be a child
-// of CardPreviewProvider (not called at ForgeGamePage top level)
-// ============================================================
-function CommanderCard({
-  card,
-  canCast,
-  onPlay,
-}: {
-  card: CardInstance;
-  canCast: boolean;
-  onPlay: () => void;
-}) {
-  const { previewCard, setPreviewCard } = useCardPreview();
-  const isSelected = previewCard?.instanceId === card.instanceId;
-
-  const handleTap = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isSelected) {
-      setPreviewCard(null);
-    } else {
-      setPreviewCard(card);
-    }
-  };
-
-  const handlePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPreviewCard(null);
-    onPlay();
-  };
-
-  return (
-    <div className="shrink-0 flex flex-col items-center" style={{ gap: 'clamp(2px,0.3vmin,1000px)' }}>
-      <span className={cn(
-        'font-bold uppercase tracking-wider',
-        canCast ? 'text-gold' : 'text-muted-foreground/30'
-      )} style={{ fontSize: 'clamp(8px,1.2vmin,1000px)' }}>⚜ Cmd</span>
-      <div
-        onClick={handleTap}
-        className={cn(
-          'relative rounded-lg transition-all duration-150 cursor-pointer',
-          isSelected && 'ring-2 ring-white/60 scale-110 z-10',
-          !isSelected && canCast && 'ring-2 ring-gold/60 shadow-[0_0_14px_rgba(212,169,68,0.35)]',
-          !canCast && 'opacity-60 saturate-0'
-        )}
-      >
-        <CardView card={card} mode="art" highlighted={canCast} interactive={false} />
-        {isSelected && canCast && (
-          <div className="absolute inset-x-0 bottom-1 flex justify-center pointer-events-none">
-            <button
-              className="pointer-events-auto bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold rounded-full shadow-lg shadow-green-900/60 flex items-center touch-manipulation" style={{ fontSize: 'clamp(10px,1.8vmin,1000px)', padding: 'clamp(3px,0.5vmin,1000px) clamp(8px,1.5vmin,1000px)', gap: 'clamp(2px,0.4vmin,1000px)' }}
-              onClick={handlePlay}
-            >
-              <Play style={{ width: 'clamp(10px,1.5vmin,1000px)', height: 'clamp(10px,1.5vmin,1000px)' }} />
-              Play
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
