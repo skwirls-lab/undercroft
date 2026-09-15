@@ -7,7 +7,7 @@
 import type {
   GameState, PlayerState, CardInstance, CardData, Zone, ZoneType,
   StackItem, TurnState, PriorityState, ManaPool, Phase, Step,
-  ManaColor,
+  ManaColor, CombatState,
 } from '@/lib/gameTypes';
 import type { ForgeGameState, ForgePlayer, ForgeCard, ForgeStackItem } from '@/lib/forgeClient';
 
@@ -248,13 +248,67 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
     stack,
     turn,
     priority,
-    combat: undefined, // TODO: map combat state from Forge
+    combat: mapCombat(forgeState, cardInstances),
     pendingChoice: undefined, // Handled separately by forgeGameStore
     events: [],
     winner: '',
     isGameOver: forgeState.isGameOver ?? false,
     mulliganPhase: false, // Forge mulligan handled by ChoicePanel, not GameBoard's built-in UI
   };
+}
+
+/**
+ * Map Forge's combat snapshot onto the UI's CombatState.
+ *
+ * The server has always sent combat.attackers[].blockers[] (GameStateSerializer:63-86), but
+ * the adapter hardcoded `combat: undefined`, so GameBoard and CombatControls never saw any
+ * combat state at all. Cards are looked up in the already-built cardInstances map so the
+ * shapes stay consistent with the rest of the adapted state.
+ */
+function mapCombat(
+  forgeState: ForgeGameState,
+  cardInstances: Map<string, CardInstance>
+): CombatState | undefined {
+  const forgeCombat = forgeState.combat;
+  if (!forgeCombat?.attackers?.length) return undefined;
+
+  const attackers: CombatState['attackers'] = [];
+  const blockers: CombatState['blockers'] = [];
+
+  for (const a of forgeCombat.attackers) {
+    const instanceId = `forge-${a.cardId}`;
+    const card = cardInstances.get(instanceId);
+    if (!card) continue;
+
+    attackers.push({
+      instanceId,
+      cardData: card.cardData,
+      power: card.modifiedPower ?? Number(card.cardData.power ?? 0),
+      toughness: card.modifiedToughness ?? Number(card.cardData.toughness ?? 0),
+      tapped: card.tapped,
+      attackingPlayerId: card.controllerId,
+    });
+
+    for (const b of a.blockers ?? []) {
+      const blockerInstanceId = `forge-${b.cardId}`;
+      const blockerCard = cardInstances.get(blockerInstanceId);
+      if (!blockerCard) continue;
+
+      blockers.push({
+        instanceId: blockerInstanceId,
+        blockerInstanceId,
+        cardData: blockerCard.cardData,
+        power: blockerCard.modifiedPower ?? Number(blockerCard.cardData.power ?? 0),
+        toughness: blockerCard.modifiedToughness ?? Number(blockerCard.cardData.toughness ?? 0),
+        tapped: blockerCard.tapped,
+        blockingPlayerId: blockerCard.controllerId,
+        blockedBy: [{ instanceId, cardData: card.cardData }],
+      });
+    }
+  }
+
+  if (!attackers.length) return undefined;
+  return { attackers, blockers };
 }
 
 /**

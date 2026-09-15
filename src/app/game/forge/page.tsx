@@ -48,6 +48,7 @@ export default function ForgeGamePage() {
     disconnect,
     respondToChoice,
     concede,
+    setPendingAbilitySelection,
   } = useForgeGameStore();
 
   const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass } = useGameStore();
@@ -74,8 +75,20 @@ export default function ForgeGamePage() {
       a => (a.type === 'PLAY_LAND' || a.type === 'CAST_SPELL') &&
         a.payload.cardInstanceId === card.instanceId
     );
-    if (cardActions.length > 0) performAction(cardActions[0]);
-  }, [legalActions, performAction]);
+    if (cardActions.length === 0) return;
+    // More than one legal play for the same card means several modes are available —
+    // kicker, Adventure, MDFC, flashback, cycling, split halves, alternate costs. Taking
+    // cardActions[0] made every one of those castable only one way.
+    if (cardActions.length > 1) {
+      setPendingAbilitySelection({
+        cardInstanceId: card.instanceId,
+        cardName: card.cardData.name,
+        actions: cardActions,
+      });
+      return;
+    }
+    performAction(cardActions[0]);
+  }, [legalActions, performAction, setPendingAbilitySelection]);
 
   // Forge-style mana payment: detect mana_payment choice and extract source IDs
   const isManaPayment = pendingChoice?.choiceType === 'mana_payment';

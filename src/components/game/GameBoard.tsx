@@ -47,7 +47,7 @@ interface TargetingState {
 
 export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZone, hidePhaseTracker, hideActionBar, manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment, externalExpandedPlayerId, onExpandedPlayerChange, expandedHandContent }: GameBoardProps) {
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
-  const { pendingChoice } = useForgeGameStore();
+  const { pendingChoice, setPendingAbilitySelection } = useForgeGameStore();
 
   console.log('[GameBoard] init:', { currentPlayerId, hasGameState: !!gameState });
 
@@ -112,6 +112,16 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
       );
 
       if (!hasTargets) {
+        // Several legal plays for one card means several modes (kicker, Adventure, MDFC,
+        // flashback, cycling, split halves). Casting cardActions[0] made the rest unreachable.
+        if (cardActions.length > 1) {
+          setPendingAbilitySelection({
+            cardInstanceId: card.instanceId,
+            cardName: card.cardData.name,
+            actions: cardActions,
+          });
+          return;
+        }
         // Non-targeted spell — cast immediately
         performAction(cardActions[0]);
       } else {
@@ -127,7 +137,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         });
       }
     },
-    [gameState, legalActions, performAction]
+    [gameState, legalActions, performAction, setPendingAbilitySelection]
   );
 
   // Handle target selection during targeting mode
