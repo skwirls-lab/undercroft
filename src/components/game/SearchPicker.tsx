@@ -56,8 +56,8 @@ export function SearchPicker({ pendingChoice, cards, onConfirm, onCancel }: Sear
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
-        className="flex flex-col gap-3 rounded-xl border border-border/30 bg-card p-4 shadow-2xl max-w-[90vw] max-h-[85vh]"
-        style={{ minWidth: '400px' }}
+        className="flex flex-col gap-3 rounded-xl border border-border/30 bg-card p-4 shadow-2xl w-full max-w-[min(90vw,32rem)] max-h-[85vh]"
+        style={{ minWidth: 'min(90vw, 20rem)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between">

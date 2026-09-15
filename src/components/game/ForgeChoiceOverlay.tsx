@@ -55,16 +55,24 @@ export function ForgeChoiceOverlay() {
   // A server prompt always outranks a local pick. Otherwise, if one card offered several
   // legal plays, ask which mode before committing — previously the first was taken silently.
   if (!pendingChoice && pendingAbilitySelection) {
+    // Must use the same modal shell as every other prompt. Rendered bare it lands in the
+    // page's `flex-1 min-h-0 overflow-hidden` container and gets clipped.
     return (
-      <div className="pointer-events-auto">
-        <AbilitySelectionPanel
-          selection={pendingAbilitySelection}
-          onPick={(action) => {
-            setPendingAbilitySelection(null);
-            performAction(action);
-          }}
-          onCancel={() => setPendingAbilitySelection(null)}
-        />
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" />
+        <div
+          className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto"
+          style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}
+        >
+          <AbilitySelectionPanel
+            selection={pendingAbilitySelection}
+            onPick={(action) => {
+              setPendingAbilitySelection(null);
+              performAction(action);
+            }}
+            onCancel={() => setPendingAbilitySelection(null)}
+          />
+        </div>
       </div>
     );
   }
@@ -105,7 +113,6 @@ function ChoicePanel({ choice, onRespond }: {
   const prompt = (data.prompt as string) || (data.message as string) || '';
   const choiceType = choice.choiceType;
 
-  console.log('[ForgeChoiceOverlay] choiceType:', choiceType, 'data keys:', Object.keys(data), 'prompt:', prompt);
 
   // --- choose_action: main priority prompt with legal plays ---
   if (choiceType === 'choose_action') {

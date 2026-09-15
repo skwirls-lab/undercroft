@@ -49,6 +49,7 @@ export default function ForgeGamePage() {
     respondToChoice,
     concede,
     setPendingAbilitySelection,
+    isAwaitingServer,
   } = useForgeGameStore();
 
   const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass } = useGameStore();
@@ -119,6 +120,9 @@ export default function ForgeGamePage() {
 
   // Unified expanded overlay: null = collapsed, playerId = expanded battlefield (with hand for current player)
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  // Concede and New Game both end the run, both were instant, and they sit ~4px apart in a
+  // 28px header. Confirm before either.
+  const [pendingExit, setPendingExit] = useState<'concede' | 'new-game' | null>(null);
 
   // Action bar state
   const hasPriorityForActions = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
@@ -168,10 +172,10 @@ export default function ForgeGamePage() {
             </div>
           )}
           <div className="flex items-center shrink-0" style={{ gap: 'clamp(2px,0.5vmin,1000px)' }}>
-            <Button variant="ghost" size="sm" onClick={concede} className="p-0 text-red-400" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Concede">
+            <Button variant="ghost" size="sm" onClick={() => setPendingExit('concede')} className="p-0 text-red-400" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Concede" aria-label="Concede">
               <Flag style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => { disconnect(); router.push('/game'); }} className="p-0 text-muted-foreground" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="New Game">
+            <Button variant="ghost" size="sm" onClick={() => setPendingExit('new-game')} className="p-0 text-muted-foreground" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="New Game" aria-label="Abandon game and start a new one">
               <RotateCcw style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
           </div>
@@ -237,15 +241,16 @@ export default function ForgeGamePage() {
           'shrink-0 flex items-center justify-center border-t border-border/20',
           hasPriorityForActions && !isGameOver ? 'bg-gold/5' : 'bg-card/30'
         )} style={{ gap: 'clamp(6px,1.5vmin,1000px)', padding: 'clamp(6px,1.2vmin,1000px) clamp(8px,2vmin,1000px)' }}>
-          {isProcessing && <Loader2 className="animate-spin text-gold" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />}
-          {hasPriorityForActions && !isProcessing && !isGameOver && (
+          {(isProcessing || isAwaitingServer) && <Loader2 className="animate-spin text-gold" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />}
+          {hasPriorityForActions && !isProcessing && !isAwaitingServer && !isGameOver && (
             <span className="relative" style={{ width: 'clamp(8px,1.5vmin,1000px)', height: 'clamp(8px,1.5vmin,1000px)' }}>
               <span className="absolute inset-0 animate-ping rounded-full opacity-75" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
               <span className="absolute inset-0 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
             </span>
           )}
-          <span className={cn('font-semibold', hasPriorityForActions ? 'text-gold' : 'text-muted-foreground/60')} style={{ fontSize: 'clamp(11px,2.5vmin,1000px)' }}>
+          <span className={cn('font-semibold', hasPriorityForActions && !isAwaitingServer ? 'text-gold' : 'text-muted-foreground/60')} style={{ fontSize: 'clamp(11px,2.5vmin,1000px)' }}>
             {isGameOver ? 'Game Over'
+              : isAwaitingServer ? 'Resolving...'
               : isProcessing ? 'AI thinking...'
               : hasPriorityForActions ? (isMyTurn ? (inCombatPhase ? 'Combat Phase' : 'Your Turn') : 'You have priority')
               : `${gameState?.players.find(p => p.id === gameState?.priority.playerWithPriority)?.name}'s turn`}
@@ -253,7 +258,7 @@ export default function ForgeGamePage() {
           <Button
             size="sm"
             onClick={handlePassPriority}
-            disabled={!hasPriorityForActions || isGameOver}
+            disabled={!hasPriorityForActions || isGameOver || isAwaitingServer}
             className={cn(
               'font-semibold',
               hasPriorityForActions && !isGameOver ? 'bg-gold text-gold-foreground hover:bg-gold/90' : ''
@@ -290,6 +295,50 @@ export default function ForgeGamePage() {
           <ChevronUp className="text-muted-foreground/40 ml-auto" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
         </div>
       </div>
+
+      {pendingExit && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setPendingExit(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exit-dialog-title"
+            className="relative z-10 mx-4 w-full max-w-sm rounded-xl border border-border/40 bg-card p-5 shadow-2xl"
+          >
+            <h2 id="exit-dialog-title" className="text-base font-semibold">
+              {pendingExit === 'concede' ? 'Concede this game?' : 'Abandon this game?'}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {pendingExit === 'concede'
+                ? 'You will lose the game immediately. This cannot be undone.'
+                : 'The current game will be ended and you will return to setup.'}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPendingExit(null)}>
+                Keep playing
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={() => {
+                  const action = pendingExit;
+                  setPendingExit(null);
+                  if (action === 'concede') {
+                    concede();
+                  } else {
+                    disconnect();
+                    router.push('/game');
+                  }
+                }}
+              >
+                {pendingExit === 'concede' ? 'Concede' : 'Abandon game'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CardPreviewFloating />
     </CardPreviewProvider>

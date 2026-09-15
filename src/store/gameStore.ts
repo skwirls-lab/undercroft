@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useForgeGameStore } from '@/store/forgeGameStore';
 import type { GameState, GameAction, GameEvent, CardData } from '@/lib/gameTypes';
 import { AIPlayerController } from '@/ai/AIPlayerController';
 import type { AIPlayerConfig } from '@/ai/types';
@@ -111,6 +112,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         console.warn('[Forge] No pending request — action dropped');
         return;
       }
+      // Mark the round-trip so the UI can show pending feedback (see forgeGameStore).
+      useForgeGameStore.getState().setAwaitingServer(true);
+
       if (action.type === 'PASS_PRIORITY') {
         forgeRespondFn(forgePendingRequestId, { pass: true });
       } else {
