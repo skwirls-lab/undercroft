@@ -390,6 +390,18 @@ function ChoicePanel({ choice, onRespond }: {
     );
   }
 
+  // --- choose_order: damage assignment order, zone-move order ---
+  if (choiceType === 'choose_order') {
+    return (
+      <OrderCardsPanel
+        prompt={prompt || 'Choose an order'}
+        cards={(data.cards || []) as CardOption[]}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
   // --- announce_number: X costs, multikicker, "choose a number" on cast ---
   // Without this renderer the prompt fell through to the generic panel, which replies
   // {pass:true}; announceRequirements then reads no `value` and returns 0, so EVERY X spell
@@ -783,6 +795,80 @@ function AbilitySelectionPanel({ selection, onPick, onCancel }: {
         style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
       >
         Cancel
+      </Button>
+    </div>
+  );
+}
+
+// ============================================================
+// OrderCardsPanel — put cards in a sequence by clicking them in order
+// Click-to-sequence rather than drag: it works on touch and needs no library.
+// ============================================================
+
+function OrderCardsPanel({ prompt, cards, requestId, onRespond }: {
+  prompt: string;
+  cards: CardOption[];
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [order, setOrder] = React.useState<number[]>([]);
+
+  const toggle = (id: number) => {
+    setOrder((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const remaining = cards.filter((c) => !order.includes(c.id));
+  const label = (c: CardOption) =>
+    `${c.name}${c.power !== undefined ? ` ${c.power}/${c.toughness}` : ''}`;
+
+  return (
+    <div className="mb-3 rounded-xl border border-gold/40 bg-card/40" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>{prompt}</h3>
+      <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+        Click cards in the order you want. {remaining.length} left to place.
+      </div>
+
+      {order.length > 0 && (
+        <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+          {order.map((id, i) => {
+            const c = cards.find((x) => x.id === id);
+            if (!c) return null;
+            return (
+              <Button
+                key={id}
+                onClick={() => toggle(id)}
+                className="rounded-lg border border-gold/50 bg-gold/15 hover:bg-gold/25"
+                style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+              >
+                {i + 1}. {label(c)}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
+      {remaining.length > 0 && (
+        <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+          {remaining.map((c) => (
+            <Button
+              key={c.id}
+              onClick={() => toggle(c.id)}
+              className="rounded-lg border border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10"
+              style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+            >
+              {label(c)}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      <Button
+        disabled={remaining.length > 0}
+        onClick={() => onRespond(requestId, { orderedIds: order })}
+        className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25 disabled:opacity-40"
+        style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+      >
+        {remaining.length > 0 ? `Place ${remaining.length} more` : 'Confirm order'}
       </Button>
     </div>
   );
