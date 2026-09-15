@@ -128,7 +128,7 @@ function GameSetupContent() {
             Back
           </Button>
         </Link>
-        <h2 className="text-lg font-semibold tracking-tight">New Game</h2>
+        <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">New Game</h1>
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-6">

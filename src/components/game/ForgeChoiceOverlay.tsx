@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
@@ -59,8 +60,16 @@ export function ForgeChoiceOverlay() {
     // page's `flex-1 min-h-0 overflow-hidden` container and gets clipped.
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" />
-        <div
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.15 }}
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.7 }}
           className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto"
           style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}
         >
@@ -72,7 +81,7 @@ export function ForgeChoiceOverlay() {
             }}
             onCancel={() => setPendingAbilitySelection(null)}
           />
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -92,11 +101,27 @@ export function ForgeChoiceOverlay() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Semi-transparent backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" />
-      {/* Modal content - key forces re-mount when requestId changes */}
-      <div key={pendingChoice.requestId} className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto" style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}>
-        <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
-      </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.15 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
+      />
+      {/* key forces a remount per prompt; AnimatePresence turns that into a cross-fade
+          rather than the hard flicker-replace it used to be. */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={pendingChoice.requestId}
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.98, y: -4 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.7 }}
+          className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto"
+          style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}
+        >
+          <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -122,7 +147,7 @@ function ChoicePanel({ choice, onRespond }: {
     const isMain = data.isMainPhase as boolean;
 
     return (
-      <div className="mb-3 rounded-xl border border-gold/30 bg-gold/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
           <span className="font-semibold text-gold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>
             {isMain ? 'Your Turn — Main Phase' : `Priority — ${phase}`}
@@ -187,7 +212,7 @@ function ChoicePanel({ choice, onRespond }: {
   // --- confirm_action / confirm_replacement: yes/no ---
   if (choiceType === 'confirm_action' || choiceType === 'confirm_replacement') {
     return (
-      <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold text-foreground" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>{prompt || 'Confirm?'}</h3>
         <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
           <Button onClick={() => onRespond(choice.requestId, { confirmed: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Yes</Button>
@@ -283,7 +308,7 @@ function ChoicePanel({ choice, onRespond }: {
   if (choiceType === 'choose_type') {
     const typeOptions = (data.options || []) as string[];
     return (
-      <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Choose a type'}</h3>
         <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
           {typeOptions.map((t, i) => (
@@ -325,7 +350,7 @@ function ChoicePanel({ choice, onRespond }: {
     // with no `index` key at all it defaults to 0 and plays ability 0. getAbilityToPlay
     // bounds-checks and returns null for -1, which is a genuine "chose nothing".
     return (
-      <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Choose an ability'}</h3>
         <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
           {abilities.map((a) => (
@@ -357,7 +382,7 @@ function ChoicePanel({ choice, onRespond }: {
   // --- play_trigger / put_on_top / scry ---
   if (choiceType === 'play_trigger') {
     return (
-      <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Play trigger?'}</h3>
         <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
           <Button onClick={() => onRespond(choice.requestId, { play: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Yes</Button>
@@ -369,7 +394,7 @@ function ChoicePanel({ choice, onRespond }: {
 
   if (choiceType === 'put_on_top') {
     return (
-      <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Put on top of library?'}</h3>
         <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
           <Button onClick={() => onRespond(choice.requestId, { onTop: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Top</Button>
@@ -492,7 +517,7 @@ function ChoicePanel({ choice, onRespond }: {
     `Responding will let the server apply a silent default. Payload:`, choice
   );
   return (
-    <div className="mb-3 rounded-xl border border-red-500/60 bg-red-500/10" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-error" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(4px,0.8vmin,1000px)' }}>
         Unimplemented prompt: {choiceType}
       </h3>
@@ -656,7 +681,7 @@ function DeclareAttackersPanel({ attackers, defenders, defaultDefenderId, reques
   };
 
   return (
-    <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-combat" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
         <span className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Declare Attackers</span>
         {defenders.length > 1 && (
@@ -730,7 +755,7 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
   };
 
   return (
-    <div className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
         <span className="font-semibold text-emerald-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Pay Mana Cost</span>
         <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 font-mono text-emerald-300" style={{ padding: 'clamp(2px,0.4vmin,1000px) clamp(6px,1vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}>
@@ -777,7 +802,7 @@ function AbilitySelectionPanel({ selection, onPick, onCancel }: {
   onCancel: () => void;
 }) {
   return (
-    <div className="mb-3 rounded-xl border border-gold/40 bg-card/40" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
         How do you want to play {selection.cardName}?
       </h3>
@@ -829,7 +854,7 @@ function OrderCardsPanel({ prompt, cards, requestId, onRespond }: {
     `${c.name}${c.power !== undefined ? ` ${c.power}/${c.toughness}` : ''}`;
 
   return (
-    <div className="mb-3 rounded-xl border border-gold/40 bg-card/40" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>{prompt}</h3>
       <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
         Click cards in the order you want. {remaining.length} left to place.
@@ -921,7 +946,7 @@ function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
     });
 
   return (
-    <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-combat" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>Declare Blockers</h3>
       <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
         {activeBlocker == null
@@ -1003,7 +1028,7 @@ function AnnounceNumberPanel({ prompt, description, min, max, requestId, onRespo
   const clamp = (n: number) => Math.max(min, max !== undefined ? Math.min(max, n) : n);
 
   return (
-    <div className="mb-3 rounded-xl border border-gold/40 bg-card/40" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(4px,0.8vmin,1000px)' }}>{prompt}</h3>
       {description ? (
         <div className="text-muted-foreground/70 truncate" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{description}</div>
@@ -1061,7 +1086,7 @@ function BinaryChoicePanel({ prompt, kind, requestId, onRespond }: {
 }) {
   const [yes, no] = BINARY_LABELS[kind] ?? ['Yes', 'No'];
   return (
-    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
       <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
         <Button
@@ -1104,7 +1129,7 @@ function ColorChoicePanel({ prompt, colors, requestId, onRespond }: {
   onRespond: (requestId: string, payload: Record<string, unknown>) => void;
 }) {
   return (
-    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
       <div className="flex flex-wrap" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
         {colors.map((c) => (
@@ -1147,7 +1172,7 @@ function AssignDamagePanel({ prompt, attackerName, totalDamage, blockers, reques
   };
 
   return (
-    <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-combat" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>{prompt}</h3>
       <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
         {attackerName} · {remaining} of {totalDamage} left to assign
@@ -1261,7 +1286,7 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
   const previewOpt = previewId != null ? options.find(o => o.id === previewId) : null;
 
   return (
-    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
       {!isSingle && hasOptions && (
         <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>Select {min === max ? min : `${min}-${max}`} · {selected.size} selected</p>
@@ -1277,7 +1302,7 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
                 onClick={() => toggle(opt.id)}
                 className={`relative rounded-lg cursor-pointer transition-all duration-150 ${
                   isActive
-                    ? 'ring-2 ring-gold/60 scale-105 z-10 shadow-[0_0_12px_rgba(212,169,68,0.3)]'
+                    ? 'ring-2 ring-gold/60 scale-105 z-10 shadow-[0_0_12px_var(--gold-glow)]'
                     : 'hover:ring-1 hover:ring-border/60'
                 }`}
               >
@@ -1359,7 +1384,7 @@ function ChooseModesPanel({ prompt, modes, min, max, requestId, onRespond }: {
   };
 
   return (
-    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
       {isMulti && (
         <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>

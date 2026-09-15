@@ -244,8 +244,8 @@ export default function ForgeGamePage() {
           {(isProcessing || isAwaitingServer) && <Loader2 className="animate-spin text-gold" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />}
           {hasPriorityForActions && !isProcessing && !isAwaitingServer && !isGameOver && (
             <span className="relative" style={{ width: 'clamp(8px,1.5vmin,1000px)', height: 'clamp(8px,1.5vmin,1000px)' }}>
-              <span className="absolute inset-0 animate-ping rounded-full opacity-75" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
-              <span className="absolute inset-0 rounded-full" style={{ backgroundColor: 'oklch(0.78 0.14 75)' }} />
+              <span className="absolute inset-0 animate-ping rounded-full opacity-75" style={{ backgroundColor: 'var(--gold)' }} />
+              <span className="absolute inset-0 rounded-full" style={{ backgroundColor: 'var(--gold)' }} />
             </span>
           )}
           <span className={cn('font-semibold', hasPriorityForActions && !isAwaitingServer ? 'text-gold' : 'text-muted-foreground/60')} style={{ fontSize: 'clamp(11px,2.5vmin,1000px)' }}>

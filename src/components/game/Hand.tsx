@@ -96,10 +96,11 @@ export function Hand({ cards, legalActions, onPlayCard, isActive, layout = 'fan'
                 interactive={false}
                 className={cn(
                   'transition-shadow',
-                  isPlayable && !isSelected && 'ring-2 ring-green-400/50 shadow-[0_0_14px_rgba(34,197,94,0.3)]',
-                  isSelected && isPlayable && 'ring-2 ring-green-400/90 shadow-[0_0_28px_rgba(34,197,94,0.6)]',
-                  isSelected && !isPlayable && 'ring-2 ring-sky-400/70 shadow-[0_0_20px_rgba(56,189,248,0.35)]',
+                  isPlayable && !isSelected && 'affordance-actionable',
+                  isSelected && isPlayable && 'affordance-selected',
+                  isSelected && !isPlayable && 'affordance-selected',
                   !isActive && !isSelected && 'opacity-50 saturate-50',
+            isActive && !isPlayable && !isSelected && 'opacity-60 saturate-[0.6]',
                 )}
               />
               <AnimatePresence>
@@ -170,10 +171,11 @@ export function Hand({ cards, legalActions, onPlayCard, isActive, layout = 'fan'
                 interactive={false}
                 className={cn(
                   'transition-shadow',
-                  isPlayable && !isSelected && 'ring-2 ring-green-400/50 shadow-[0_0_14px_rgba(34,197,94,0.3)]',
-                  isSelected && isPlayable && 'ring-2 ring-green-400/90 shadow-[0_0_28px_rgba(34,197,94,0.6)]',
-                  isSelected && !isPlayable && 'ring-2 ring-sky-400/70 shadow-[0_0_20px_rgba(56,189,248,0.35)]',
+                  isPlayable && !isSelected && 'affordance-actionable',
+                  isSelected && isPlayable && 'affordance-selected',
+                  isSelected && !isPlayable && 'affordance-selected',
                   !isActive && !isSelected && 'opacity-50 saturate-50',
+            isActive && !isPlayable && !isSelected && 'opacity-60 saturate-[0.6]',
                 )}
               />
 

@@ -65,7 +65,7 @@ export function PhaseTracker({ turn, activePlayerName, className }: PhaseTracker
                 {isActive && (
                   <motion.div
                     layoutId="phase-indicator"
-                    className="absolute inset-0 rounded-md bg-gold/20 border border-gold/40 shadow-[0_0_12px_rgba(212,169,68,0.3)]"
+                    className="absolute inset-0 rounded-md bg-gold/20 border border-gold/40 shadow-[0_0_12px_var(--gold-glow)]"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}

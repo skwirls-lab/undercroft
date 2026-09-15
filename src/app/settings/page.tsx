@@ -99,7 +99,7 @@ function SettingsContent() {
             Back
           </Button>
         </Link>
-        <h2 className="text-lg font-semibold tracking-tight">Settings</h2>
+        <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">Settings</h1>
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">

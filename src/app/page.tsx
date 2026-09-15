@@ -56,7 +56,7 @@ function MarketingPage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/15">
             <Swords className="h-4 w-4 text-gold" />
           </div>
-          <span className="text-lg font-bold tracking-tight">
+          <span className="font-display text-lg font-bold tracking-tight">
             <span className="text-gold">Under</span>croft
           </span>
         </div>
@@ -75,7 +75,7 @@ function MarketingPage() {
       <section className="relative flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
         {/* Ambient glows */}
         <div className="pointer-events-none absolute inset-0 select-none">
-          <div className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 h-[700px] w-[900px] bg-[radial-gradient(ellipse,rgba(212,169,68,0.07),transparent_60%)]" />
+          <div className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 h-[700px] w-[900px] bg-[radial-gradient(ellipse,oklch(0.80_0.12_75_/_0.07),transparent_60%)]" />
           <div className="absolute right-0 top-0 h-[500px] w-[500px] bg-[radial-gradient(circle,rgba(100,60,180,0.06),transparent_70%)]" />
           <div className="absolute bottom-0 left-0 h-[400px] w-[400px] bg-[radial-gradient(circle,rgba(60,120,200,0.05),transparent_70%)]" />
         </div>
@@ -91,7 +91,7 @@ function MarketingPage() {
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1, type: 'spring', stiffness: 180, damping: 18 }}
-            className="relative flex h-28 w-28 items-center justify-center rounded-3xl border border-gold/30 bg-card/80 shadow-[0_0_40px_rgba(212,169,68,0.15)]"
+            className="relative flex h-28 w-28 items-center justify-center rounded-3xl border border-gold/30 bg-card/80 shadow-[0_0_40px_oklch(0.80_0.12_75_/_0.15)]"
           >
             <Swords className="h-14 w-14 text-gold" />
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-gold/15 to-transparent pointer-events-none" />
@@ -101,7 +101,7 @@ function MarketingPage() {
 
           {/* Title */}
           <div>
-            <h1 className="text-5xl font-black tracking-tight sm:text-7xl lg:text-8xl">
+            <h1 className="font-display text-5xl font-bold tracking-tight sm:text-7xl lg:text-8xl">
               <span className="text-gold">Under</span>
               <span className="text-foreground">croft</span>
             </h1>
@@ -125,7 +125,7 @@ function MarketingPage() {
             <Button
               size="lg"
               onClick={signInWithGoogle}
-              className="gap-2.5 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[0_0_32px_rgba(212,169,68,0.3)] font-bold text-base px-8 py-6 rounded-xl"
+              className="gap-2.5 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[0_0_32px_oklch(0.80_0.12_75_/_0.3)] font-bold text-base px-8 py-6 rounded-xl"
             >
               <LogIn className="h-5 w-5" />
               Sign In to Play
@@ -199,7 +199,7 @@ function MarketingPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="mx-auto max-w-xl rounded-2xl border border-gold/20 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-sm p-8 text-center shadow-[0_0_40px_rgba(212,169,68,0.06)]"
+          className="mx-auto max-w-xl rounded-2xl border border-gold/20 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-sm p-8 text-center shadow-[0_0_40px_oklch(0.80_0.12_75_/_0.06)]"
         >
           <Sparkles className="mx-auto mb-4 h-8 w-8 text-gold/50" />
           <h2 className="text-xl font-bold text-foreground">Ready to play?</h2>
@@ -244,7 +244,7 @@ function Dashboard() {
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gold/15">
             <Swords className="h-3.5 w-3.5 text-gold" />
           </div>
-          <span className="text-lg font-bold tracking-tight">
+          <span className="font-display text-lg font-bold tracking-tight">
             <span className="text-gold">Under</span>croft
           </span>
         </div>
@@ -346,7 +346,7 @@ function FeatureCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4, delay }}
-      className="group rounded-2xl border border-border/25 bg-card/30 p-6 transition-all hover:border-gold/20 hover:bg-card/50 hover:shadow-[0_0_24px_rgba(212,169,68,0.05)]"
+      className="group rounded-2xl border border-border/25 bg-card/30 p-6 transition-all hover:border-gold/20 hover:bg-card/50 hover:shadow-[0_0_24px_oklch(0.80_0.12_75_/_0.05)]"
     >
       <div className="mb-3.5 flex h-10 w-10 items-center justify-center rounded-xl bg-gold/10 text-gold transition-colors group-hover:bg-gold/15">
         {icon}
@@ -394,7 +394,7 @@ function DashboardCard({
         className={cn(
           'group flex h-full flex-col gap-4 rounded-2xl border p-6 transition-all cursor-pointer hover:shadow-lg',
           accent
-            ? 'border-gold/30 bg-gold/[0.04] hover:border-gold/50 hover:bg-gold/[0.07] hover:shadow-[0_0_24px_rgba(212,169,68,0.1)]'
+            ? 'border-gold/30 bg-gold/[0.04] hover:border-gold/50 hover:bg-gold/[0.07] hover:shadow-[0_0_24px_oklch(0.80_0.12_75_/_0.1)]'
             : 'border-border/30 bg-card/30 hover:border-border/50 hover:bg-card/50'
         )}
       >

@@ -174,7 +174,7 @@ function DecksContent() {
               Back
             </Button>
           </Link>
-          <h2 className="text-lg font-semibold tracking-tight">My Decks</h2>
+          <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">My Decks</h1>
         </div>
 
         <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>

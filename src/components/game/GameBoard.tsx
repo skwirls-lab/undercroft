@@ -420,8 +420,10 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   'rounded-[clamp(8px,1.5vmin,1000px)] border transition-all text-left',
                   'p-[clamp(8px,2vmin,1000px)] flex flex-col justify-center gap-[clamp(4px,1vmin,1000px)]',
                   'hover:bg-card/60 active:scale-[0.98]',
+                  // Active-player marker: deliberately NOT gold. Gold means "you can act",
+                  // and using it here pointed the strongest signal on screen at the opponent.
                   gameState.turn.activePlayerId === opp.id
-                    ? 'border-gold/40 bg-gold/5 shadow-[0_0_12px_rgba(212,169,68,0.1)]'
+                    ? 'border-foreground/25 bg-foreground/[0.04]'
                     : 'border-border/20 bg-card/30'
                 )}
               >
@@ -462,9 +464,10 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
             className={cn(
               'rounded-[clamp(10px,2vmin,1000px)] border transition-all text-left flex-1 min-h-0',
               'p-[clamp(10px,2.5vmin,1000px)] flex flex-col justify-center gap-[clamp(6px,1.5vmin,1000px)]',
-              'hover:bg-card/60 active:scale-[0.99]',
+              'hover:bg-card/60 active:scale-[0.98]',
+              // Gold here and only here: you have priority, you can act.
               hasPriority && !gameState.isGameOver
-                ? 'border-gold/40 bg-gold/5 shadow-[0_0_16px_rgba(212,169,68,0.12)]'
+                ? 'border-gold/40 bg-gold/5 shadow-[0_0_16px_var(--gold-glow-soft)]'
                 : 'border-border/20 bg-card/30'
             )}
           >
