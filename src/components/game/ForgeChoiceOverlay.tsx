@@ -22,6 +22,12 @@ interface LegalPlay {
   isAbility?: boolean;
 }
 
+interface ColorOption {
+  mask: number;
+  name: string;
+  symbol: string;
+}
+
 interface CardOption {
   id: number;
   name: string;
@@ -171,6 +177,11 @@ function ChoicePanel({ choice, onRespond }: {
     const min = (data.min as number) ?? (data.optional ? 0 : 1);
     const max = (data.max as number) ?? cardOptions.length;
     const isSingle = choiceType === 'choose_single_entity' || choiceType === 'choose_single_card_zone';
+    // The response key is NOT implied by single-selection. choose_single_entity is read as
+    // `entityId` (scalar) by the server, but choose_single_card_zone — every tutor/fetch —
+    // is read as `selectedIds` (array). Sending entityId for it made the server fall through
+    // to fetchList.get(0), silently discarding the player's pick.
+    const singleResponseKey = choiceType === 'choose_single_entity' ? 'entityId' : 'selectedIds';
     return (
       <CardSelectPanel
         prompt={prompt || `Choose ${isSingle ? 'one' : `${min}-${max}`}`}
@@ -179,7 +190,7 @@ function ChoicePanel({ choice, onRespond }: {
         max={isSingle ? 1 : max}
         requestId={choice.requestId}
         onRespond={onRespond}
-        responseKey={isSingle ? 'entityId' : choiceType === 'choose_entities' ? 'entityIds' : 'selectedIds'}
+        responseKey={isSingle ? singleResponseKey : choiceType === 'choose_entities' ? 'entityIds' : 'selectedIds'}
       />
     );
   }
@@ -226,23 +237,17 @@ function ChoicePanel({ choice, onRespond }: {
 
   // --- declare_blockers ---
   if (choiceType === 'declare_blockers') {
-    const blockers = (data.possibleBlockers || []) as CardOption[];
+    // The blocker buttons previously had no onClick at all, and the panel ignored
+    // data.attackers entirely — so the only reachable outcome was "No Blocks" and the player
+    // could never block. DeclareBlockersPanel pairs a blocker with an attacker and sends the
+    // {blocks:[{blockerId, attackerId}]} shape the server actually parses.
     return (
-      <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
-        <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>Declare Blockers</h3>
-        {blockers.length > 0 ? (
-          <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-            {blockers.map((b) => (
-          <Button key={b.id} className="rounded-lg border border-border/40 bg-card/60 hover:border-red-500/40 hover:bg-red-500/10" style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}>
-                {b.name} {b.power !== undefined ? `${b.power}/${b.toughness}` : ''}
-              </Button>
-            ))}
-          </div>
-        ) : null}
-          <Button variant="outline" onClick={() => onRespond(choice.requestId, { blocks: [] })} className="rounded-lg border bg-card/60 font-medium hover:border-red-500/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
-            No Blocks
-          </Button>
-      </div>
+      <DeclareBlockersPanel
+        blockers={(data.possibleBlockers || []) as CardOption[]}
+        attackers={(data.attackers || []) as CardOption[]}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
     );
   }
 
@@ -283,6 +288,14 @@ function ChoicePanel({ choice, onRespond }: {
   // --- choose_ability / choose_single_spell / choose_spell_abilities ---
   if (['choose_ability', 'choose_single_spell', 'choose_spell_abilities'].includes(choiceType)) {
     const abilities = (data.abilities || []) as LegalPlay[];
+    // choose_ability and choose_single_spell are read as a scalar `index`, but
+    // choose_spell_abilities is read as an `indices` array. Sending `index` for it meant the
+    // server never saw a selection and silently auto-picked the first `num` abilities.
+    const abilityResponse = (index: number): Record<string, unknown> =>
+      choiceType === 'choose_spell_abilities' ? { indices: [index] } : { index };
+    // Cancel sends index -1, not {cancel:true}: the server has no `cancel` handling here, and
+    // with no `index` key at all it defaults to 0 and plays ability 0. getAbilityToPlay
+    // bounds-checks and returns null for -1, which is a genuine "chose nothing".
     return (
       <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Choose an ability'}</h3>
@@ -290,7 +303,7 @@ function ChoicePanel({ choice, onRespond }: {
           {abilities.map((a) => (
           <Button
               key={a.index}
-              onClick={() => onRespond(choice.requestId, { index: a.index })}
+              onClick={() => onRespond(choice.requestId, abilityResponse(a.index))}
               className="rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10"
               style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
             >
@@ -301,7 +314,7 @@ function ChoicePanel({ choice, onRespond }: {
           {abilities.length === 0 && (
             <Button
               variant="outline"
-              onClick={() => onRespond(choice.requestId, { cancel: true })}
+              onClick={() => onRespond(choice.requestId, { index: -1 })}
               className="rounded-lg border bg-card/60 font-medium hover:border-red-500/40 hover:bg-red-500/10"
               style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
             >
@@ -340,6 +353,8 @@ function ChoicePanel({ choice, onRespond }: {
 
   // --- scry: choose cards to put on bottom ---
   if (choiceType === 'scry') {
+    // arrangeForScry reads `bottomIds`; sending selectedIds made scry — and surveil, which
+    // delegates to the same server handler — a no-op that always kept every card on top.
     const cards = (data.cards || []) as CardOption[];
     return (
       <CardSelectPanel
@@ -349,7 +364,63 @@ function ChoicePanel({ choice, onRespond }: {
         max={cards.length}
         requestId={choice.requestId}
         onRespond={onRespond}
-        responseKey="selectedIds"
+        responseKey="bottomIds"
+      />
+    );
+  }
+
+  // --- announce_number: X costs, multikicker, "choose a number" on cast ---
+  // Without this renderer the prompt fell through to the generic panel, which replies
+  // {pass:true}; announceRequirements then reads no `value` and returns 0, so EVERY X spell
+  // resolved with X = 0.
+  if (choiceType === 'announce_number') {
+    return (
+      <AnnounceNumberPanel
+        prompt={prompt || 'Choose a value'}
+        description={(data.abilityDescription as string) || ''}
+        min={(data.min as number) ?? 0}
+        max={(data.max as number) ?? undefined}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
+  // --- choose_binary: tap/untap, play/draw, heads/tails, top/bottom ---
+  if (choiceType === 'choose_binary') {
+    return (
+      <BinaryChoicePanel
+        prompt={prompt || 'Choose'}
+        kind={(data.choiceType as string) || ''}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
+  // --- choose_color: "add one mana of any color", protection, etc. ---
+  if (choiceType === 'choose_color') {
+    const colors = (data.colors || []) as ColorOption[];
+    return (
+      <ColorChoicePanel
+        prompt={prompt || 'Choose a color'}
+        colors={colors}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
+  // --- assign_combat_damage: allocate damage across multiple blockers ---
+  if (choiceType === 'assign_combat_damage') {
+    return (
+      <AssignDamagePanel
+        prompt={prompt || `Assign ${data.totalDamage ?? 0} damage`}
+        attackerName={(data.attackerName as string) || 'Attacker'}
+        totalDamage={(data.totalDamage as number) ?? 0}
+        blockers={(data.blockers || []) as CardOption[]}
+        requestId={choice.requestId}
+        onRespond={onRespond}
       />
     );
   }
@@ -372,11 +443,25 @@ function ChoicePanel({ choice, onRespond }: {
   }
 
   // --- Fallback for any unhandled type ---
+  // This is a BUG, not a normal state. The server is blocked on a decision this client cannot
+  // render; replying {pass:true} carries no key any handler reads, so the engine falls back to
+  // a hardcoded default and the mechanic silently does nothing. Make that loud rather than
+  // dressing it up as a normal "OK" button.
+  console.error(
+    `[ForgeChoiceOverlay] UNIMPLEMENTED PROMPT: "${choiceType}" has no renderer. ` +
+    `Responding will let the server apply a silent default. Payload:`, choice
+  );
   return (
-    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
-      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || `Choice: ${choiceType}`}</h3>
-      <Button variant="outline" onClick={() => onRespond(choice.requestId, { pass: true })} className="rounded-lg border bg-card/60 font-medium hover:border-border/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
-        OK / Pass
+    <div className="mb-3 rounded-xl border border-red-500/60 bg-red-500/10" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(4px,0.8vmin,1000px)' }}>
+        Unimplemented prompt: {choiceType}
+      </h3>
+      <p className="text-red-300/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+        {prompt ? `"${prompt}" — ` : ''}this client has no UI for this decision. Continuing lets
+        the engine apply a default, which usually means the card does nothing.
+      </p>
+      <Button variant="outline" onClick={() => onRespond(choice.requestId, { pass: true })} className="rounded-lg border border-red-500/40 bg-card/60 font-medium hover:border-red-500/60" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
+        Continue with default
       </Button>
       <details style={{ marginTop: 'clamp(6px,1vmin,1000px)' }}>
         <summary className="cursor-pointer text-muted-foreground" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>Raw data</summary>
@@ -642,6 +727,303 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
 }
 
 // ============================================================
+// DeclareBlockersPanel — assign each blocker to an attacker
+// ============================================================
+
+function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
+  blockers: CardOption[];
+  attackers: CardOption[];
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  // blockerId -> attackerId
+  const [blocks, setBlocks] = React.useState<Record<number, number>>({});
+  const [activeBlocker, setActiveBlocker] = React.useState<number | null>(null);
+
+  const label = (c: CardOption) =>
+    `${c.name}${c.power !== undefined ? ` ${c.power}/${c.toughness}` : ''}`;
+
+  const assign = (attackerId: number) => {
+    if (activeBlocker == null) return;
+    setBlocks((prev) => ({ ...prev, [activeBlocker]: attackerId }));
+    setActiveBlocker(null);
+  };
+
+  const clearBlocker = (blockerId: number) => {
+    setBlocks((prev) => {
+      const next = { ...prev };
+      delete next[blockerId];
+      return next;
+    });
+  };
+
+  const submit = () =>
+    onRespond(requestId, {
+      blocks: Object.entries(blocks).map(([blockerId, attackerId]) => ({
+        blockerId: Number(blockerId),
+        attackerId,
+      })),
+    });
+
+  return (
+    <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>Declare Blockers</h3>
+      <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+        {activeBlocker == null
+          ? 'Select a blocker, then choose the attacker it blocks.'
+          : `Blocking with ${label(blockers.find((b) => b.id === activeBlocker) ?? { id: 0, name: '?' })} — pick an attacker.`}
+      </div>
+
+      <div style={{ marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+        <div className="text-muted-foreground/70" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>Your creatures</div>
+        <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
+          {blockers.map((b) => {
+            const assignedTo = blocks[b.id];
+            const attacker = attackers.find((a) => a.id === assignedTo);
+            return (
+              <Button
+                key={b.id}
+                onClick={() => (assignedTo !== undefined ? clearBlocker(b.id) : setActiveBlocker(activeBlocker === b.id ? null : b.id))}
+                className={`rounded-lg border bg-card/60 hover:bg-red-500/10 ${activeBlocker === b.id ? 'border-gold/60' : assignedTo !== undefined ? 'border-green-500/50' : 'border-border/40'}`}
+                style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+              >
+                {label(b)}{attacker ? ` → ${attacker.name}` : ''}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+        <div className="text-muted-foreground/70" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>Attackers</div>
+        <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
+          {attackers.map((a) => (
+            <Button
+              key={a.id}
+              disabled={activeBlocker == null}
+              onClick={() => assign(a.id)}
+              className="rounded-lg border border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10 disabled:opacity-40"
+              style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+            >
+              {label(a)}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+        <Button
+          onClick={submit}
+          className="rounded-lg border border-red-500/40 bg-red-500/15 font-medium hover:bg-red-500/25"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+        >
+          Confirm blocks ({Object.keys(blocks).length})
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => onRespond(requestId, { blocks: [] })}
+          className="rounded-lg border bg-card/60 font-medium hover:border-red-500/40"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+        >
+          No Blocks
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AnnounceNumberPanel — X costs, multikicker, "announce a number"
+// ============================================================
+
+function AnnounceNumberPanel({ prompt, description, min, max, requestId, onRespond }: {
+  prompt: string;
+  description: string;
+  min: number;
+  max?: number;
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [value, setValue] = React.useState(min);
+  const clamp = (n: number) => Math.max(min, max !== undefined ? Math.min(max, n) : n);
+
+  return (
+    <div className="mb-3 rounded-xl border border-gold/40 bg-card/40" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(4px,0.8vmin,1000px)' }}>{prompt}</h3>
+      {description ? (
+        <div className="text-muted-foreground/70 truncate" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{description}</div>
+      ) : null}
+      <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+        <Button
+          variant="outline"
+          onClick={() => setValue((v) => clamp(v - 1))}
+          className="rounded-lg border bg-card/60 font-bold"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', width: 'clamp(32px,4.5vmin,1000px)', fontSize: 'clamp(14px,2.4vmin,1000px)' }}
+        >
+          −
+        </Button>
+        <span className="font-bold tabular-nums text-center" style={{ fontSize: 'clamp(18px,3.5vmin,1000px)', minWidth: 'clamp(40px,6vmin,1000px)' }}>{value}</span>
+        <Button
+          variant="outline"
+          onClick={() => setValue((v) => clamp(v + 1))}
+          className="rounded-lg border bg-card/60 font-bold"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', width: 'clamp(32px,4.5vmin,1000px)', fontSize: 'clamp(14px,2.4vmin,1000px)' }}
+        >
+          +
+        </Button>
+        <Button
+          onClick={() => onRespond(requestId, { value })}
+          className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)', marginLeft: 'clamp(4px,0.8vmin,1000px)' }}
+        >
+          Confirm
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BinaryChoicePanel — two-option prompts (BinaryChoiceType)
+// ============================================================
+
+const BINARY_LABELS: Record<string, [string, string]> = {
+  HeadsOrTails: ['Heads', 'Tails'],
+  TapOrUntap: ['Tap', 'Untap'],
+  PlayOrDraw: ['Play', 'Draw'],
+  OddsOrEvens: ['Odds', 'Evens'],
+  UntapOrLeaveTapped: ['Untap', 'Leave tapped'],
+  UntapTimeVault: ['Untap', 'Leave tapped'],
+  LeftOrRight: ['Left', 'Right'],
+  AddOrRemove: ['Add', 'Remove'],
+};
+
+function BinaryChoicePanel({ prompt, kind, requestId, onRespond }: {
+  prompt: string;
+  kind: string;
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [yes, no] = BINARY_LABELS[kind] ?? ['Yes', 'No'];
+  return (
+    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
+      <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+        <Button
+          onClick={() => onRespond(requestId, { result: true })}
+          className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+        >
+          {yes}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => onRespond(requestId, { result: false })}
+          className="rounded-lg border bg-card/60 font-medium hover:border-border/40"
+          style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+        >
+          {no}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ColorChoicePanel — "choose a color" (mana, protection, ...)
+// ============================================================
+
+const COLOR_SWATCH: Record<string, string> = {
+  W: 'bg-[#f8f6d8] text-black',
+  U: 'bg-[#c1d7e9] text-black',
+  B: 'bg-[#bab1ab] text-black',
+  R: 'bg-[#e49977] text-black',
+  G: 'bg-[#a3c095] text-black',
+  C: 'bg-[#ccc2c0] text-black',
+};
+
+function ColorChoicePanel({ prompt, colors, requestId, onRespond }: {
+  prompt: string;
+  colors: ColorOption[];
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="mb-3 rounded-xl border border-border/30 bg-card/30" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
+      <div className="flex flex-wrap" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+        {colors.map((c) => (
+          <Button
+            key={c.mask}
+            onClick={() => onRespond(requestId, { mask: c.mask })}
+            className={`rounded-lg border border-border/40 font-bold ${COLOR_SWATCH[c.symbol] ?? 'bg-card/60'}`}
+            style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+          >
+            {c.symbol} · {c.name}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AssignDamagePanel — allocate combat damage across blockers
+// ============================================================
+
+function AssignDamagePanel({ prompt, attackerName, totalDamage, blockers, requestId, onRespond }: {
+  prompt: string;
+  attackerName: string;
+  totalDamage: number;
+  blockers: CardOption[];
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [assigned, setAssigned] = React.useState<Record<number, number>>({});
+  const used = Object.values(assigned).reduce((a, b) => a + b, 0);
+  const remaining = totalDamage - used;
+
+  const bump = (id: number, delta: number) => {
+    setAssigned((prev) => {
+      const current = prev[id] ?? 0;
+      const next = Math.max(0, Math.min(current + delta, current + remaining));
+      return { ...prev, [id]: next };
+    });
+  };
+
+  return (
+    <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/5" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold text-red-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>{prompt}</h3>
+      <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+        {attackerName} · {remaining} of {totalDamage} left to assign
+      </div>
+      <div className="flex flex-col" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+        {blockers.map((b) => (
+          <div key={b.id} className="flex items-center justify-between rounded-lg border border-border/30 bg-card/40" style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', gap: 'clamp(6px,1.2vmin,1000px)' }}>
+            <span style={{ fontSize: 'clamp(11px,1.9vmin,1000px)' }}>
+              {b.name}{b.power !== undefined ? ` ${b.power}/${b.toughness}` : ''}
+            </span>
+            <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)' }}>
+              <Button variant="outline" onClick={() => bump(b.id, -1)} className="rounded border bg-card/60 font-bold" style={{ height: 'clamp(24px,3.4vmin,1000px)', width: 'clamp(24px,3.4vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>−</Button>
+              <span className="tabular-nums font-semibold text-center" style={{ fontSize: 'clamp(12px,2.1vmin,1000px)', minWidth: 'clamp(20px,3vmin,1000px)' }}>{assigned[b.id] ?? 0}</span>
+              <Button variant="outline" onClick={() => bump(b.id, 1)} className="rounded border bg-card/60 font-bold" style={{ height: 'clamp(24px,3.4vmin,1000px)', width: 'clamp(24px,3.4vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>+</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button
+        disabled={remaining !== 0}
+        onClick={() => onRespond(requestId, { assignments: Object.fromEntries(blockers.map((b) => [String(b.id), assigned[b.id] ?? 0])) })}
+        className="rounded-lg border border-red-500/40 bg-red-500/15 font-medium hover:bg-red-500/25 disabled:opacity-40"
+        style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+      >
+        {remaining === 0 ? 'Confirm damage' : `Assign ${remaining} more`}
+      </Button>
+    </div>
+  );
+}
+
+// ============================================================
 // CardSelectPanel — reusable multi-select card picker
 // Used for discard, sacrifice, search, targets, etc.
 // ============================================================
@@ -662,7 +1044,7 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
   const isSingle = max === 1;
 
   // Keys that the server expects as arrays even for single selection
-  const arrayKeys = new Set(['selectedIds', 'entityIds', 'targetIds', 'attackerCardIds']);
+  const arrayKeys = new Set(['selectedIds', 'entityIds', 'targetIds', 'attackerCardIds', 'bottomIds']);
 
   // Resolve card options to CardInstance objects for art display
   const gameState = useGameStore((s) => s.gameState);

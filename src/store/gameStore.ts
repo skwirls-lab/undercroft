@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { GameState, GameAction, GameEvent, CardData } from '@/lib/gameTypes';
 import { AIPlayerController } from '@/ai/AIPlayerController';
 import type { AIPlayerConfig } from '@/ai/types';
-import { useForgeGameStore } from '@/store/forgeGameStore';
 import {
   sfxTapLand, sfxCastSpell, sfxPlayCard, sfxDamage,
   sfxLifeGain, sfxTurnStart, sfxGameOver, sfxPassPriority
@@ -99,34 +98,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { gameState: prevState, forgeMode, forgePendingRequestId, forgeRespondFn } = get();
     
     if (forgeMode) {
-      // auto-pass: PASS_PRIORITY action when no pending request and feature enabled
-      if (action.type === 'PASS_PRIORITY' && !forgePendingRequestId && get().autoPassUntilNextTurn) {
-        const client = useForgeGameStore.getState().client;
-        if (client) {
-          console.log('[Forge] Auto-passing priority');
-          client.handlePriorityPass(true);
-        }
-        return; // Don't double-process this action
-      }
-
-      // In forge mode, map game actions to WebSocket choice responses
-      console.log('[Forge] performAction', {
-        type: action.type,
-        hasPendingRequest: !!forgePendingRequestId,
-        hasRespondFn: !!forgeRespondFn,
-        payload: action.payload,
-      });
+      // NOTE: there is deliberately no auto-pass here. This branch used to call
+      // client.handlePriorityPass(), which sent a `priority_response` message the server does
+      // not accept (ForgeServer handles only start_game/choice_response/concede/ping). The
+      // server answered with an `error`, the pending choice future was never completed, and
+      // the game stalled for the full 30-minute CHOICE_TIMEOUT_SECONDS.
+      //
+      // Auto-pass is handled correctly in forgeGameStore's choose_action handler, which
+      // replies to the real requestId via sendChoiceResponse. With no pending request there
+      // is nothing for the server to receive anyway, so dropping the action is correct.
       if (!forgePendingRequestId || !forgeRespondFn) {
         console.warn('[Forge] No pending request — action dropped');
         return;
       }
       if (action.type === 'PASS_PRIORITY') {
-        console.log('[Forge] Sending pass response for request', forgePendingRequestId);
         forgeRespondFn(forgePendingRequestId, { pass: true });
       } else {
         const forgeIdx = action.payload?.forgeAbilityIndex as number | undefined;
         if (forgeIdx != null) {
-          console.log('[Forge] Sending abilityIndex', forgeIdx, 'for request', forgePendingRequestId);
           forgeRespondFn(forgePendingRequestId, { abilityIndex: forgeIdx });
         } else {
           console.warn('[Forge] No forgeAbilityIndex in payload — action dropped');
