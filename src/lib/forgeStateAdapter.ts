@@ -10,6 +10,7 @@ import type {
   ManaColor, CombatState,
 } from '@/lib/gameTypes';
 import type { ForgeGameState, ForgePlayer, ForgeCard, ForgeStackItem } from '@/lib/forgeClient';
+import { debugLog } from '@/lib/debug';
 
 // Forge phase names → our Phase type
 const PHASE_MAP: Record<string, Phase> = {
@@ -111,10 +112,10 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
 
         // Debug: log raw Forge card data for cards with counters or unusual P/T
         if (fc.counters && Object.keys(fc.counters).length > 0) {
-          console.log(`[ForgeAdapter] Card "${fc.name}" (id:${fc.id}) raw counters:`, JSON.stringify(fc.counters), 'power:', fc.power, 'basePower:', fc.basePower, 'toughness:', fc.toughness, 'baseToughness:', fc.baseToughness);
+          debugLog(`[ForgeAdapter] Card "${fc.name}" (id:${fc.id}) raw counters:`, JSON.stringify(fc.counters), 'power:', fc.power, 'basePower:', fc.basePower, 'toughness:', fc.toughness, 'baseToughness:', fc.baseToughness);
         }
         if (zoneType === 'battlefield' && fc.power != null && fc.basePower != null && fc.power !== fc.basePower) {
-          console.log(`[ForgeAdapter] Card "${fc.name}" P/T mismatch — net:${fc.power}/${fc.toughness} base:${fc.basePower}/${fc.baseToughness} counters:`, JSON.stringify(fc.counters ?? {}));
+          debugLog(`[ForgeAdapter] Card "${fc.name}" P/T mismatch — net:${fc.power}/${fc.toughness} base:${fc.basePower}/${fc.baseToughness} counters:`, JSON.stringify(fc.counters ?? {}));
         }
 
         const cardData = forgeCardToCardData(fc);
@@ -346,7 +347,7 @@ function normalizeCounters(raw?: Record<string, number>): Record<string, number>
     result[normalized] = (result[normalized] ?? 0) + value;
   }
   if (Object.keys(result).length > 0) {
-    console.log('[ForgeAdapter] counters:', result);
+    debugLog('[ForgeAdapter] counters:', result);
   }
   return result;
 }

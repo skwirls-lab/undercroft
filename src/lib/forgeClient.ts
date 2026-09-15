@@ -116,15 +116,37 @@ export class ForgeGameClient {
     this.handlers = handlers;
   }
 
-  /** Connect to the Forge server */
-  connect(): Promise<void> {
+  /**
+   * Connect to the Forge server.
+   *
+   * @param timeoutMs give up after this long. The server is hosted on Railway and sleeps when
+   * idle, so a first connection of the day genuinely takes 10-30s — but without a ceiling a
+   * truly unreachable server left the promise pending until the browser's own WebSocket
+   * timeout, which can be minutes, with the UI stuck on a spinner the whole time.
+   */
+  connect(timeoutMs = 45000): Promise<void> {
     return new Promise((resolve, reject) => {
       this.handlers.onConnectionChange?.('connecting');
+
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        // Stop the socket from opening later and half-initialising a dead session.
+        try { this.ws?.close(); } catch { /* already gone */ }
+        this.handlers.onConnectionChange?.('error');
+        reject(new Error(
+          `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the game server.`
+        ));
+      }, timeoutMs);
 
       try {
         this.ws = new WebSocket(this.serverUrl);
 
         this.ws.onopen = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
           this.reconnectAttempts = 0;
           this.handlers.onConnectionChange?.('connected');
           // Start keepalive pings to prevent idle timeout
@@ -154,12 +176,21 @@ export class ForgeGameClient {
 
         this.ws.onerror = (error) => {
           console.error('[ForgeClient] WebSocket error:', error);
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
           this.handlers.onConnectionChange?.('error');
-          reject(error);
+          // onerror hands back a DOM Event, not an Error, so callers that did
+          // `e instanceof Error ? e.message : ...` always fell through to a generic string.
+          reject(new Error('Could not reach the game server.'));
         };
       } catch (e) {
-        this.handlers.onConnectionChange?.('error');
-        reject(e);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          this.handlers.onConnectionChange?.('error');
+          reject(e);
+        }
       }
     });
   }

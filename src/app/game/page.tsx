@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useDeckStore } from '@/store/deckStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
-import { FORGE_SERVER_URL } from '@/lib/forgeConfig';
+import { FORGE_SERVER_URL, prewarmForgeServer } from '@/lib/forgeConfig';
 import { pickRandomAIDeck, aiDeckToForgeFormat, AI_DECKS } from '@/lib/aiDecks';
 import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -54,14 +54,70 @@ export default function GameSetupPage() {
 
 function GameSetupContent() {
   const router = useRouter();
-  const { decks } = useDeckStore();
+  const { decks, isSyncing } = useDeckStore();
   const { connect, startGame, connectionStatus } = useForgeGameStore();
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [aiCount, setAiCount] = useState(1);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [connectPhase, setConnectPhase] = useState('Connecting...');
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
-  const canStart = selectedDeckId !== null || decks.length === 0;
+  // While decks are still loading from Firestore we must not treat "none" as "none exist".
+  const canStart = selectedDeckId !== null || (decks.length === 0 && !isSyncing);
+
+  // The Forge server sleeps when idle on Railway. Nudge it awake as soon as the player reaches
+  // this screen so the container is usually warm by the time they press Start.
+  useEffect(() => { prewarmForgeServer(); }, []);
+
+  const handleStartGame = useCallback(async () => {
+    setStarting(true);
+    setStartError(null);
+    setConnectPhase('Connecting...');
+
+    // Escalate the copy while a cold start is in progress, so a long wait reads as expected
+    // behaviour rather than a hang.
+    const slow = setTimeout(() => setConnectPhase('Waking the game server...'), 3000);
+    const slower = setTimeout(() => setConnectPhase('Still waking (first launch is slow)...'), 12000);
+
+    try {
+      if (connectionStatus !== 'connected') {
+        await connect(FORGE_SERVER_URL);
+      }
+
+      const usedNames: string[] = [];
+      const aiDecks = Array.from({ length: aiCount }, () => {
+        const picked = pickRandomAIDeck(usedNames);
+        usedNames.push(picked.name);
+        return aiDeckToForgeFormat(picked);
+      });
+
+      let allDecks: Array<{ deckList: string[]; commander?: string }>;
+      if (selectedDeck) {
+        allDecks = [buildForgeDeck(selectedDeck), ...aiDecks];
+      } else if (decks.length === 0) {
+        allDecks = [{ deckList: buildGoblinDemo(), commander: 'Krenko, Mob Boss' }, ...aiDecks];
+      } else {
+        throw new Error('Please select a deck to continue.');
+      }
+
+      setConnectPhase('Dealing opening hands...');
+      const playerDeck = allDecks[0];
+      startGame(
+        playerDeck.deckList,
+        playerDeck.commander ?? undefined,
+        'Player',
+        aiCount,
+        allDecks.slice(1),
+      );
+      setTimeout(() => router.push('/game/forge'), 500);
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : 'Failed to connect to game server.');
+      setStarting(false);
+    } finally {
+      clearTimeout(slow);
+      clearTimeout(slower);
+    }
+  }, [aiCount, connect, connectionStatus, decks.length, router, selectedDeck, startGame]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -88,7 +144,12 @@ function GameSetupContent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {decks.length === 0 ? (
+            {isSyncing && decks.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading your decks...
+              </div>
+            ) : decks.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-8 text-center">
                 <p className="text-sm text-muted-foreground">
                   No decks yet. Import or create one first.
@@ -175,84 +236,44 @@ function GameSetupContent() {
           size="lg"
           disabled={!canStart || starting}
           className="w-full gap-2"
-          onClick={async () => {
-            setStarting(true);
-            setStartError(null);
-
-            try {
-              // Connect to Forge server if not already connected
-              if (connectionStatus !== 'connected') {
-                await connect(FORGE_SERVER_URL);
-              }
-
-              // Build deck list from selected deck, or automatically use demo/defaults for everyone
-              let allDecks: Array<{ deckList: string[]; commander?: string }>;
-
-              // Build AI decks — each AI gets a unique random deck
-              const usedNames: string[] = [];
-              const aiDecks = Array.from({ length: aiCount }, () => {
-                const picked = pickRandomAIDeck(usedNames);
-                usedNames.push(picked.name);
-                return aiDeckToForgeFormat(picked);
-              });
-
-              if (decks.length === 0) {
-                // NO DECKS IN YOUR LIST - auto-give player demo deck
-                const myDeck = buildGoblinDemo();
-                allDecks = [
-                  { deckList: myDeck, commander: 'Krenko, Mob Boss' },
-                  ...aiDecks,
-                ];
-              } else if (selectedDeck) {
-                // HAVE DECKS IN LIST - use selected deck for player
-                const myForgeDeck = buildForgeDeck(selectedDeck);
-                allDecks = [
-                  myForgeDeck,
-                  ...aiDecks,
-                ];
-              } else {
-                // DECKS EXIST BUT NONE SELECTED - prompt user or skip
-                throw new Error('Please select a deck to continue');
-              }
-
-              console.log('[Game Setup] Starting game with', aiCount === 0 ? 'solo mode' : `${allDecks.length} players`, `- commanders:`, allDecks.map(d => d.commander || 'unknown'));
-
-              // Send start_game to server - player's deck first, AI decks separately
-              const playerDeck = allDecks[0];
-              const aiDeckPayloads = allDecks.slice(1);
-              startGame(playerDeck.deckList, playerDeck.commander ?? undefined, 'Player', aiCount, aiDeckPayloads as Array<{ deckList: string[]; commander?: string }>);
-
-      setTimeout(() => router.push('/game/forge'), 500);
-    } catch (e) {
-              setStartError(e instanceof Error ? e.message : 'Failed to connect to game server');
-              setStarting(false);
-            }
-          }}
+          onClick={handleStartGame}
         >
           {starting ? (
-            <><Loader2 className="h-5 w-5 animate-spin" /> Connecting...</>
+            <><Loader2 className="h-5 w-5 animate-spin" /> {connectPhase}</>
           ) : (
             <><Swords className="h-5 w-5" /> Start Game</>
           )}
         </Button>
 
+        {/* Say why the button is dead, instead of just disabling it. */}
+        {!canStart && !starting && (
+          <p className="text-center text-xs text-muted-foreground">
+            {isSyncing ? 'Loading your decks...' : 'Select a deck above to continue.'}
+          </p>
+        )}
+
         {startError && (
           <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             <WifiOff className="h-4 w-4 shrink-0" />
-            <span>{startError}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto text-xs"
-              onClick={() => { setStartError(null); setStarting(false); }}
-            >
-              Dismiss
-            </Button>
+            <span className="min-w-0">{startError}</span>
+            <div className="ml-auto flex shrink-0 gap-1">
+              <Button variant="ghost" size="sm" className="text-xs" onClick={handleStartGame}>
+                Retry
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => { setStartError(null); setStarting(false); }}
+              >
+                Dismiss
+              </Button>
+            </div>
           </div>
         )}
 
         {/* Quick start without a deck */}
-        {decks.length === 0 && (
+        {decks.length === 0 && !isSyncing && (
           <p className="text-center text-xs text-muted-foreground">
             No deck selected — a demo deck will be used.
           </p>

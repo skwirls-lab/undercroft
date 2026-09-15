@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "build:forge": "npx tsx scripts/build-forge-data.ts",
-    "check:protocol": "node scripts/check-protocol.mjs"
+    "check:protocol": "node scripts/check-protocol.mjs",
+    "test:parser": "tsx scripts/test-decklist-parser.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

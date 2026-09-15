@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect } from 'react';
+import { debugLog } from '@/lib/debug';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { PlayerField } from './PlayerField';
@@ -49,11 +50,11 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
   const { gameState, legalActions, events, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
   const { pendingChoice, setPendingAbilitySelection } = useForgeGameStore();
 
-  console.log('[GameBoard] init:', { currentPlayerId, hasGameState: !!gameState });
+  debugLog('[GameBoard] init:', { currentPlayerId, hasGameState: !!gameState });
 
   // Debug: show all zone card counts for current player
   if (currentPlayerId) {
-    console.log('[GameBoard] adapter zone contents for', currentPlayerId, ':', 
+    debugLog('[GameBoard] adapter zone contents for', currentPlayerId, ':', 
       Array.from(gameState?.zones.keys() ?? []).filter(k => k.includes(currentPlayerId)).map((z: string) => ({
         key: z,
         cardsLen: gameState?.zones.get(z)?.cards.length ?? 0,
@@ -89,7 +90,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
           a.payload.cardInstanceId === card.instanceId
       );
 
-      console.log('[GameBoard] handlePlayCard', {
+      debugLog('[GameBoard] handlePlayCard', {
         cardId: card.instanceId,
         cardName: card.cardData.name,
         totalLegalActions: legalActions.length,
@@ -353,8 +354,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
   const hasPriority = gameState.priority.playerWithPriority === currentPlayerId;
   const isMyTurn = gameState.turn.activePlayerId === currentPlayerId;
   const handCards = getCardsInZone(gameState, currentPlayerId, 'hand');
-  console.log("[GameBoard] player", currentPlayerId, "has", handCards.length, "cards in hand");
-  console.log("[GameBoard] hand from adapter zones:", { player: currentPlayerId, zoneKey: `${currentPlayerId}:hand`, cardsCount: gameState.zones.get(`${currentPlayerId}:hand`)?.cards.length ?? "no-zone", cardInstancesCount: gameState.cardInstances.size });
+  debugLog("[GameBoard] player", currentPlayerId, "has", handCards.length, "cards in hand");
+  debugLog("[GameBoard] hand from adapter zones:", { player: currentPlayerId, zoneKey: `${currentPlayerId}:hand`, cardsCount: gameState.zones.get(`${currentPlayerId}:hand`)?.cards.length ?? "no-zone", cardInstancesCount: gameState.cardInstances.size });
   const combat = gameState.combat;
   const inCombatPhase = gameState.turn.phase === 'combat';
   const step = gameState.turn.step;

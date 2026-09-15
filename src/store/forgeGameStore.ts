@@ -8,6 +8,7 @@
  */
 
 import { create } from 'zustand';
+import { debugLog } from '@/lib/debug';
 import {
   ForgeGameClient,
   ForgeGameState,
@@ -127,6 +128,14 @@ export interface ForgeGameStoreState {
    */
   pendingAbilitySelection: PendingAbilitySelection | null;
 
+  /**
+   * True from the moment we answer the server until it pushes the next state or prompt.
+   * Every interaction in this client is a round-trip to the Forge engine, so without this
+   * the UI goes completely inert after a tap — no spinner, no disabled state, and nothing
+   * preventing a double-submit.
+   */
+  isAwaitingServer: boolean;
+
   // Actions
   connect: (serverUrl: string) => Promise<void>;
   disconnect: () => void;
@@ -134,6 +143,7 @@ export interface ForgeGameStoreState {
   respondToChoice: (requestId: string, payload: Record<string, unknown>) => void;
   concede: () => void;
   setPendingAbilitySelection: (selection: PendingAbilitySelection | null) => void;
+  setAwaitingServer: (awaiting: boolean) => void;
 
   // Helpers
   getHumanPlayer: () => ForgePlayer | null;
@@ -147,6 +157,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   gameState: null,
   pendingChoice: null,
   pendingAbilitySelection: null,
+  isAwaitingServer: false,
   gameEvents: [],
   isGameOver: false,
   winner: null,
@@ -159,7 +170,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
       onGameState: (state) => {
         const prevState = get().gameState;
-        set({ gameState: state });
+        set({ gameState: state, isAwaitingServer: false });
 
         // Generate synthetic game events from state changes for the GameLog
         const syntheticEvents: ForgeGameEvent[] = [];
@@ -259,16 +270,16 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
           const bf = adapted.zones.get(`${p.id}:battlefield`);
           const gy = adapted.zones.get(`${p.id}:graveyard`);
           const cmd = adapted.zones.get(`${p.id}:command`);
-          console.log(`[Forge] game_state zones for ${p.name} (${p.id}): hand=${hand?.cards.length ?? 0}, bf=${bf?.cards.length ?? 0}, gy=${gy?.cards.length ?? 0}, cmd=${cmd?.cards.length ?? 0}, life=${p.life}`);
+          debugLog(`[Forge] game_state zones for ${p.name} (${p.id}): hand=${hand?.cards.length ?? 0}, bf=${bf?.cards.length ?? 0}, gy=${gy?.cards.length ?? 0}, cmd=${cmd?.cards.length ?? 0}, life=${p.life}`);
           if (bf && bf.cards.length > 0) {
-            console.log(`[Forge]   battlefield:`, bf.cards.map(id => {
+            debugLog(`[Forge]   battlefield:`, bf.cards.map(id => {
               const c = adapted.cardInstances.get(id);
               return c ? `${id}(${c.cardData.name}, tapped=${c.tapped})` : id;
             }));
           }
         }
         if (adapted.stack.length > 0) {
-          console.log(`[Forge] stack:`, adapted.stack.map(s => s.cardData?.name ?? s.id));
+          debugLog(`[Forge] stack:`, adapted.stack.map(s => s.cardData?.name ?? s.id));
         }
       },
 
@@ -304,7 +315,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
             let actionType: string;
             if (!card) {
-              console.log(`[Forge] action for ${play.cardName}(${instanceId}): card NOT FOUND in gameState`);
+              debugLog(`[Forge] action for ${play.cardName}(${instanceId}): card NOT FOUND in gameState`);
               actionType = play.isSpell ? 'CAST_SPELL' : 'ACTIVATE_ABILITY';
             } else if (card.zone === 'hand') {
               actionType = card.cardData.typeLine?.toLowerCase().includes('land')
@@ -349,26 +360,26 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
 
           // Push to gameStore — GameBoard will highlight cards & wire clicks
           const respondFn = (rid: string, p: Record<string, unknown>) => {
-            console.log('[Forge] respondFn called', { rid, payload: p, hasClient: !!get().client });
+            debugLog('[Forge] respondFn called', { rid, payload: p, hasClient: !!get().client });
             get().client?.sendChoiceResponse(rid, p);
           };
-          console.log('[Forge] setForgeLegalActions', {
+          debugLog('[Forge] setForgeLegalActions', {
             requestId: choice.requestId,
             actionCount: actions.length,
             actionTypes: actions.map(a => `${a.type}:${a.payload.cardInstanceId}`),
           });
           useGameStore.getState().setForgeLegalActions(actions, choice.requestId, respondFn);
-          set({ pendingChoice: null, pendingAbilitySelection: null });
+          set({ pendingChoice: null, pendingAbilitySelection: null, isAwaitingServer: false });
         } else {
           // Non-action choices: show overlay, clear forge legal actions
-          console.log('[Forge] non-action choice received', {
+          debugLog('[Forge] non-action choice received', {
             choiceType: choice.choiceType,
             requestId: choice.requestId,
             dataKeys: Object.keys(choice.data || {}),
             data: choice.data,
           });
           useGameStore.getState().clearForgeLegalActions();
-          set({ pendingChoice: choice, pendingAbilitySelection: null });
+          set({ pendingChoice: choice, pendingAbilitySelection: null, isAwaitingServer: false });
         }
       },
 
@@ -383,11 +394,13 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
           isGameOver: true,
           winner: payload.winner,
           pendingChoice: null,
+          isAwaitingServer: false,
         });
       },
 
       onError: (message) => {
         console.error('[ForgeGameStore] Server error:', message);
+        set({ isAwaitingServer: false });
       },
     });
 
@@ -404,6 +417,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       connectionStatus: 'disconnected',
       gameState: null,
       pendingChoice: null,
+      isAwaitingServer: false,
       gameEvents: [],
       isGameOver: false,
       winner: null,
@@ -429,10 +443,14 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   respondToChoice: (requestId, payload) => {
     const { client } = get();
     if (client) {
-      set({ pendingChoice: null });
+      // Clear the prompt and mark that we are waiting, so the priority bar can show its
+      // spinner and in-flight panels can disable themselves against double-taps.
+      set({ pendingChoice: null, isAwaitingServer: true });
       client.sendChoiceResponse(requestId, payload);
     }
   },
+
+  setAwaitingServer: (awaiting) => set({ isAwaitingServer: awaiting }),
 
   setPendingAbilitySelection: (selection) => set({ pendingAbilitySelection: selection }),
 

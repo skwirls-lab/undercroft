@@ -47,6 +47,119 @@ interface DeckStore {
   clearSync: () => void;
 }
 
+/**
+ * Parse a decklist pasted from Moxfield, Archidekt, MTGGoldfish, TappedOut, EDHREC or plain text.
+ *
+ * The previous implementation stripped every `//` line as a comment and only recognised an
+ * explicit `Commander:` prefix — so a stock Moxfield export (where the commander is marked by a
+ * `// Commander` section header, or simply sits alone in the first block) imported with no
+ * commander at all. It also kept set codes and collector numbers as part of the card name, and
+ * turned category headers like `Creatures (30)` into a card.
+ *
+ * Handled here:
+ *   `1 Sol Ring`, `1x Sol Ring`, `Sol Ring`            quantity forms
+ *   `1 Sol Ring (LTR) 305`                             set code + collector number
+ *   `1x Sol Ring (c21) 263 [Ramp]`                     Archidekt category brackets
+ *   `1 Atraxa, Praetors' Voice *CMDR*`                 inline commander marker
+ *   `// Commander` / `Commander:` / `[Commander]`      commander section headers
+ *   `Creatures (30)`, `SIDEBOARD:`                     headers and sections to skip
+ *   first single-card block, when nothing else marks a commander (Moxfield/MTGGoldfish default)
+ */
+export function parseDecklist(text: string): { cards: DeckEntry[]; commanderName: string } {
+  const rawLines = text.split('\n').map((l) => l.trim());
+
+  const cards: DeckEntry[] = [];
+  let commanderName = '';
+
+  const SKIP_SECTION = /^(sideboard|sb|maybeboard|considering|tokens?|planes?)\b[:\s]*$/i;
+  // A category header has no leading quantity: `Creatures (30)`, `Lands 38`, `Deck`.
+  const CATEGORY_HEADER = /^[A-Za-z][A-Za-z '/-]*\s*(\(\d+\)|\d+)?$/;
+
+  let inCommanderSection = false;
+  let inSkippedSection = false;
+  let sawExplicitCommander = false;
+  let blockIndex = 0;
+  const blockStart: Record<number, number> = {};
+
+  for (const raw of rawLines) {
+    if (!raw) {
+      // A blank line ends a block; Moxfield separates the commander from the deck this way.
+      if (blockStart[blockIndex] !== undefined) blockIndex++;
+      inCommanderSection = false;
+      inSkippedSection = false;
+      continue;
+    }
+
+    const isComment = raw.startsWith('//') || raw.startsWith('#');
+    const headerBody = raw.replace(/^(\/\/|#)\s*/, '').trim();
+
+    if (/^commanders?\b[:\s]*$/i.test(headerBody)) {
+      inCommanderSection = true;
+      inSkippedSection = false;
+      continue;
+    }
+    if (SKIP_SECTION.test(headerBody)) {
+      inSkippedSection = true;
+      inCommanderSection = false;
+      continue;
+    }
+    // `Commander: Atraxa, Praetors' Voice` — name on the same line.
+    const inlineCommander = headerBody.match(/^commanders?\s*[:\-]\s*(.+)$/i);
+    if (inlineCommander) {
+      const nm = cleanCardName(inlineCommander[1]);
+      if (nm) {
+        commanderName = nm;
+        sawExplicitCommander = true;
+        if (blockStart[blockIndex] === undefined) blockStart[blockIndex] = cards.length;
+        cards.push({ cardName: nm, quantity: 1 });
+      }
+      continue;
+    }
+    if (isComment) continue;
+    if (inSkippedSection) continue;
+
+    const match = raw.match(/^(\d+)\s*x?\s+(.+)$/i);
+    let quantity = 1;
+    let body = raw;
+    if (match) {
+      quantity = parseInt(match[1], 10);
+      body = match[2];
+    } else if (CATEGORY_HEADER.test(raw) && raw.split(/\s+/).length <= 3) {
+      continue; // header like `Creatures (30)`, not a card
+    }
+
+    const isMarkedCommander =
+      /\*CMDR\*/i.test(body) || /\[[^\]]*commander[^\]]*\]/i.test(body);
+    const cardName = cleanCardName(body);
+    if (!cardName) continue;
+
+    if (blockStart[blockIndex] === undefined) blockStart[blockIndex] = cards.length;
+    cards.push({ cardName, quantity });
+
+    if ((inCommanderSection || isMarkedCommander) && !sawExplicitCommander) {
+      commanderName = cardName;
+      sawExplicitCommander = true;
+    }
+  }
+
+  // Moxfield/MTGGoldfish default: commander alone in the first block, then a blank line.
+  if (!commanderName && blockIndex > 0 && cards.length > 1 && blockStart[1] === 1 && cards[0].quantity === 1) {
+    commanderName = cards[0].cardName;
+  }
+
+  return { cards, commanderName };
+}
+
+/** Strip set codes, collector numbers, category brackets and commander markers from a card name. */
+function cleanCardName(input: string): string {
+  return input
+    .replace(/\*CMDR\*/gi, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/\([^)]*\)\s*\d*\s*$/g, '')
+    .replace(/\s+\d+\s*$/g, '')
+    .trim();
+}
+
 export const useDeckStore = create<DeckStore>((set, get) => ({
   decks: [],
   activeDeckId: null,
@@ -88,33 +201,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   setActiveDeck: (id) => set({ activeDeckId: id }),
 
   importDeckFromText: (text, name) => {
-    const lines = text
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith('//') && !l.startsWith('#'));
-
-    const cards: DeckEntry[] = [];
-    let commanderName = '';
-
-    for (const line of lines) {
-      // Handle "COMMANDER:" prefix
-      if (line.toLowerCase().startsWith('commander:')) {
-        commanderName = line.slice('commander:'.length).trim();
-        cards.push({ cardName: commanderName, quantity: 1 });
-        continue;
-      }
-
-      // Handle formats like "1 Sol Ring" or "1x Sol Ring"
-      const match = line.match(/^(\d+)x?\s+(.+)$/);
-      if (match) {
-        const quantity = parseInt(match[1], 10);
-        const cardName = match[2].trim();
-        cards.push({ cardName, quantity });
-      } else {
-        // Just a card name, assume quantity 1
-        cards.push({ cardName: line, quantity: 1 });
-      }
-    }
+    const { cards, commanderName } = parseDecklist(text);
 
     const totalCards = cards.reduce((s, c) => s + c.quantity, 0);
     const deck: Deck = {
