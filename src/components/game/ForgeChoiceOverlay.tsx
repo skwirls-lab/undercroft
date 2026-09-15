@@ -8,6 +8,8 @@ import { CardView } from './CardView';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import type { CardInstance } from '@/lib/gameTypes';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
+import type { PendingAbilitySelection } from '@/store/forgeGameStore';
+import type { GameAction } from '@/lib/gameTypes';
 
 // ============================================================
 // Interfaces for choice panel sub-components
@@ -46,7 +48,26 @@ interface CardOption {
 // ============================================================
 
 export function ForgeChoiceOverlay() {
-  const { pendingChoice, respondToChoice } = useForgeGameStore();
+  const { pendingChoice, respondToChoice, pendingAbilitySelection, setPendingAbilitySelection } =
+    useForgeGameStore();
+  const performAction = useGameStore((s) => s.performAction);
+
+  // A server prompt always outranks a local pick. Otherwise, if one card offered several
+  // legal plays, ask which mode before committing — previously the first was taken silently.
+  if (!pendingChoice && pendingAbilitySelection) {
+    return (
+      <div className="pointer-events-auto">
+        <AbilitySelectionPanel
+          selection={pendingAbilitySelection}
+          onPick={(action) => {
+            setPendingAbilitySelection(null);
+            performAction(action);
+          }}
+          onCancel={() => setPendingAbilitySelection(null)}
+        />
+      </div>
+    );
+  }
 
   if (!pendingChoice) return null;
 
@@ -722,6 +743,47 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
           Cancel Spell
         </Button>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// AbilitySelectionPanel — pick which mode of a card to play
+// Local only: the server sent one legalPlay per mode, all for the same card.
+// ============================================================
+
+function AbilitySelectionPanel({ selection, onPick, onCancel }: {
+  selection: PendingAbilitySelection;
+  onPick: (action: GameAction) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mb-3 rounded-xl border border-gold/40 bg-card/40" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+        How do you want to play {selection.cardName}?
+      </h3>
+      <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+        {selection.actions.map((action, i) => (
+          <Button
+            key={`${action.payload.forgeAbilityIndex ?? i}`}
+            onClick={() => onPick(action)}
+            className="rounded-lg border border-border/40 bg-card/60 text-left hover:border-gold/40 hover:bg-gold/10"
+            style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)', maxWidth: 'clamp(200px,32vmin,1000px)' }}
+          >
+            <span className="block truncate">
+              {(action.payload.forgeDescription as string) || action.type.replace(/_/g, ' ').toLowerCase()}
+            </span>
+          </Button>
+        ))}
+      </div>
+      <Button
+        variant="outline"
+        onClick={onCancel}
+        className="rounded-lg border bg-card/60 font-medium hover:border-border/40"
+        style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+      >
+        Cancel
+      </Button>
     </div>
   );
 }

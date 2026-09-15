@@ -98,6 +98,13 @@ async function enrichAndUpdateImages(adapted: GameState) {
   }
 }
 
+/** One card's competing legal plays, awaiting a local pick. */
+export interface PendingAbilitySelection {
+  cardInstanceId: string;
+  cardName: string;
+  actions: GameAction[];
+}
+
 // Re-use existing UI types where possible
 export interface ForgeGameStoreState {
   // Connection
@@ -111,12 +118,22 @@ export interface ForgeGameStoreState {
   isGameOver: boolean;
   winner: string | null;
 
+  /**
+   * Client-side disambiguation when one card has several legal plays (kicker, Adventure,
+   * MDFC, flashback, cycling, split cards, alternate costs). The server sends one legalPlay
+   * per mode, all sharing a cardInstanceId and differing only by forgeAbilityIndex; without
+   * this the click handlers took cardActions[0] and the other modes were unreachable.
+   * Purely local - it is resolved into a normal performAction, never sent to the server.
+   */
+  pendingAbilitySelection: PendingAbilitySelection | null;
+
   // Actions
   connect: (serverUrl: string) => Promise<void>;
   disconnect: () => void;
   startGame: (deckList: string[], commander?: string, playerName?: string, aiCount?: number, aiDecks?: Array<{ deckList: string[]; commander?: string }>) => void;
   respondToChoice: (requestId: string, payload: Record<string, unknown>) => void;
   concede: () => void;
+  setPendingAbilitySelection: (selection: PendingAbilitySelection | null) => void;
 
   // Helpers
   getHumanPlayer: () => ForgePlayer | null;
@@ -129,6 +146,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   client: null,
   gameState: null,
   pendingChoice: null,
+  pendingAbilitySelection: null,
   gameEvents: [],
   isGameOver: false,
   winner: null,
@@ -305,6 +323,8 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
             const payload: Record<string, unknown> = {
               cardInstanceId: instanceId,
               forgeAbilityIndex: play.index,
+              // Used to label each option when one card has several legal plays.
+              forgeDescription: play.description,
             };
             if (actionType === 'ACTIVATE_ABILITY') payload.ability = 'forge_activated';
             if (card?.zone === 'command') payload.fromZone = 'command';
@@ -338,7 +358,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
             actionTypes: actions.map(a => `${a.type}:${a.payload.cardInstanceId}`),
           });
           useGameStore.getState().setForgeLegalActions(actions, choice.requestId, respondFn);
-          set({ pendingChoice: null });
+          set({ pendingChoice: null, pendingAbilitySelection: null });
         } else {
           // Non-action choices: show overlay, clear forge legal actions
           console.log('[Forge] non-action choice received', {
@@ -348,7 +368,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
             data: choice.data,
           });
           useGameStore.getState().clearForgeLegalActions();
-          set({ pendingChoice: choice });
+          set({ pendingChoice: choice, pendingAbilitySelection: null });
         }
       },
 
@@ -413,6 +433,8 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       client.sendChoiceResponse(requestId, payload);
     }
   },
+
+  setPendingAbilitySelection: (selection) => set({ pendingAbilitySelection: selection }),
 
   concede: () => {
     const { client } = get();
