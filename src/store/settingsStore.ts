@@ -1,17 +1,21 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AIProviderConfig } from '@/ai/types';
+import { setSfxEnabled } from '@/lib/audio';
 
 interface SettingsStore {
   aiProvider: AIProviderConfig | null;
   cardDataLoaded: boolean;
   cardDataProgress: number;
   forgeServerUrl: string;
+  /** Procedural sound effects during play. */
+  sfxEnabled: boolean;
 
   setAIProvider: (config: AIProviderConfig | null) => void;
   setCardDataLoaded: (loaded: boolean) => void;
   setCardDataProgress: (progress: number) => void;
   setForgeServerUrl: (url: string) => void;
+  setSfxEnabled: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -21,11 +25,17 @@ export const useSettingsStore = create<SettingsStore>()(
       cardDataLoaded: false,
       cardDataProgress: 0,
       forgeServerUrl: 'ws://localhost:7000/game',
+      sfxEnabled: true,
 
       setAIProvider: (config) => set({ aiProvider: config }),
       setCardDataLoaded: (loaded) => set({ cardDataLoaded: loaded }),
       setCardDataProgress: (progress) => set({ cardDataProgress: progress }),
       setForgeServerUrl: (url) => set({ forgeServerUrl: url }),
+      setSfxEnabled: (enabled) => {
+        // Keep the audio module's module-level gate in step with the persisted setting.
+        setSfxEnabled(enabled);
+        set({ sfxEnabled: enabled });
+      },
     }),
     {
       name: 'undercroft-settings',
@@ -34,7 +44,13 @@ export const useSettingsStore = create<SettingsStore>()(
         aiProvider: state.aiProvider,
         cardDataLoaded: state.cardDataLoaded,
         forgeServerUrl: state.forgeServerUrl,
+        sfxEnabled: state.sfxEnabled,
       }),
+      // Persisted value must be pushed into the audio module after rehydration, or the
+      // in-memory gate stays at its default and ignores the user's choice.
+      onRehydrateStorage: () => (state) => {
+        if (state) setSfxEnabled(state.sfxEnabled);
+      },
     }
   )
 );

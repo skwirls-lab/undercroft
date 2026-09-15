@@ -10,6 +10,9 @@
 import { create } from 'zustand';
 import { debugLog } from '@/lib/debug';
 import {
+  sfxCastSpell, sfxPlayCard, sfxDamage, sfxLifeGain, sfxTurnStart, sfxGameOver,
+} from '@/lib/audio';
+import {
   ForgeGameClient,
   ForgeGameState,
   ForgeChoiceRequest,
@@ -136,6 +139,15 @@ export interface ForgeGameStoreState {
    */
   isAwaitingServer: boolean;
 
+  /** The last start_game arguments, kept so `rematch()` can replay the same matchup. */
+  lastStartPayload: {
+    deckList: string[];
+    commander?: string;
+    playerName?: string;
+    aiCount?: number;
+    aiDecks?: Array<{ deckList: string[]; commander?: string }>;
+  } | null;
+
   // Actions
   connect: (serverUrl: string) => Promise<void>;
   disconnect: () => void;
@@ -144,10 +156,57 @@ export interface ForgeGameStoreState {
   concede: () => void;
   setPendingAbilitySelection: (selection: PendingAbilitySelection | null) => void;
   setAwaitingServer: (awaiting: boolean) => void;
+  /**
+   * Replay the last start_game payload on the same connection.
+   * The server tears down the existing GameSession and starts fresh (ForgeServer
+   * .handleStartGame), so this is a genuine rematch with the same decks rather than a
+   * round trip back through deck selection.
+   */
+  rematch: () => void;
+  canRematch: () => boolean;
 
   // Helpers
   getHumanPlayer: () => ForgePlayer | null;
   getAIPlayer: () => ForgePlayer | null;
+}
+
+/**
+ * Map state-diff events onto sound effects.
+ *
+ * Deliberately sparse: a Commander board can produce a dozen events in one state push, and
+ * playing a sound for each turns a board wipe into noise. Only one sound per category per
+ * push, and only the categories a player actually wants feedback on.
+ */
+function playSfxForEvents(events: ForgeGameEvent[], isHumanTurn: boolean): void {
+  const played = { cast: false, play: false, damage: false, gain: false, turn: false, over: false };
+
+  for (const e of events) {
+    const type = (e as { eventType?: string }).eventType;
+    switch (type) {
+      case 'SPELL_CAST':
+        if (!played.cast) { sfxCastSpell(); played.cast = true; }
+        break;
+      case 'CARD_PLAYED':
+        if (!played.play) { sfxPlayCard(); played.play = true; }
+        break;
+      case 'CARD_DESTROYED':
+        if (!played.damage) { sfxDamage(); played.damage = true; }
+        break;
+      case 'LIFE_CHANGED': {
+        const delta = (e as { delta?: number }).delta ?? 0;
+        if (delta < 0 && !played.damage) { sfxDamage(); played.damage = true; }
+        else if (delta > 0 && !played.gain) { sfxLifeGain(); played.gain = true; }
+        break;
+      }
+      case 'TURN_STARTED':
+        // Only chime when it becomes the human's turn, not on every AI turn.
+        if (!played.turn && isHumanTurn) { sfxTurnStart(); played.turn = true; }
+        break;
+      case 'GAME_OVER':
+        if (!played.over) { sfxGameOver(); played.over = true; }
+        break;
+    }
+  }
 }
 
 export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
@@ -158,6 +217,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   pendingChoice: null,
   pendingAbilitySelection: null,
   isAwaitingServer: false,
+  lastStartPayload: null,
   gameEvents: [],
   isGameOver: false,
   winner: null,
@@ -257,6 +317,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         }
         if (syntheticEvents.length > 0) {
           set((prev) => ({ gameEvents: [...prev.gameEvents.slice(-190), ...syntheticEvents] }));
+          playSfxForEvents(syntheticEvents, humanId != null && state.turn.activePlayerId === humanId);
         }
 
         // Push adapted state into the main gameStore so existing UI components work
@@ -390,6 +451,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       },
 
       onGameOver: (payload) => {
+        sfxGameOver();
         set({
           isGameOver: true,
           winner: payload.winner,
@@ -430,14 +492,30 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       set({
         gameState: null,
         pendingChoice: null,
+        pendingAbilitySelection: null,
+        isAwaitingServer: false,
         gameEvents: [],
         isGameOver: false,
         winner: null,
+        // Remembered so a rematch can replay the exact same matchup.
+        lastStartPayload: { deckList, commander, playerName, aiCount, aiDecks },
       });
       // Put the main game store into forge mode so existing UI components render correctly
       useGameStore.getState().enterForgeMode();
       client.startGame(deckList, commander, playerName, aiCount, aiDecks);
     }
+  },
+
+  canRematch: () => {
+    const { client, lastStartPayload, connectionStatus } = get();
+    return !!client && !!lastStartPayload && connectionStatus === 'connected';
+  },
+
+  rematch: () => {
+    const { lastStartPayload } = get();
+    if (!lastStartPayload) return;
+    const { deckList, commander, playerName, aiCount, aiDecks } = lastStartPayload;
+    get().startGame(deckList, commander, playerName, aiCount, aiDecks);
   },
 
   respondToChoice: (requestId, payload) => {

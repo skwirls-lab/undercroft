@@ -50,6 +50,8 @@ export default function ForgeGamePage() {
     concede,
     setPendingAbilitySelection,
     isAwaitingServer,
+    rematch,
+    canRematch,
   } = useForgeGameStore();
 
   const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass } = useGameStore();
@@ -134,6 +136,36 @@ export default function ForgeGamePage() {
     if (action) performAction(action);
   }, [legalActions, performAction]);
 
+  /**
+   * Keyboard shortcuts. The game view had none at all, which makes desktop play needlessly
+   * mouse-bound. Deliberately minimal and non-destructive: nothing here can concede, mulligan
+   * or commit a choice.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Never hijack typing.
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === 'Escape') {
+        // Back out of the innermost thing that is open.
+        if (pendingExit) { setPendingExit(null); e.preventDefault(); }
+        else if (expandedPlayerId) { setExpandedPlayerId(null); e.preventDefault(); }
+        return;
+      }
+      // Space / Enter passes priority, but only when it is actually yours to pass and
+      // nothing is waiting on a decision.
+      if ((e.key === ' ' || e.key === 'Enter') && hasPriorityForActions && !isGameOver
+          && !pendingChoice && !isAwaitingServer && !pendingExit) {
+        e.preventDefault();
+        handlePassPriority();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expandedPlayerId, pendingExit, hasPriorityForActions, isGameOver, pendingChoice, isAwaitingServer, handlePassPriority]);
+
   // If not connected, redirect back to setup
   useEffect(() => {
     if (connectionStatus === 'disconnected' || connectionStatus === 'error') {
@@ -199,7 +231,20 @@ export default function ForgeGamePage() {
             <div className="shrink-0 mx-2 mt-1 rounded-xl border border-gold/30 bg-gold/10 text-center p-2">
               <h2 className="text-base font-bold text-gold">Game Over</h2>
               <p className="text-xs mt-0.5">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`}</p>
-              <Button size="sm" className="mt-1 h-7 text-xs" onClick={() => { disconnect(); router.push('/game'); }}>New Game</Button>
+              <div className="mt-1 flex items-center justify-center gap-2">
+                {/* Rematch replays the same decks on the same connection, instead of sending
+                    you back through deck selection for every single game. */}
+                {canRematch() && (
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs bg-gold text-gold-foreground hover:bg-gold/90"
+                    onClick={() => rematch()}
+                  >
+                    Rematch
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { disconnect(); router.push('/game'); }}>New Game</Button>
+              </div>
             </div>
           )}
           <GameBoard
@@ -225,7 +270,9 @@ export default function ForgeGamePage() {
                   <Hand
                     cards={handCards}
                     legalActions={handLegalActions}
-                    onPlayCard={(card) => { handleForgePlayCard(card); setExpandedPlayerId(null); }}
+                    // Deliberately does NOT close the overlay: you usually want to play
+                    // several things in a row while looking at your board.
+                    onPlayCard={handleForgePlayCard}
                     isActive={!!hasPriority && !isGameOver}
                     layout="grid"
                   />

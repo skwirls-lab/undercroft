@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useSettingsStore } from '@/store/settingsStore';
 import { CardDatabase } from '@/cards/CardDatabase';
-import { ArrowLeft, Bot, Database, Save, Check, Download, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bot, Database, Save, Check, Download, Loader2, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 
 export default function SettingsPage() {
@@ -16,7 +16,7 @@ export default function SettingsPage() {
 }
 
 function SettingsContent() {
-  const { aiProvider, setAIProvider, cardDataLoaded, cardDataProgress, setCardDataLoaded, setCardDataProgress } = useSettingsStore();
+  const { aiProvider, setAIProvider, cardDataLoaded, cardDataProgress, setCardDataLoaded, setCardDataProgress, sfxEnabled, setSfxEnabled } = useSettingsStore();
   const [provider, setProvider] = useState<'groq' | 'openai' | 'anthropic' | 'custom'>(aiProvider?.provider || 'groq');
   const [apiKey, setApiKey] = useState(aiProvider?.apiKey || '');
   const [model, setModel] = useState(aiProvider?.model || '');
@@ -103,6 +103,40 @@ function SettingsContent() {
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
+        {/* Sound */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {sfxEnabled ? <Volume2 className="h-5 w-5 text-gold" /> : <VolumeX className="h-5 w-5 text-gold" />}
+              Sound
+            </CardTitle>
+            <CardDescription>
+              Short procedural sound effects for casting, damage, life changes and turn starts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <button
+              onClick={() => setSfxEnabled(!sfxEnabled)}
+              role="switch"
+              aria-checked={sfxEnabled}
+              className="flex w-full items-center justify-between rounded-lg border border-border/50 px-4 py-3 text-left transition-colors hover:border-border"
+            >
+              <span className="text-sm font-medium">Sound effects</span>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  sfxEnabled ? 'bg-gold' : 'bg-muted'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
+                    sfxEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+            </button>
+          </CardContent>
+        </Card>
+
         {/* AI Provider */}
         <Card>
           <CardHeader>
