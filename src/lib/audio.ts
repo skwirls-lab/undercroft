@@ -7,6 +7,31 @@
 
 let audioCtx: AudioContext | null = null;
 
+/**
+ * Global SFX gate.
+ *
+ * Every sound in this module was previously unreachable: the only call sites lived in the
+ * local-engine branch of gameStore.performAction, which never runs now that the Forge bridge
+ * is the only engine. The sounds are now driven from forgeGameStore's state-diff events, so
+ * they need a user-facing off switch.
+ *
+ * Defaults to on; the real value is restored from persisted settings on mount.
+ */
+let sfxEnabled = true;
+let sfxVolume = 1;
+
+export function setSfxEnabled(enabled: boolean): void {
+  sfxEnabled = enabled;
+}
+
+export function setSfxVolume(volume: number): void {
+  sfxVolume = Math.max(0, Math.min(1, volume));
+}
+
+export function isSfxEnabled(): boolean {
+  return sfxEnabled;
+}
+
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!audioCtx) {
@@ -30,6 +55,8 @@ function playTone(
   volume = 0.15,
   rampDown = true
 ) {
+  if (!sfxEnabled || sfxVolume === 0) return;
+
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -37,7 +64,7 @@ function playTone(
   const gain = ctx.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  gain.gain.setValueAtTime(volume * sfxVolume, ctx.currentTime);
   if (rampDown) {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   }

@@ -4,6 +4,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { debugLog } from '@/lib/debug';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { CommanderDamage } from './CommanderDamage';
 import { PlayerField } from './PlayerField';
 import { Hand } from './Hand';
 import { CardView } from './CardView';
@@ -17,7 +18,7 @@ import { useForgeGameStore } from '@/store/forgeGameStore';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { getZoneCardCount } from '@/lib/ZoneManager';
 import type { CardInstance, GameAction, ManaColor } from '@/lib/gameTypes';
-import { ArrowRight, Flag, Loader2, FastForward, X, Heart, BookOpen, Skull, Ban, Crown, Swords, Sparkles, TreePine, ChevronRight } from 'lucide-react';
+import { ArrowRight, Flag, Loader2, FastForward, X, Heart, BookOpen, Skull, Ban, Crown, Swords, Sparkles, TreePine, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface GameBoardProps {
   currentPlayerId: string;
@@ -452,6 +453,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                   <StatIcon icon={TreePine} count={landCount} label="Lnd" />
                   <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
                 </div>
+                {/* Commander damage dealt TO this opponent — 21 from one commander is lethal. */}
+                <CommanderDamage damage={opp.commanderDamageReceived} compact />
               </button>
             );
           })}
@@ -508,6 +511,8 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
                     <StatIcon icon={TreePine} count={myLands} label="Lnd" size="lg" />
                     <ChevronRight className="ml-auto shrink-0 text-muted-foreground/20" style={{ width: 'clamp(14px,3.5vmin,1000px)', height: 'clamp(14px,3.5vmin,1000px)' }} />
                   </div>
+                  {/* Commander damage taken — shown in full here since it decides your blocks. */}
+                  <CommanderDamage damage={currentPlayer.commanderDamageReceived} />
                 </>
               );
             })()}
@@ -516,7 +521,11 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
       </div>{/* end STAT BOXES */}
 
       {/* ─── INLINE OVERLAYS: stack, targeting, mana, combat, mulligan ─── */}
-      <div className="shrink-0 z-20 flex flex-col gap-1 px-[clamp(6px,1.5vmin,20px)]">
+      <div className={cn(
+        'shrink-0 flex flex-col gap-1 px-[clamp(6px,1.5vmin,20px)]',
+        // Above the expanded-board overlay (z-40) so the stack stays visible while browsing.
+        expandedPlayerId ? 'relative z-50' : 'z-20'
+      )}>
         {/* Mulligan overlay is rendered as a full-screen modal below */}
         <AnimatePresence>
           {gameState.stack.length > 0 && <StackDisplay stack={gameState.stack} />}
@@ -643,13 +652,44 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-40 flex flex-col bg-background/95 backdrop-blur-md"
+              className="absolute inset-0 z-40 flex flex-col rounded-xl bg-background/95 backdrop-blur-md"
             >
               {/* Overlay header */}
               <div className="flex items-center justify-between border-b border-border/30 shrink-0" style={{ padding: 'clamp(6px,1vmin,1000px) clamp(10px,2vmin,1000px)' }}>
-                <div className="flex items-center" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                  <span className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>{ep.name}</span>
-                  <span className="text-red-400 flex items-center" style={{ fontSize: 'clamp(11px,2vmin,1000px)', gap: 'clamp(3px,0.5vmin,1000px)' }}><Heart style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} /> {ep.life}</span>
+                <div className="flex items-center min-w-0" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+                  {/* Step between players without closing — comparing boards previously meant
+                      closing this overlay and reopening a different one. */}
+                  {gameState.players.length > 1 && (
+                    <button
+                      onClick={() => {
+                        const ids = gameState.players.map((p) => p.id);
+                        const i = ids.indexOf(expandedPlayerId);
+                        setExpandedPlayerId(ids[(i - 1 + ids.length) % ids.length]);
+                      }}
+                      aria-label="Previous player's board"
+                      className="rounded-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground shrink-0"
+                      style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}
+                    >
+                      <ChevronLeft style={{ width: 'clamp(16px,2.6vmin,1000px)', height: 'clamp(16px,2.6vmin,1000px)' }} />
+                    </button>
+                  )}
+                  <span className="font-semibold truncate" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>{ep.name}</span>
+                  <span className="text-red-400 flex items-center shrink-0" style={{ fontSize: 'clamp(11px,2vmin,1000px)', gap: 'clamp(3px,0.5vmin,1000px)' }}><Heart style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} /> {ep.life}</span>
+                  <CommanderDamage damage={ep.commanderDamageReceived} compact className="shrink-0" />
+                  {gameState.players.length > 1 && (
+                    <button
+                      onClick={() => {
+                        const ids = gameState.players.map((p) => p.id);
+                        const i = ids.indexOf(expandedPlayerId);
+                        setExpandedPlayerId(ids[(i + 1) % ids.length]);
+                      }}
+                      aria-label="Next player's board"
+                      className="rounded-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground shrink-0"
+                      style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}
+                    >
+                      <ChevronRight style={{ width: 'clamp(16px,2.6vmin,1000px)', height: 'clamp(16px,2.6vmin,1000px)' }} />
+                    </button>
+                  )}
                 </div>
                 <button onClick={() => setExpandedPlayerId(null)} className="rounded-lg bg-muted/30 text-muted-foreground hover:bg-muted/50" style={{ padding: 'clamp(4px,0.8vmin,1000px)' }}>
                   <X style={{ width: 'clamp(18px,3vmin,1000px)', height: 'clamp(18px,3vmin,1000px)' }} />

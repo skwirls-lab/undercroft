@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Spectral } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -36,6 +36,30 @@ const spectral = Spectral({
 export const metadata: Metadata = {
   title: "Undercroft — MTG Commander",
   description: "Play Magic: The Gathering Commander against AI opponents in your browser.",
+  applicationName: "Undercroft",
+  // Without these, sharing the link in a group chat or Discord renders as a bare URL.
+  openGraph: {
+    type: "website",
+    siteName: "Undercroft",
+    title: "Undercroft — Commander, Reimagined",
+    description:
+      "Play Magic: The Gathering Commander against AI opponents — right in your browser. Full rules engine, real cards, no downloads.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Undercroft — Commander, Reimagined",
+    description:
+      "Play Magic: The Gathering Commander against AI opponents — right in your browser.",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0d14",
+  width: "device-width",
+  initialScale: 1,
+  // The game view is full-bleed and uses 100dvh; cover lets it reach into the safe areas
+  // instead of leaving letterbox bars on notched phones.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
