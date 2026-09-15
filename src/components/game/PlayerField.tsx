@@ -169,7 +169,7 @@ export function PlayerField({
       className={cn(
         'relative rounded-2xl border transition-all overflow-hidden flex flex-col',
         isActivePlayer 
-          ? 'border-gold/40 bg-gold/[0.03] shadow-[0_0_20px_rgba(212,169,68,0.08)] ring-1 ring-gold/20' 
+          ? 'border-gold/40 bg-gold/[0.03] shadow-[0_0_20px_var(--gold-glow-soft)] ring-1 ring-gold/20' 
           : isCurrentUser
             ? 'border-border/40 bg-card/50 shadow-lg'
             : 'border-border/20 bg-card/20',
@@ -199,7 +199,7 @@ export function PlayerField({
       <div
         className={cn(
           'relative flex items-center justify-between',
-          validTargetIds?.has(player.id) && 'cursor-crosshair rounded-xl ring-2 ring-cyan-500/60 bg-cyan-950/20 -mx-1 -my-1'
+          validTargetIds?.has(player.id) && 'cursor-crosshair rounded-xl affordance-target bg-cyan-950/20 -mx-1 -my-1'
         )}
         style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)', padding: validTargetIds?.has(player.id) ? 'clamp(6px,1vmin,1000px) clamp(8px,1.5vmin,1000px)' : undefined }}
         onClick={() => validTargetIds?.has(player.id) && onSelectTarget?.(player.id)}
@@ -304,7 +304,7 @@ export function PlayerField({
                     highlighted={canCast}
                     interactive
                     className={cn(
-                      canCast && 'ring-2 ring-green-500/60 card-glow-strong'
+                      canCast && 'affordance-actionable card-glow-strong'
                     )}
                   />
                 </div>
@@ -389,8 +389,8 @@ export function PlayerField({
                       highlighted={isTarget || canActivate}
                       interactive
                       className={cn(
-                        isTarget && 'ring-2 ring-cyan-500/60 cursor-crosshair',
-                        canActivate && !isTarget && 'ring-2 ring-emerald-500/60 cursor-pointer'
+                        isTarget && 'affordance-target cursor-crosshair',
+                        canActivate && !isTarget && 'affordance-actionable cursor-pointer'
                       )}
                     />
                   </motion.div>
@@ -434,9 +434,9 @@ export function PlayerField({
                       highlighted={isTarget || canEquip || canActivate}
                       interactive
                       className={cn(
-                        isTarget && 'ring-2 ring-cyan-500/60 cursor-crosshair',
-                        canEquip && !isTarget && 'ring-2 ring-amber-500/60 cursor-pointer',
-                        canActivate && !isTarget && !canEquip && 'ring-2 ring-emerald-500/60 cursor-pointer'
+                        isTarget && 'affordance-target cursor-crosshair',
+                        canEquip && !isTarget && 'affordance-actionable cursor-pointer',
+                        canActivate && !isTarget && !canEquip && 'affordance-actionable cursor-pointer'
                       )}
                     />
                   </motion.div>
@@ -492,10 +492,10 @@ export function PlayerField({
                         highlighted={isManaPaymentSource || canTap || canActivate || hasPendingChoice}
                         interactive
                         className={cn(
-                          isManaPaymentSource && 'ring-2 ring-emerald-400/70 shadow-[0_0_8px_rgba(16,185,129,0.3)]',
-                          !isManaPaymentSource && canActivate && !canTap && 'ring-2 ring-emerald-500/60',
-                          !isManaPaymentSource && canUntap && !canTap && !canActivate && 'ring-1 ring-amber-500/50',
-                          hasPendingChoice && 'ring-2 ring-primary'
+                          isManaPaymentSource && 'affordance-actionable',
+                          !isManaPaymentSource && canActivate && !canTap && 'affordance-actionable',
+                          !isManaPaymentSource && canUntap && !canTap && !canActivate && 'affordance-latent',
+                          hasPendingChoice && 'affordance-selected'
                         )}
                       />
                     </div>
@@ -769,7 +769,7 @@ function MobileBattlefield({
                         highlighted={canCast}
                         interactive
                         className={cn(
-                          canCast && 'ring-2 ring-green-500/60'
+                          canCast && 'affordance-actionable'
                         )}
                       />
                     </div>
@@ -793,8 +793,8 @@ function MobileBattlefield({
                         highlighted={isTarget || canActivate}
                         interactive
                         className={cn(
-                          isTarget && 'ring-2 ring-cyan-500/60',
-                          canActivate && !isTarget && 'ring-2 ring-emerald-500/60'
+                          isTarget && 'affordance-target',
+                          canActivate && !isTarget && 'affordance-actionable'
                         )}
                       />
                     </div>
@@ -819,9 +819,9 @@ function MobileBattlefield({
                         highlighted={isTarget || canEquip || canActivate}
                         interactive
                         className={cn(
-                          isTarget && 'ring-2 ring-cyan-500/60',
-                          canEquip && !isTarget && 'ring-2 ring-amber-500/60',
-                          canActivate && !isTarget && !canEquip && 'ring-2 ring-emerald-500/60'
+                          isTarget && 'affordance-target',
+                          canEquip && !isTarget && 'affordance-actionable',
+                          canActivate && !isTarget && !canEquip && 'affordance-actionable'
                         )}
                       />
                     </div>
@@ -855,10 +855,10 @@ function MobileBattlefield({
                           highlighted={isManaPaymentSource || canTap || canActivate || hasPendingChoice}
                           interactive
                           className={cn(
-                            isManaPaymentSource && 'ring-2 ring-emerald-400/70',
-                            !isManaPaymentSource && canActivate && !canTap && 'ring-2 ring-emerald-500/60',
-                            !isManaPaymentSource && canUntap && !canTap && !canActivate && 'ring-1 ring-amber-500/50',
-                            hasPendingChoice && 'ring-2 ring-primary'
+                            isManaPaymentSource && 'affordance-actionable',
+                            !isManaPaymentSource && canActivate && !canTap && 'affordance-actionable',
+                            !isManaPaymentSource && canUntap && !canTap && !canActivate && 'affordance-latent',
+                            hasPendingChoice && 'affordance-selected'
                           )}
                         />
                       </div>

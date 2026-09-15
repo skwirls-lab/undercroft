@@ -7,8 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-spectral), ui-serif, Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -78,6 +79,12 @@
   --gold: oklch(0.80 0.12 75);
   --gold-foreground: oklch(0.15 0.02 75);
   --gold-muted: oklch(0.60 0.10 75);
+  /* Glow shadows, derived from --gold rather than the hardcoded rgba(212,169,68,…) that was
+     scattered across five components as a fourth, slightly different gold. */
+  --gold-glow: oklch(0.80 0.12 75 / 0.25);
+  --gold-glow-soft: oklch(0.80 0.12 75 / 0.12);
+  --gold-glow-strong: oklch(0.80 0.12 75 / 0.5);
+  --gold-glow-tight: oklch(0.80 0.12 75 / 0.15);
   --chart-1: oklch(0.70 0.15 280);
   --chart-2: oklch(0.60 0.18 45);
   --chart-3: oklch(0.55 0.12 250);
@@ -108,22 +115,77 @@
 }
 
 @layer utilities {
+  /*
+   * These previously redefined .text-gold / .bg-gold / .border-gold at oklch(0.78 0.14 75),
+   * while Tailwind generated the same classes from --gold at oklch(0.80 0.12 75). The result
+   * was that `text-gold` and `text-gold/80` were literally different hues, and which one won
+   * depended on cascade order. The bare classes now come from the token alone; only the glow
+   * helpers live here, and they reference the token too.
+   */
   .card-glow {
-    box-shadow: 0 0 12px oklch(0.78 0.14 75 / 0.3);
+    box-shadow: 0 0 12px var(--gold-glow-soft);
   }
   .card-glow-strong {
-    box-shadow: 0 0 20px oklch(0.78 0.14 75 / 0.5);
-  }
-  .text-gold {
-    color: oklch(0.78 0.14 75);
-  }
-  .bg-gold {
-    background-color: oklch(0.78 0.14 75);
-  }
-  .border-gold {
-    border-color: oklch(0.78 0.14 75);
+    box-shadow: 0 0 20px var(--gold-glow-strong);
   }
   .glow-gold {
-    box-shadow: 0 0 16px oklch(0.78 0.14 75 / 0.25), 0 0 4px oklch(0.78 0.14 75 / 0.15);
+    box-shadow: 0 0 16px var(--gold-glow), 0 0 4px var(--gold-glow-tight);
+  }
+
+  /* ── Interaction language ──────────────────────────────────────────────────
+   * Three affordance states, one colour each.
+   *
+   * Nine different ring colours previously meant some flavour of "you can act
+   * here" — green (playable), green-500 (castable commander), emerald-500
+   * (activatable), emerald-400 (tappable for mana), amber-500 (equippable),
+   * sky (selected but unplayable), gold (selected in a panel) and violet
+   * (picker open) — with amber also doing double duty at two ring widths.
+   * Players cannot learn that. Gold now means one thing: you can act on this.
+   *
+   * Combat state stays separate on purpose: attacking/blocking reports what IS
+   * happening, not what you may do, so it keeps its own red/blue.
+   */
+  .affordance-actionable {
+    @apply ring-2 ring-gold/60;
+  }
+  .affordance-selected {
+    @apply ring-2 ring-gold;
+    box-shadow: 0 0 20px var(--gold-glow);
+  }
+  .affordance-target {
+    @apply ring-2 ring-cyan-400/70;
+  }
+  /* A latent, lower-priority affordance (e.g. a tapped land you could untap).
+     Deliberately neutral so it never competes with the gold "act here" signal. */
+  .affordance-latent {
+    @apply ring-1 ring-muted-foreground/30;
+  }
+
+  /* ── Prompt panels ─────────────────────────────────────────────────────────
+   * The 15 choice panels previously used six different accent treatments with
+   * no rule — gold/30, gold/40, border/30, amber/30, red/30, emerald/40 — so
+   * the same kind of decision looked different depending on which panel drew
+   * it, and amber acted as an uncoordinated second gold.
+   *
+   * Four accents now, each meaning one thing:
+   *   default  a routine choice
+   *   action   the prompt wants a positive commitment from you
+   *   combat   an attack/block/damage decision (red is the MTG convention)
+   *   error    the client has no UI for this prompt — a bug, not a game state
+   */
+  .prompt-panel {
+    @apply rounded-xl border;
+  }
+  .prompt-default {
+    @apply border-border/30 bg-card/40;
+  }
+  .prompt-action {
+    @apply border-gold/40 bg-gold/[0.06];
+  }
+  .prompt-combat {
+    @apply border-red-500/40 bg-red-500/[0.07];
+  }
+  .prompt-error {
+    @apply border-2 border-red-500 bg-red-500/15;
   }
 }
