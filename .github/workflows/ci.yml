@@ -1,0 +1,49 @@
+name: CI
+
+# Neither repo had any CI, which is how a server that stopped compiling went unnoticed for
+# two months. These are the checks a contributor would run locally.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Non-blocking for now: the repo carries 20 pre-existing eslint errors (mostly `any` in
+      # the admin pages and unused imports). Making CI red on day one would train everyone to
+      # ignore it. Drop continue-on-error once that backlog is cleared.
+      - name: Lint
+        run: npx eslint src
+        continue-on-error: true
+
+      # Diffs the server's requestChoice prompt types and response keys against the client's
+      # renderers. Catches the silent-default bug class: a prompt the client answers with a
+      # key the server does not read resolves as an engine default instead of your choice.
+      - name: Protocol conformance
+        run: npm run check:protocol
+
+      - name: Decklist parser tests
+        run: npm run test:parser
+
+      - name: Card sync tests
+        run: npm run test:sync
+
+      - name: Build
+        run: npx next build

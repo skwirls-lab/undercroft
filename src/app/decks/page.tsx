@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,11 +13,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useDeckStore, type DeckEntry } from '@/store/deckStore';
-import { useSettingsStore } from '@/store/settingsStore';
 import { useAuth } from '@/lib/firebase/auth';
-import { CardDatabase } from '@/cards/CardDatabase';
 import {
-  ArrowLeft,
+
   Plus,
   Trash2,
   Upload,
@@ -38,7 +35,6 @@ export default function DecksPage() {
 
 function DecksContent() {
   const { decks, removeDeck, importDeckFromText, updateDeck, isSyncing, syncedUserId, syncFailed, loadFromFirestore } = useDeckStore();
-  const { cardDataLoaded } = useSettingsStore();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [importOpen, setImportOpen] = useState(false);
   const [deckName, setDeckName] = useState('');
@@ -128,7 +124,7 @@ function DecksContent() {
       setImporting(false);
       setImportStep('');
     }
-  }, [deckName, deckText, cardDataLoaded, importDeckFromText, updateDeck]);
+  }, [deckName, deckText, importDeckFromText, updateDeck]);
 
   const handleResolve = useCallback(async (deckId: string) => {
     const deck = decks.find((d) => d.id === deckId);
@@ -166,16 +162,8 @@ function DecksContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-border/50 px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-          <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">My Decks</h1>
-        </div>
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 pb-2 pt-6">
+        <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">My Decks</h1>
 
         <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>
           <DialogTrigger
@@ -194,20 +182,6 @@ function DecksContent() {
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4">
-              {!cardDataLoaded && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-400">
-                  <p className="font-medium">Card database not loaded</p>
-                  <p className="mt-1 text-xs text-amber-400/70">
-                    Import will save card names, but can&apos;t verify them until you load
-                    the card database in{' '}
-                    <Link href="/settings" className="underline">
-                      Settings
-                    </Link>
-                    .
-                  </p>
-                </div>
-              )}
-
               {importResult ? (
                 // Show import results
                 <div className="flex flex-col gap-3">
@@ -413,7 +387,7 @@ function DecksContent() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      {cardDataLoaded && !hasResolution && (
+                      {!hasResolution && (
                         <Button
                           variant="ghost"
                           size="sm"

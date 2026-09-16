@@ -14,7 +14,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { getFirebaseDb } from './config';
-import type { ScryfallCardRecord } from '@/lib/db';
+import type { ScryfallCardRecord } from '@/lib/cardTypes';
 
 /**
  * Get a card by its Scryfall ID

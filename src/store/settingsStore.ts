@@ -1,62 +1,69 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AIProviderConfig } from '@/ai/types';
-import { setSfxEnabled } from '@/lib/audio';
+import { setSfxEnabled, setSfxVolume } from '@/lib/audio';
 
 interface SettingsStore {
-  aiProvider: AIProviderConfig | null;
-  cardDataLoaded: boolean;
-  cardDataProgress: number;
-  forgeServerUrl: string;
   /** Procedural sound effects during play. */
   sfxEnabled: boolean;
+  /** Effect volume, 0-1. */
+  sfxVolume: number;
+  /** Skip entrance/transition animations. Mirrors prefers-reduced-motion when the OS sets it. */
+  reduceMotion: boolean;
 
-  setAIProvider: (config: AIProviderConfig | null) => void;
-  setCardDataLoaded: (loaded: boolean) => void;
-  setCardDataProgress: (progress: number) => void;
-  setForgeServerUrl: (url: string) => void;
   setSfxEnabled: (enabled: boolean) => void;
+  setSfxVolume: (volume: number) => void;
+  setReduceMotion: (reduce: boolean) => void;
+
   /**
-   * Drop settings that belong to the signed-in person rather than to this device.
-   * Called on sign-out and on an account switch so one tester's LLM API key is never
-   * handed to the next person to use the browser.
+   * Reset the preferences that belong to a person rather than to this device.
+   * Called on sign-out and on an account switch so one tester's choices do not silently
+   * become the next person's on a shared browser.
    */
   clearUserSettings: () => void;
 }
 
+const DEFAULTS = {
+  sfxEnabled: true,
+  sfxVolume: 0.7,
+  reduceMotion: false,
+};
+
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      aiProvider: null,
-      cardDataLoaded: false,
-      cardDataProgress: 0,
-      forgeServerUrl: 'ws://localhost:7000/game',
-      sfxEnabled: true,
+      ...DEFAULTS,
 
-      setAIProvider: (config) => set({ aiProvider: config }),
-      setCardDataLoaded: (loaded) => set({ cardDataLoaded: loaded }),
-      setCardDataProgress: (progress) => set({ cardDataProgress: progress }),
-      setForgeServerUrl: (url) => set({ forgeServerUrl: url }),
       setSfxEnabled: (enabled) => {
         // Keep the audio module's module-level gate in step with the persisted setting.
         setSfxEnabled(enabled);
         set({ sfxEnabled: enabled });
       },
-      clearUserSettings: () => set({ aiProvider: null }),
+      setSfxVolume: (volume) => {
+        setSfxVolume(volume);
+        set({ sfxVolume: volume });
+      },
+      setReduceMotion: (reduce) => set({ reduceMotion: reduce }),
+
+      clearUserSettings: () => {
+        setSfxEnabled(DEFAULTS.sfxEnabled);
+        setSfxVolume(DEFAULTS.sfxVolume);
+        set({ ...DEFAULTS });
+      },
     }),
     {
       name: 'undercroft-settings',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        aiProvider: state.aiProvider,
-        cardDataLoaded: state.cardDataLoaded,
-        forgeServerUrl: state.forgeServerUrl,
         sfxEnabled: state.sfxEnabled,
+        sfxVolume: state.sfxVolume,
+        reduceMotion: state.reduceMotion,
       }),
-      // Persisted value must be pushed into the audio module after rehydration, or the
-      // in-memory gate stays at its default and ignores the user's choice.
+      // Persisted values must be pushed into the audio module after rehydration, or the
+      // in-memory gates stay at their defaults and ignore the user's choices.
       onRehydrateStorage: () => (state) => {
-        if (state) setSfxEnabled(state.sfxEnabled);
+        if (!state) return;
+        setSfxEnabled(state.sfxEnabled);
+        setSfxVolume(state.sfxVolume);
       },
     }
   )

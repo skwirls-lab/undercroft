@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { useForgeGameStore } from '@/store/forgeGameStore';
-import type { GameState, GameAction, GameEvent, CardData } from '@/lib/gameTypes';
-import { AIPlayerController } from '@/ai/AIPlayerController';
-import type { AIPlayerConfig } from '@/ai/types';
+import type { GameState, GameAction, GameEvent } from '@/lib/gameTypes';
 import {
   sfxTapLand, sfxCastSpell, sfxPlayCard, sfxDamage,
   sfxLifeGain, sfxTurnStart, sfxGameOver, sfxPassPriority
@@ -13,7 +11,6 @@ interface GameStore {
   legalActions: GameAction[];
   events: GameEvent[];
   isProcessing: boolean;
-  aiControllers: Map<string, AIPlayerController>;
   autoPassUntilNextTurn: boolean;
   lockedTappedIds: Set<string>;
 
@@ -22,13 +19,7 @@ interface GameStore {
   forgePendingRequestId: string | null;
   forgeRespondFn: ((requestId: string, payload: Record<string, unknown>) => void) | null;
 
-  initGame: (
-    players: Array<{ id: string; name: string; isAI: boolean }>,
-    decks: Map<string, CardData[]>,
-    aiConfigs?: AIPlayerConfig[]
-  ) => void;
   performAction: (action: GameAction) => void;
-  processAITurn: () => Promise<void>;
   resetGame: () => void;
   setAutoPass: (enabled: boolean) => void;
 
@@ -62,7 +53,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       legalActions: [],
       events: [],
       isProcessing: false,
-      aiControllers: new Map(),
       autoPassUntilNextTurn: false,
       lockedTappedIds: new Set(),
       forgePendingRequestId: null,
@@ -76,22 +66,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       events: events ?? get().events,
       // Don't clear legalActions here — they're managed by setForgeLegalActions
       isProcessing: false,
-    });
-  },
-
-  initGame: (players, decks, aiConfigs) => {
-    const aiControllers = new Map<string, AIPlayerController>();
-    if (aiConfigs) {
-      for (const config of aiConfigs) {
-        aiControllers.set(config.playerId, new AIPlayerController(config));
-      }
-    }
-
-    set({
-      gameState: null, // Will be set by forgeGameStore or engine
-      legalActions: [],
-      events: [],
-      aiControllers,
     });
   },
 
@@ -194,76 +168,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  processAITurn: async () => {
-    const { gameState, aiControllers, forgeMode } = get();
-    
-    if (forgeMode) return; // Server handles AI turns
-    
-    if (!gameState || gameState.isGameOver) return;
-
-    // Handle pending choices for AI players first
-    if (gameState.pendingChoice) {
-      const choicePlayer = gameState.players.find(p => p.id === gameState.pendingChoice!.playerId);
-      if (choicePlayer?.isAI) {
-        set({ isProcessing: true });
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        const pending = gameState.pendingChoice;
-        let payload: Record<string, unknown> = {};
-        if (pending.type === 'confirm_ability') {
-          payload = { confirmed: true };
-        } else {
-          // AI auto-picks the first matching card for search
-          const chosenCardIds = pending.cardInstanceIds && pending.cardInstanceIds.length > 0
-            ? [pending.cardInstanceIds[0]]
-            : [];
-          payload = { chosenCardIds };
-        }
-        
-        // In local engine mode, process through GameEngine
-        // For now, just resolve the choice and update state
-        console.log('[AI] Resolving choice for AI player:', pending.playerId);
-        
-        set({
-          isProcessing: false,
-        });
-        return;
-      }
-      return; // Human player has pending choice — don't process AI turn
-    }
-
-    const currentPlayerId = gameState.priority.playerWithPriority;
-    const currentPlayer = gameState.players.find((p) => p.id === currentPlayerId);
-    if (!currentPlayer?.isAI) return;
-
-    const controller = aiControllers.get(currentPlayerId);
-    if (!controller) return;
-
-    set({ isProcessing: true });
-
-    try {
-      // Get legal actions for AI player
-      const legalActions = get().legalActions.filter(a => a.playerId === currentPlayerId);
-      
-      const decision = await controller.makeDecision(gameState, legalActions);
-
-      // Small delay to make AI actions visible
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      console.log('[AI] AI decision made:', (decision.action?.type ?? 'unknown'));
-    } catch (error) {
-      console.error('AI turn error:', error);
-    } finally {
-      set({ isProcessing: false });
-    }
-  },
-
   resetGame: () => {
     set({
       gameState: null,
       legalActions: [],
       events: [],
       isProcessing: false,
-      aiControllers: new Map(),
       autoPassUntilNextTurn: false,
       lockedTappedIds: new Set(),
       forgeMode: false,
