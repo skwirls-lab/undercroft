@@ -34,6 +34,8 @@ interface DeckStore {
   activeDeckId: string | null;
   syncedUserId: string | null;
   isSyncing: boolean;
+  /** True when the last Firestore load failed — the deck list on screen is not authoritative. */
+  syncFailed: boolean;
 
   addDeck: (deck: Deck) => void;
   removeDeck: (id: string) => void;
@@ -164,6 +166,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   decks: [],
   activeDeckId: null,
   syncedUserId: null,
+  syncFailed: false,
   isSyncing: false,
 
   addDeck: (deck) => {
@@ -224,13 +227,27 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   // ─── Firestore Sync ─────────────────────────────────
 
   loadFromFirestore: async (uid) => {
-    set({ isSyncing: true });
+    // Drop whatever is in memory before loading a different account's decks. Without this a
+    // direct account switch (signInWithPopup while already signed in never emits a null user,
+    // so clearSync does not run) could leave the previous user's decks on screen.
+    const { syncedUserId: previousUid } = get();
+    if (previousUid && previousUid !== uid) {
+      set({ decks: [], activeDeckId: null });
+    }
+
+    set({ isSyncing: true, syncedUserId: uid, syncFailed: false });
     try {
       const decks = await loadDecks(uid);
-      set({ decks, syncedUserId: uid, isSyncing: false });
+      // A fast A -> B switch can let A's request resolve after B's. Applying it would show B
+      // another user's decks, and any later edit would write them into B's account.
+      if (get().syncedUserId !== uid) return;
+      set({ decks, isSyncing: false, syncFailed: false });
     } catch (error) {
       console.error('Failed to load decks from Firestore:', error);
-      set({ syncedUserId: uid, isSyncing: false });
+      if (get().syncedUserId !== uid) return;
+      // Never fall back to stale data on failure — an empty list is wrong but safe, whereas
+      // the previous account's decks are wrong AND get written to this account on any edit.
+      set({ decks: [], activeDeckId: null, isSyncing: false, syncFailed: true });
     }
   },
 
@@ -245,6 +262,6 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   },
 
   clearSync: () => {
-    set({ syncedUserId: null, decks: [], activeDeckId: null });
+    set({ syncedUserId: null, decks: [], activeDeckId: null, syncFailed: false });
   },
 }));

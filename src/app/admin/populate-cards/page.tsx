@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { AdminGuard } from '@/components/AdminGuard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Database, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export default function PopulateCardsPage() {
+function PopulateCardsPage() {
   const [status, setStatus] = useState<string>('');
   const [progress, setProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -226,5 +227,13 @@ export default function PopulateCardsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function GuardedPopulateCardsPage() {
+  return (
+    <AdminGuard>
+      <PopulateCardsPage />
+    </AdminGuard>
   );
 }
