@@ -355,7 +355,7 @@ function normalizeCounters(raw?: Record<string, number>): Record<string, number>
 /**
  * Convert a ForgeCard to our CardData format.
  * This creates a synthetic CardData without Scryfall images.
- * Images can be looked up later via the CardDatabase by name.
+ * Images are resolved later from the Firestore card collection by name.
  */
 function forgeCardToCardData(fc: ForgeCard): CardData {
   // Parse mana cost string to extract colors

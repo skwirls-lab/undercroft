@@ -62,7 +62,9 @@ writes with no sign-in at all, and that any page on the internet could trigger w
 `<img src="https://yoursite/api/admin/populate-cards">`. Deleting it does not change what the
 admin pages do.
 
-To keep using those pages, add yourself as an admin **once, permanently**:
+The scheduled sync below now does the routine refresh, so these pages are the manual
+fallback — for pulling one missing card, checking a count, or forcing a rebuild. To use them,
+add yourself as an admin **once, permanently**:
 
 1. Get your Firebase UID: `Firebase Console → Authentication → Users`.
 2. Put it in `isAdmin()` in `firestore.rules` and deploy the rules.
@@ -81,18 +83,54 @@ Two separate card databases back this app, and a new set needs both:
   scripts. This is what makes a card actually *do* anything during a game.
 
 Import a brand-new set's card into a deck with only Firestore updated and it resolves, shows
-art, and then fails to be playable, because the Forge engine has no script for it. Updating
-Forge's data means pulling newer `forge-res` from upstream Forge and redeploying Railway —
-worth doing in the same sitting as a Scryfall refresh.
+art, and then fails to be playable, because the Forge engine has no script for it. Both are
+now on schedules of their own — see below.
 
-### On automating it
+### Both halves are automated now
 
-Worth being straight about the trade: a scheduled refresh needs a Vercel Cron hitting a route
-that authenticates as a service account (`firebase-admin` plus a private key in the
-environment) — precisely the kind of unattended, credentialed, 90k-write endpoint that the
-deleted route was a broken version of. Given that sets release roughly six times a year and
-the Forge half has to be done by hand anyway, clicking the page when a set drops is the better
-deal. Revisit it if the manual step ever becomes the thing standing between you and playing.
+Two scheduled GitHub Actions, and neither one needs you to remember anything.
+
+**Scryfall -> Firestore** (`.github/workflows/sync-cards.yml`, Tuesdays). Runs
+`scripts/sync-cards.mjs` as a Firebase service account. It fingerprints each card and writes
+only what changed, so a run after a set release costs a few thousand writes rather than
+ninety thousand. It is a scheduled job rather than a web endpoint on purpose — that is the
+whole difference from the `/api/admin/populate-cards` route that was deleted. There is no
+public surface to trigger.
+
+One-time setup:
+
+1. `Firebase Console -> Project settings -> Service accounts -> Generate new private key`.
+2. Paste the entire JSON file into a GitHub repository secret named
+   `FIREBASE_SERVICE_ACCOUNT`.
+
+A service account bypasses security rules, so this keeps working with `/cards` write locked
+to the admin allowlist. Run it by hand any time from the Actions tab; tick "dry run" to see
+what would change without writing.
+
+**Forge engine + card scripts** (`upgrade-forge.yml` in the server repo, Mondays). Covered
+below, because it is not the job it looks like.
+
+### Why the Forge job upgrades the engine, not just the scripts
+
+Card scripts are plain text files, so refreshing only `forge-res` looks like the cheap
+option. It does not work. Measured on 2026-09-16: upstream's current card scripts against
+the pinned 2.0.12 engine fail with
+
+    IllegalArgumentException: No enum constant forge.card.CardSplitType.Prepare
+
+and load **0 of 94,606 cards**. Forge aborts the entire card database rather than skipping a
+script that names a mechanic the engine build has no enum for — and the server still starts
+and reports itself ready. A card-data-only cron would have taken the game server down
+silently.
+
+So the job moves the engine and the card data together, and it never pushes to `main`. It
+opens a pull request, and the PR only exists if three gates passed: the upstream engine
+built, the bridge still compiled against Forge's API, and the card database loaded with at
+least 30,000 cards. Railway deploys when you merge, so a bad upstream release is a PR that
+never appears, not an outage.
+
+Your pinned version is in `FORGE_VERSION` (currently `forge-2.0.12`; upstream is at
+`forge-2.0.14`), so the first run will propose an upgrade.
 
 ## 3. Sign-in and account separation
 
@@ -114,21 +152,15 @@ Client-side account separation was hardened alongside this:
   discarded if the current UID has moved on.
 - A failed load clears the deck list instead of leaving the previous account's decks on
   screen, and the decks page now says the load failed rather than showing "Synced to cloud".
-- The AI provider config (which holds an LLM API key) is cleared from persisted settings on
-  sign-out, so it is not handed to the next person to use the browser.
+- Per-person preferences are reset on sign-out and on an account switch. (This originally
+  existed to clear a stored LLM API key; that setting is gone with the engine it configured,
+  but resetting on a shared browser is still the right behaviour.)
 
 ## Still open
 
-`POST /api/ai` is dead code. It routed an LLM call (Groq/OpenAI/Anthropic/custom) for the old
-in-browser JavaScript game engine, so an LLM could pick the AI opponent's plays. That engine
-was replaced by Forge, whose AI is Java code running on Railway and involves no LLM at all.
-Its only caller is `src/ai/AIPlayerController.ts`, reachable only from `gameStore.initGame` and
-`gameStore.processAITurn`, and neither of those is called from anywhere in the app.
-
-It still deploys as a live endpoint, and with a `custom` provider it fetches an arbitrary
-`baseUrl` server-side with no auth and no rate limit — a server-side request forgery vector and
-an open proxy wearing your deployment's IP. The fix is to delete it along with the rest of the
-orphaned engine (`src/ai/*`, the unused half of `gameStore`), not to harden it.
+`POST /api/ai` — the unauthenticated open proxy — has been deleted, along with the orphaned
+engine behind it (`src/ai/*`, the write-only Dexie card cache, `gameStore.initGame` and
+`processAITurn`).
 
 The Forge game server has no authentication, no origin check and no rate limiting, and each
 `start_game` spawns an OS thread on a 512 MB heap. Fine for a private play group, not fine

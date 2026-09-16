@@ -1,0 +1,49 @@
+name: Sync card data
+
+# Refreshes the Firestore `cards` collection from Scryfall.
+#
+# This replaces the deleted GET /api/admin/populate-cards, which was an unauthenticated
+# endpoint doing ~90k Firestore writes that any page on the internet could trigger. A
+# scheduled job holding a service-account secret in GitHub has no public surface at all.
+#
+# Setup (one time):
+#   1. Firebase Console -> Project settings -> Service accounts -> Generate new private key.
+#   2. Paste the whole JSON file into a repository secret named FIREBASE_SERVICE_ACCOUNT.
+# A service account bypasses Firestore security rules, so this works with /cards write
+# locked to the admin allowlist.
+#
+# NOTE: this only refreshes Scryfall data — names, images, oracle text. It does NOT make a
+# new set playable. That needs Forge's own card scripts, which live in the server repo and
+# are updated by its upgrade-forge workflow.
+
+on:
+  schedule:
+    # Tuesdays, 08:00 UTC. Scryfall posts a new bulk export daily; weekly is plenty, and a
+    # set's cards land there before its release date.
+    - cron: '0 8 * * 2'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what would change without writing'
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin@^13
+
+      - name: Sync
+        run: node scripts/sync-cards.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '' }}

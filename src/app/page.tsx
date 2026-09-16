@@ -10,9 +10,7 @@ import { Button } from '@/components/ui/button';
 import {
   Swords,
   Library,
-  Settings,
   LogIn,
-  LogOut,
   Loader2,
   Shield,
   Layers,
@@ -233,32 +231,11 @@ function MarketingPage() {
 // ─── Dashboard (logged in) ───────────────────────────────────────────────────
 
 function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { decks } = useDeckStore();
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* ── Nav ────────────────────────────── */}
-      <header className="flex items-center justify-between border-b border-border/30 px-6 py-4 sm:px-10">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gold/15">
-            <Swords className="h-3.5 w-3.5 text-gold" />
-          </div>
-          <span className="font-display text-lg font-bold tracking-tight">
-            <span className="text-gold">Under</span>croft
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted-foreground sm:inline">
-            {user?.displayName || user?.email}
-          </span>
-          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground">
-            <LogOut className="mr-1.5 h-4 w-4" />
-            Sign out
-          </Button>
-        </div>
-      </header>
-
+    <div className="flex flex-1 flex-col">
       {/* ── Content ────────────────────────── */}
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-10 px-6 py-10 sm:px-10">
         {/* Welcome */}
@@ -275,7 +252,7 @@ function Dashboard() {
         </div>
 
         {/* Quick actions */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <DashboardCard
             href="/game"
             icon={<Swords className="h-7 w-7 text-gold" />}
@@ -288,12 +265,6 @@ function Dashboard() {
             icon={<Library className="h-7 w-7 text-gold" />}
             title="My Decks"
             description={`Import and manage your decklists${decks.length > 0 ? ` · ${decks.length} deck${decks.length !== 1 ? 's' : ''}` : ''}`}
-          />
-          <DashboardCard
-            href="/settings"
-            icon={<Settings className="h-7 w-7 text-gold" />}
-            title="Settings"
-            description="AI provider, card database, preferences"
           />
         </div>
 
@@ -320,9 +291,6 @@ function Dashboard() {
         )}
       </main>
 
-      <footer className="border-t border-border/20 px-6 py-5 text-center text-xs text-muted-foreground/50">
-        Card data provided by Scryfall. Undercroft is not affiliated with Wizards of the Coast.
-      </footer>
     </div>
   );
 }

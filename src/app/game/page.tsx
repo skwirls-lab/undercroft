@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDeckStore } from '@/store/deckStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { FORGE_SERVER_URL, prewarmForgeServer } from '@/lib/forgeConfig';
-import { pickRandomAIDeck, aiDeckToForgeFormat, AI_DECKS } from '@/lib/aiDecks';
-import { ArrowLeft, Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
+import { pickRandomAIDeck, aiDeckToForgeFormat } from '@/lib/aiDecks';
+import { Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 
 /**
@@ -121,13 +121,7 @@ function GameSetupContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center gap-4 border-b border-border/50 px-6 py-4">
-        <Link href="/">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
-          </Button>
-        </Link>
+      <header className="mx-auto flex w-full max-w-2xl items-center px-6 pb-2 pt-6">
         <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">New Game</h1>
       </header>
 

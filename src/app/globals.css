@@ -189,3 +189,19 @@
     @apply border-2 border-red-500 bg-red-500/15;
   }
 }
+/*
+ * Reduce motion, driven by the in-app setting (see MotionPreference.tsx).
+ *
+ * Framer Motion writes its transitions as inline styles, which a stylesheet cannot override
+ * by specificity alone — hence !important here. The 0.01ms rather than 0s is deliberate:
+ * a true zero duration stops transitionend/animationend from firing, and anything waiting on
+ * those events never completes.
+ */
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

@@ -1,5 +1,11 @@
-import Dexie, { type EntityTable } from 'dexie';
-
+/**
+ * Shape of a Scryfall card as stored in the Firestore `cards` collection.
+ *
+ * This used to live in `src/lib/db.ts` alongside a Dexie/IndexedDB schema. That schema was
+ * write-only — the settings page filled it and nothing ever read it back, because card
+ * resolution goes through Firestore (`src/lib/firebase/cards.ts`). The Dexie layer is gone;
+ * the type it carried is still the contract for Firestore card documents, so it lives here.
+ */
 export interface ScryfallCardRecord {
   id: string;
   oracle_id: string;
@@ -45,26 +51,3 @@ export interface ScryfallCardRecord {
   set_name: string;
   rarity: string;
 }
-
-export interface DeckRecord {
-  id: string;
-  userId: string;
-  name: string;
-  commanderIds: string[];
-  cardEntries: Array<{ cardName: string; quantity: number }>;
-  format: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-const db = new Dexie('UndercraftDB') as Dexie & {
-  cards: EntityTable<ScryfallCardRecord, 'id'>;
-  decks: EntityTable<DeckRecord, 'id'>;
-};
-
-db.version(1).stores({
-  cards: 'id, oracle_id, name, type_line, cmc, *color_identity, *keywords, legalities.commander',
-  decks: 'id, userId, name, updatedAt',
-});
-
-export { db };
