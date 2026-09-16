@@ -10,8 +10,9 @@
  * `firestore.rules` — this constant only controls what the UI offers; the rules are what
  * actually enforces it.
  *
- * With the variable unset, nobody is an admin and the admin pages redirect away. That is the
- * intended default: the card database is already populated.
+ * Set it to your own UID and leave it set — the admin pages are how the card database gets
+ * refreshed when a new set releases. With the variable unset, nobody is an admin and the admin
+ * pages refuse everyone, including you.
  */
 const ADMIN_UIDS: string[] = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? '')
   .split(',')
