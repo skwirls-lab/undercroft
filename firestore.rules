@@ -3,21 +3,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Admin allowlist. Add the Firebase UID of each person allowed to rewrite the shared
-    // card database. Keep this in step with NEXT_PUBLIC_ADMIN_UIDS in the app config — that
-    // variable only decides what the admin UI offers; this function is what enforces it.
+    // Admin allowlist. Put your own Firebase UID here and leave it here — you are the only
+    // admin, and the admin pages (/admin/populate-cards, /admin/import-missing-cards) are how
+    // the card database gets updated when a new set releases. Find your UID at
+    // Firebase Console -> Authentication -> Users.
     //
-    //   function isAdmin() {
-    //     return request.auth != null && request.auth.uid in [
-    //       'PASTE_YOUR_FIREBASE_UID_HERE'
-    //     ];
-    //   }
-    //
-    // With the list empty, nobody can write to /cards. That is the correct steady state: the
-    // collection is already populated, and repopulating it is a rare, deliberate act. To run
-    // the admin populate page, add your UID above, deploy the rules, populate, then remove it.
+    // Keep this list in step with NEXT_PUBLIC_ADMIN_UIDS in the app config. That variable only
+    // decides who the admin UI lets in; this function is what actually stops a write.
     function isAdmin() {
-      return false;
+      return request.auth != null && request.auth.uid in [
+        'PASTE_YOUR_FIREBASE_UID_HERE'
+      ];
     }
 
     function isOwner(userId) {
