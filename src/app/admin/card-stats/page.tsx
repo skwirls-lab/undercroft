@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { AdminGuard } from '@/components/AdminGuard';
 import { Database, Search } from 'lucide-react';
 
-export default function CardStatsPage() {
+function CardStatsPage() {
   const [stats, setStats] = useState<{ total: number; loading: boolean }>({
     total: 0,
     loading: false,
@@ -180,5 +181,13 @@ export default function CardStatsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function GuardedCardStatsPage() {
+  return (
+    <AdminGuard>
+      <CardStatsPage />
+    </AdminGuard>
   );
 }

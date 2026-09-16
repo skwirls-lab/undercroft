@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { AdminGuard } from '@/components/AdminGuard';
 import { Upload, CheckCircle, XCircle } from 'lucide-react';
 
-export default function ImportMissingCardsPage() {
+function ImportMissingCardsPage() {
   const [cardNames, setCardNames] = useState('');
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<Array<{ name: string; success: boolean; message: string }>>([]);
@@ -168,5 +169,13 @@ export default function ImportMissingCardsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function GuardedImportMissingCardsPage() {
+  return (
+    <AdminGuard>
+      <ImportMissingCardsPage />
+    </AdminGuard>
   );
 }

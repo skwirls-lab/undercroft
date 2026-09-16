@@ -1,6 +1,10 @@
 /**
  * Server-side endpoint to stream Scryfall data directly
  * This avoids the 500MB download in the browser
+ *
+ * Only the admin card-population page calls this, from the same origin. It performs no
+ * writes, but it does proxy a ~500MB download on every hit, so cross-origin callers are
+ * refused to keep a third-party page from using this deployment as a bandwidth relay.
  */
 
 import { NextResponse } from 'next/server';
@@ -8,7 +12,25 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes max
 
-export async function GET() {
+/**
+ * Browsers attach `Origin` to cross-origin fetches and omit it on same-origin navigations,
+ * so an Origin that disagrees with the request's own host is the one case worth refusing.
+ */
+function isCrossOrigin(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== new URL(request.url).host;
+  } catch {
+    return true;
+  }
+}
+
+export async function GET(request: Request) {
+  if (isCrossOrigin(request)) {
+    return NextResponse.json({ error: 'Cross-origin requests are not allowed' }, { status: 403 });
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({

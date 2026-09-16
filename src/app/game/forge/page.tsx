@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
+import { AuthGuard } from '@/components/AuthGuard';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { GameBoard } from '@/components/game/GameBoard';
@@ -36,7 +37,7 @@ import {
 
 const HUMAN_PLAYER_ID = 'player-human';
 
-export default function ForgeGamePage() {
+function ForgeGamePage() {
   const router = useRouter();
   const {
     connectionStatus,
@@ -509,5 +510,15 @@ function CardPreviewFloating() {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// The board resolves card data out of Firestore, which is readable only by a signed-in
+// user, and a game in progress is that person's data. Guard it like every other app page.
+export default function GuardedForgeGamePage() {
+  return (
+    <AuthGuard>
+      <ForgeGamePage />
+    </AuthGuard>
   );
 }

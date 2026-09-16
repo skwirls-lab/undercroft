@@ -16,6 +16,12 @@ interface SettingsStore {
   setCardDataProgress: (progress: number) => void;
   setForgeServerUrl: (url: string) => void;
   setSfxEnabled: (enabled: boolean) => void;
+  /**
+   * Drop settings that belong to the signed-in person rather than to this device.
+   * Called on sign-out and on an account switch so one tester's LLM API key is never
+   * handed to the next person to use the browser.
+   */
+  clearUserSettings: () => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -36,6 +42,7 @@ export const useSettingsStore = create<SettingsStore>()(
         setSfxEnabled(enabled);
         set({ sfxEnabled: enabled });
       },
+      clearUserSettings: () => set({ aiProvider: null }),
     }),
     {
       name: 'undercroft-settings',

@@ -37,7 +37,7 @@ export default function DecksPage() {
 }
 
 function DecksContent() {
-  const { decks, removeDeck, importDeckFromText, updateDeck, isSyncing, syncedUserId } = useDeckStore();
+  const { decks, removeDeck, importDeckFromText, updateDeck, isSyncing, syncedUserId, syncFailed, loadFromFirestore } = useDeckStore();
   const { cardDataLoaded } = useSettingsStore();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [importOpen, setImportOpen] = useState(false);
@@ -354,14 +354,33 @@ function DecksContent() {
             Loading your decks...
           </div>
         )}
-        {user && syncedUserId && !isSyncing && (
+        {user && syncedUserId && !isSyncing && syncFailed && (
+          <div className="mb-4 flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <div className="flex items-center gap-2">
+              <CloudOff className="h-4 w-4 shrink-0" />
+              <span>
+                Couldn&apos;t load your decks. This list is empty because the load failed, not
+                because you have no decks — don&apos;t re-import yet.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => loadFromFirestore(syncedUserId)}
+              className="shrink-0 gap-1 text-destructive hover:text-destructive"
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+        {user && syncedUserId && !isSyncing && !syncFailed && (
           <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-2 text-xs text-green-400">
             <Cloud className="h-3.5 w-3.5" />
             Synced to cloud as {user.displayName || user.email}
           </div>
         )}
 
-        {decks.length === 0 && !isSyncing ? (
+        {decks.length === 0 && !isSyncing && !syncFailed ? (
           <div className="flex flex-col items-center gap-4 py-16 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border/50 bg-card">
               <Upload className="h-8 w-8 text-muted-foreground" />
