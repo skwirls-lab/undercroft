@@ -22,7 +22,7 @@ const SCREENS = [
   { name: 'dashboard', path: '/' },
   { name: 'decks', path: '/decks' },
   { name: 'setup', path: '/game' },
-  { name: 'settings', path: '/', click: 'button[aria-label="Settings"]' },
+  { name: 'settings', path: '/', click: 'button[aria-label="Settings"]:visible' },
   { name: 'board', path: '/dev/board' },
   { name: 'board-me', path: '/dev/board?open=me' },
   { name: 'board-opp', path: '/dev/board?open=ai-2' },

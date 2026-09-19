@@ -29,9 +29,11 @@ interface ManaSymbolProps {
   symbol: string;
   size?: keyof typeof SIZES;
   className?: string;
+  /** Inline overrides, for callers that scale symbols with a CSS variable. */
+  style?: React.CSSProperties;
 }
 
-export function ManaSymbol({ symbol, size = 'sm', className }: ManaSymbolProps) {
+export function ManaSymbol({ symbol, size = 'sm', className, style }: ManaSymbolProps) {
   const s = symbol.toUpperCase().trim();
   const sizeClass = SIZES[size];
   const base = cn('inline-flex shrink-0 items-center justify-center rounded-full font-bold', sizeClass, className);
@@ -40,13 +42,13 @@ export function ManaSymbol({ symbol, size = 'sm', className }: ManaSymbolProps) 
   if (COLORED_STYLES[s]) {
     return (
       <span aria-label={COLORED_STYLES[s].label} title={COLORED_STYLES[s].label}
-        className={cn(base, COLORED_STYLES[s].bg)} />
+        className={cn(base, COLORED_STYLES[s].bg)} style={style} />
     );
   }
 
   // Tap / Untap
-  if (s === 'T') return <span aria-label="Tap" title="Tap" className={cn(base, TAP_BG)}>↷</span>;
-  if (s === 'Q') return <span aria-label="Untap" title="Untap" className={cn(base, TAP_BG)}>↺</span>;
+  if (s === 'T') return <span aria-label="Tap" title="Tap" className={cn(base, TAP_BG)} style={style}>↷</span>;
+  if (s === 'Q') return <span aria-label="Untap" title="Untap" className={cn(base, TAP_BG)} style={style}>↺</span>;
 
   // Hybrid like W/U, 2/U — show smaller text
   if (s.includes('/')) {
@@ -56,7 +58,7 @@ export function ManaSymbol({ symbol, size = 'sm', className }: ManaSymbolProps) 
     // Simple: use the first color as background if it's a color, else generic
     const bg = leftStyle?.bg ?? rightStyle?.bg ?? GENERIC_BG;
     return (
-      <span aria-label={s} title={s} className={cn(base, bg)}>
+      <span aria-label={s} title={s} className={cn(base, bg)} style={style}>
         {!leftStyle && !rightStyle ? s : ''}
       </span>
     );
@@ -65,7 +67,7 @@ export function ManaSymbol({ symbol, size = 'sm', className }: ManaSymbolProps) 
   // Generic / numeric / X / snow / etc.
   const display = s.length <= 2 ? s : s[0];
   return (
-    <span aria-label={`${s} mana`} title={`{${s}}`} className={cn(base, GENERIC_BG)}>
+    <span aria-label={`${s} mana`} title={`{${s}}`} className={cn(base, GENERIC_BG)} style={style}>
       {display}
     </span>
   );
