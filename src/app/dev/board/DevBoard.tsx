@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { adaptForgeState } from '@/lib/forgeStateAdapter';
@@ -16,7 +16,9 @@ import type { GameAction } from '@/lib/gameTypes';
  *   ?open=me | ai-2 | ai-3 | ai-4   open the expanded board for that player on load
  */
 export function DevBoard() {
-  const [ready, setReady] = useState(false);
+  // Readiness is read back from the store the effect seeds, so no local state is set inside
+  // an effect and the seeding happens exactly once.
+  const ready = useForgeGameStore((s) => s.connectionStatus === 'connected' && s.gameState !== null);
 
   useEffect(() => {
     const forgeState = buildMockGame();
@@ -67,7 +69,6 @@ export function DevBoard() {
         { eventType: 'LIFE_CHANGED', playerName: 'Krenko AI', newLife: 18, delta: -4 },
       ],
     });
-    setReady(true);
   }, []);
 
   // Let the page mount, then open a board if asked.

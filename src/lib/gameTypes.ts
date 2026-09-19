@@ -217,6 +217,7 @@ export interface BlockerAssignment {
 // ===================================================================
 
 export type GameEventType =
+  | 'OPENING_HANDS'
   | 'LIFE_CHANGED'
   | 'DAMAGE_DEALT'
   | 'DAMAGE_RECEIVED'

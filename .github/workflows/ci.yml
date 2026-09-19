@@ -45,5 +45,8 @@ jobs:
       - name: Card sync tests
         run: npm run test:sync
 
+      - name: Game log synthesiser tests
+        run: npm run test:events
+
       - name: Build
         run: npx next build

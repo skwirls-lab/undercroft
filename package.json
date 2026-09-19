@@ -11,7 +11,8 @@
     "check:protocol": "node scripts/check-protocol.mjs",
     "test:parser": "tsx scripts/test-decklist-parser.ts",
     "test:sync": "node scripts/test-sync-cards.mjs",
-    "screenshot": "node scripts/screenshot.mjs"
+    "screenshot": "node scripts/screenshot.mjs",
+    "test:events": "tsx scripts/test-game-events.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
