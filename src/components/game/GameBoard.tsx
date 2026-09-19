@@ -416,6 +416,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
             return (
               <button
                 key={opp.id}
+                data-dev-open={opp.id}
                 onClick={() => setExpandedPlayerId(opp.id)}
                 className={cn(
                   'rounded-[clamp(8px,1.5vmin,1000px)] border transition-all text-left',
@@ -463,6 +464,7 @@ export function GameBoard({ currentPlayerId, className, hideHand, hideCommandZon
         {/* Player stat box */}
         {currentPlayer && (
           <button
+            data-dev-open={currentPlayerId}
             onClick={() => setExpandedPlayerId(currentPlayerId)}
             className={cn(
               'rounded-[clamp(10px,2vmin,1000px)] border transition-all text-left flex-1 min-h-0',

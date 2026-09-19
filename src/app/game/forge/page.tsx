@@ -37,7 +37,7 @@ import {
 
 const HUMAN_PLAYER_ID = 'player-human';
 
-function ForgeGamePage() {
+export function ForgeGamePage() {
   const router = useRouter();
   const {
     connectionStatus,

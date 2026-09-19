@@ -15,6 +15,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { getFirebaseAuth } from './config';
+import { isDevMock, DEV_MOCK_USER } from '@/lib/devMock';
 
 interface AuthContextType {
   user: User | null;
@@ -35,6 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Development-only: pretend a user is signed in so signed-in screens can be rendered
+    // without Firebase credentials. Compiled out of production builds (see devMock.ts).
+    if (isDevMock()) {
+      // ?signedOut=1 lets the signed-out landing page be previewed in the same mode.
+      const signedOut = new URLSearchParams(window.location.search).has('signedOut');
+      setUser(signedOut ? null : (DEV_MOCK_USER as unknown as User));
+      setLoading(false);
+      return;
+    }
+
     const auth = getFirebaseAuth();
     if (!auth) {
       setLoading(false);

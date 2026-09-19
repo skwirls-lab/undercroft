@@ -25,7 +25,7 @@ const TABS = [
   { href: '/decks', label: 'Decks', icon: Library },
 ] as const;
 
-const HIDDEN_ON = ['/game/forge'];
+const HIDDEN_ON = ['/game/forge', '/dev/'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

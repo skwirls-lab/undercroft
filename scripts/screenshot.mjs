@@ -1,0 +1,90 @@
+/**
+ * Screenshot sweep of every screen at phone and desktop size.
+ *
+ *   NEXT_PUBLIC_DEV_MOCK_AUTH=1 npx next dev -p 3100   (in another terminal)
+ *   node scripts/screenshot.mjs [outDir] [--only=board]
+ *
+ * Needs the dev server running in mock-auth mode so signed-in screens render.
+ * Reports any page whose document scrolls vertically at either size, because the game
+ * screen is supposed to fit the viewport exactly.
+ */
+
+import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+const BASE = process.env.BASE_URL ?? 'http://localhost:3100';
+const outDir = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'screenshots';
+const only = (process.argv.find((a) => a.startsWith('--only=')) ?? '').replace('--only=', '');
+
+const SCREENS = [
+  { name: 'landing', path: '/', signedOut: true },
+  { name: 'dashboard', path: '/' },
+  { name: 'decks', path: '/decks' },
+  { name: 'setup', path: '/game' },
+  { name: 'board', path: '/dev/board' },
+  { name: 'board-me', path: '/dev/board?open=me' },
+  { name: 'board-opp', path: '/dev/board?open=ai-2' },
+];
+
+const VIEWPORTS = [
+  { tag: 'phone', width: 390, height: 844, mobile: true },
+  { tag: 'desktop', width: 1440, height: 900, mobile: false },
+];
+
+const executablePath = process.env.CHROME_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+
+mkdirSync(outDir, { recursive: true });
+const browser = await chromium.launch({ executablePath });
+const problems = [];
+
+for (const vp of VIEWPORTS) {
+  for (const screen of SCREENS) {
+    if (only && !screen.name.startsWith(only)) continue;
+    const ctx = await browser.newContext({
+      viewport: { width: vp.width, height: vp.height },
+      isMobile: vp.mobile,
+      hasTouch: vp.mobile,
+      deviceScaleFactor: 1,
+    });
+    const page = await ctx.newPage();
+    const url = BASE + screen.path + (screen.signedOut ? (screen.path.includes('?') ? '&' : '?') + 'signedOut=1' : '');
+    try {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.waitForTimeout(900);
+      const file = join(outDir, `${screen.name}-${vp.tag}.png`);
+      await page.screenshot({ path: file });
+
+      // Vertical scroll audit — the game board must never scroll.
+      const scroll = await page.evaluate(() => {
+        const docScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollers = [...document.querySelectorAll('*')]
+          .filter((el) => {
+            const cs = getComputedStyle(el);
+            return (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 2;
+          })
+          .map((el) => `${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).split(' ').slice(0, 2).join('.') : ''} (+${el.scrollHeight - el.clientHeight}px)`);
+        return { docScroll, scrollers };
+      });
+      const tag = `${screen.name}@${vp.tag}`;
+      if (screen.name.startsWith('board') && (scroll.docScroll > 2 || scroll.scrollers.length)) {
+        problems.push(`${tag}: document +${scroll.docScroll}px; inner scrollers: ${scroll.scrollers.join(', ') || 'none'}`);
+      }
+      console.log(`ok   ${tag}${scroll.scrollers.length ? '  [scrollers: ' + scroll.scrollers.length + ']' : ''}`);
+    } catch (err) {
+      console.log(`FAIL ${screen.name}@${vp.tag}: ${err.message.split('\n')[0]}`);
+      problems.push(`${screen.name}@${vp.tag}: ${err.message.split('\n')[0]}`);
+    }
+    await ctx.close();
+  }
+}
+
+await browser.close();
+
+if (problems.length) {
+  console.log('\nProblems:');
+  for (const p of problems) console.log('  - ' + p);
+  process.exitCode = 1;
+} else {
+  console.log('\nNo scroll problems on the board.');
+}
