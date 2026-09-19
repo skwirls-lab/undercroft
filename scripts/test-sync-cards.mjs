@@ -9,7 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { slimCard, digest, isCommanderPlayable } from './sync-cards.mjs';
+import { slimCard, digest, isCommanderPlayable, resolveDownloadUri } from './sync-cards.mjs';
 
 let passed = 0;
 const test = (name, fn) => {
@@ -95,6 +95,69 @@ test('digest changes when the stored content changes', () => {
 
 test('digest ignores fields that are not stored', () => {
   assert.equal(digest(slimCard(base)), digest(slimCard({ ...base, released_at: '2026-01-01' })));
+});
+
+// --- resolveDownloadUri -------------------------------------------------------------
+// The first real run failed here with "Failed to parse URL from undefined", which named
+// neither the field nor the entry. These cover the fallback and the diagnostics.
+
+const asyncTest = async (name, fn) => {
+  try {
+    await fn();
+    console.log(`PASS  ${name}`);
+    passed++;
+  } catch (err) {
+    console.error(`FAIL  ${name}\n      ${err.message}`);
+    process.exitCode = 1;
+  }
+};
+
+const never = () => {
+  throw new Error('should not have hit the network');
+};
+
+await asyncTest('uses the inline download_uri without a second request', async () => {
+  const uri = await resolveDownloadUri({ name: 'Default Cards', download_uri: 'https://d/x.json' }, never);
+  assert.equal(uri, 'https://d/x.json');
+});
+
+await asyncTest('follows the entry uri when download_uri is missing', async () => {
+  const uri = await resolveDownloadUri(
+    { name: 'Default Cards', uri: 'https://api/bulk-data/abc' },
+    async () => ({ ok: true, json: async () => ({ download_uri: 'https://d/followed.json' }) })
+  );
+  assert.equal(uri, 'https://d/followed.json');
+});
+
+await asyncTest('ignores an empty download_uri rather than fetching ""', async () => {
+  const uri = await resolveDownloadUri(
+    { name: 'Default Cards', download_uri: '', uri: 'https://api/bulk-data/abc' },
+    async () => ({ ok: true, json: async () => ({ download_uri: 'https://d/followed.json' }) })
+  );
+  assert.equal(uri, 'https://d/followed.json');
+});
+
+await asyncTest('names the keys Scryfall sent when nothing resolves', async () => {
+  await assert.rejects(
+    () => resolveDownloadUri({ name: 'Default Cards', size: 1, updated_at: 'x' }, never),
+    (err) => {
+      assert.match(err.message, /Default Cards/);
+      assert.match(err.message, /name, size, updated_at/);
+      return true;
+    }
+  );
+});
+
+await asyncTest('reports the status when the per-object endpoint fails', async () => {
+  await assert.rejects(
+    () =>
+      resolveDownloadUri({ name: 'Default Cards', uri: 'https://api/bulk-data/abc' }, async () => ({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      })),
+    /503 Service Unavailable/
+  );
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', failures above' : ', 0 failed'}`);

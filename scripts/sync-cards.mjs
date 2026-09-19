@@ -86,6 +86,43 @@ export const isCommanderPlayable = (card) =>
 export const digest = (slim) =>
   createHash('sha1').update(JSON.stringify(slim, Object.keys(slim).sort())).digest('hex');
 
+export const SCRYFALL_HEADERS = { 'User-Agent': 'Undercroft/1.0', Accept: 'application/json' };
+
+/**
+ * Find the URL of the actual bulk file for a bulk-data entry.
+ *
+ * The listing normally carries `download_uri` inline, but a run on 2026-09-19 got an entry
+ * with a usable `name` and no `download_uri`, so `fetch(undefined)` threw
+ * "Failed to parse URL from undefined" — a message that says nothing about which field was
+ * missing. Two changes: follow the entry's own `uri` when the inline field is absent (the
+ * per-object endpoint is authoritative and always carries it), and when that also fails,
+ * name the keys Scryfall actually sent so the next run diagnoses itself instead of needing
+ * another round trip.
+ *
+ * `fetchImpl` is injectable so this is testable without network access.
+ */
+export async function resolveDownloadUri(entry, fetchImpl = fetch) {
+  if (typeof entry?.download_uri === 'string' && entry.download_uri) return entry.download_uri;
+
+  if (typeof entry?.uri === 'string' && entry.uri) {
+    console.log(`  no inline download_uri; following ${entry.uri}`);
+    const res = await fetchImpl(entry.uri, { headers: SCRYFALL_HEADERS });
+    if (res.ok) {
+      const full = await res.json();
+      if (typeof full?.download_uri === 'string' && full.download_uri) return full.download_uri;
+      throw new Error(
+        `No download_uri at ${entry.uri}. Keys returned: ${Object.keys(full ?? {}).join(', ')}`
+      );
+    }
+    throw new Error(`Could not read ${entry.uri}: ${res.status} ${res.statusText}`);
+  }
+
+  throw new Error(
+    `Bulk entry "${entry?.name ?? 'unknown'}" has no download_uri and no uri to follow. ` +
+      `Keys present: ${Object.keys(entry ?? {}).join(', ')}`
+  );
+}
+
 async function main() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set');
@@ -114,16 +151,23 @@ async function main() {
   console.log(`\r  ${existing.size.toLocaleString()} cards already in Firestore`);
 
   console.log('Locating Scryfall bulk export…');
-  const bulkRes = await fetch('https://api.scryfall.com/bulk-data', {
-    headers: { 'User-Agent': 'Undercroft/1.0', Accept: 'application/json' },
-  });
+  const bulkRes = await fetch('https://api.scryfall.com/bulk-data', { headers: SCRYFALL_HEADERS });
   if (!bulkRes.ok) throw new Error(`Scryfall bulk-data listing failed: ${bulkRes.status}`);
   const bulk = await bulkRes.json();
+  if (!Array.isArray(bulk?.data)) {
+    throw new Error(`Unexpected bulk-data listing shape; top-level keys: ${Object.keys(bulk ?? {}).join(', ')}`);
+  }
   const defaultCards = bulk.data.find((d) => d.type === 'default_cards');
-  if (!defaultCards) throw new Error('No default_cards export in the Scryfall listing');
+  if (!defaultCards) {
+    const types = bulk.data.map((d) => d.type).join(', ');
+    throw new Error(`No default_cards export in the Scryfall listing. Types offered: ${types}`);
+  }
+
+  const downloadUri = await resolveDownloadUri(defaultCards);
 
   console.log(`Streaming ${defaultCards.name}…`);
-  const res = await fetch(defaultCards.download_uri);
+  const res = await fetch(downloadUri, { headers: SCRYFALL_HEADERS });
+  if (!res.ok) throw new Error(`Bulk file download failed: ${res.status} ${res.statusText}`);
   if (!res.body) throw new Error('No response body from Scryfall');
 
   let batch = db.batch();
