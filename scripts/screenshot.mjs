@@ -22,6 +22,7 @@ const SCREENS = [
   { name: 'dashboard', path: '/' },
   { name: 'decks', path: '/decks' },
   { name: 'setup', path: '/game' },
+  { name: 'settings', path: '/', click: 'button[aria-label="Settings"]' },
   { name: 'board', path: '/dev/board' },
   { name: 'board-me', path: '/dev/board?open=me' },
   { name: 'board-opp', path: '/dev/board?open=ai-2' },
@@ -52,6 +53,10 @@ for (const vp of VIEWPORTS) {
     try {
       await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       await page.waitForTimeout(900);
+      if (screen.click) {
+        await page.locator(screen.click).first().click();
+        await page.waitForTimeout(600);
+      }
       const file = join(outDir, `${screen.name}-${vp.tag}.png`);
       await page.screenshot({ path: file });
 

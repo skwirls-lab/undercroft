@@ -8,6 +8,7 @@ import { useDeckStore } from '@/store/deckStore';
 import { useAuth } from '@/lib/firebase/auth';
 import { sfxCastSpell } from '@/lib/audio';
 import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon } from 'lucide-react';
+import { Keystone } from '@/components/brand/Keystone';
 
 /**
  * Settings as an overlay rather than a route.
@@ -64,8 +65,13 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full gap-0 overflow-y-auto sm:max-w-md">
         <SheetHeader className="border-b border-border/40 pb-4">
-          <SheetTitle className="font-display text-xl">Settings</SheetTitle>
-          <SheetDescription>Preferences are saved on this device.</SheetDescription>
+          <div className="flex items-center gap-3">
+            <Keystone size={40} />
+            <div>
+              <SheetTitle className="font-display text-xl">Settings</SheetTitle>
+              <SheetDescription>Preferences are saved on this device.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
 
         <div className="flex flex-col gap-8 py-6">
@@ -164,7 +170,7 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+    <h3 className="eyebrow">
       {children}
     </h3>
   );
