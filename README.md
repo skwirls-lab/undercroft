@@ -2,66 +2,94 @@
 
 Play Magic: The Gathering Commander against AI opponents in your browser.
 
+The rules engine is [Forge](https://github.com/Card-Forge/forge), running headless on a
+small Java server (`undercroft-forge-server`). This repository is the web client: sign in,
+import a decklist, pick opponents, play.
+
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Copy env template and fill in Firebase config
-cp env.template .env.local
-
-# Run dev server
+cp env.template .env.local    # fill in the Firebase web-app config
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). The game server URL defaults to the
+Railway deployment; override it with `NEXT_PUBLIC_FORGE_SERVER_URL` to point at a local
+`undercroft-forge-server` (`ws://localhost:7000/game`).
+
+## Working on the UI without credentials
+
+Every signed-in screen, and the game board itself, can be rendered with no Firebase project
+and no game server:
+
+```bash
+NEXT_PUBLIC_DEV_MOCK_AUTH=1 npx next dev -p 3100
+```
+
+- A fake user is signed in; three sample decks are seeded.
+- `/dev/board` renders the real game screen against a seeded mid-game 4-player state.
+  `?open=me` or `?open=ai-2` opens a player's board on load.
+- `/?signedOut=1` shows the landing page.
+
+This is a development-only mode: it is gated on `NODE_ENV`, which is inlined at build time,
+so a production bundle cannot enable it and `/dev/board` is a 404 there.
+
+Screenshot every screen at phone and desktop size, with an audit that fails if the game board
+scrolls vertically (it is designed to fit the viewport exactly):
+
+```bash
+npm run screenshot            # writes to ./screenshots
+```
 
 ## Architecture
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14+ (App Router), TypeScript |
-| UI | TailwindCSS, shadcn/ui, Framer Motion, Lucide icons |
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
+| UI | Tailwind v4, shadcn/ui, Framer Motion, Lucide icons |
 | Auth | Firebase Authentication (Google OAuth) |
-| Database | Cloud Firestore (decks, settings), IndexedDB/Dexie (card cache) |
-| Game Engine | Pure TypeScript, client-side, deterministic |
-| AI Opponents | LLM-powered (Groq/OpenAI/Anthropic) via API routes, with heuristic fallback |
-| Card Data | Scryfall Oracle dataset (local JSON → IndexedDB) |
-| Hosting | Vercel (Git-push deploys) |
+| Data | Cloud Firestore — `users/{uid}/decks` per player, a shared `cards` collection of Scryfall data |
+| Rules engine | Forge, headless, on a Java WebSocket bridge (separate repo) |
+| AI opponents | Forge's own AI |
+| Hosting | Vercel (frontend), Railway (game server) |
+
+The client keeps no rules logic. It renders state snapshots the server pushes and sends back
+decisions the server asks for (`src/lib/forgeClient.ts` → `src/store/forgeGameStore.ts` →
+`src/lib/forgeStateAdapter.ts` → the game components).
 
 ## Project Structure
 
 ```
 src/
-├── app/           # Next.js pages and API routes
-├── engine/        # Game engine (pure TS, no DOM)
-│   ├── types.ts         # Core type definitions
-│   ├── GameEngine.ts    # Top-level orchestrator
-│   ├── GameState.ts     # State model and helpers
-│   ├── TurnManager.ts   # Phase/step/priority
-│   ├── ZoneManager.ts   # Card zone management
-│   ├── ManaSystem.ts    # Mana parsing and payment
-│   └── ActionValidator.ts # Legal action enumeration
-├── ai/            # AI player system
-│   ├── AIPlayerController.ts
-│   ├── PromptBuilder.ts
-│   └── FallbackAI.ts
-├── cards/         # Card data layer (Scryfall → IndexedDB)
-├── store/         # Zustand state stores
-├── components/    # React components (ui/ + game/)
-└── lib/           # Firebase config, DB, utils
+├── app/               # Routes: landing/dashboard, decks, game setup, game board, admin, dev
+├── components/
+│   ├── brand/         # Keystone, Arch, Alcove — the Undercroft visual identity
+│   ├── game/          # Board, seats, cards, hand, prompts
+│   └── ui/            # shadcn primitives
+├── hooks/             # useFitToRow (size cards to their row), useMediaQuery, Firestore sync
+├── lib/               # Forge client + adapter, game-log synthesiser, motion presets, Firebase
+├── store/             # Zustand: decks, settings, game state
+└── dev/               # Mock game and mock decks for the development harness
+scripts/               # Tests, protocol check, card sync, screenshot sweep
 ```
 
-## Key Concepts
+## Checks
 
-- **Engine is authoritative**: The game engine enforces all rules. AI only chooses from legal actions.
-- **Client-side for MVP**: Game runs in the browser. No game server needed for single-player vs AI.
-- **Tiered card rendering**: Pip view (tiny) → art crop (medium) → full card (hover/click) to handle crowded boards.
-- **LLM is optional**: Heuristic fallback AI works without any API key configured.
+```bash
+npx tsc --noEmit          # types
+npx eslint src            # lint
+npm run check:protocol    # every server prompt has a renderer and matching response key
+npm run test:parser       # decklist parser
+npm run test:events       # game-log synthesiser
+npm run test:sync         # Scryfall → Firestore sync helpers
+npx next build
+```
 
-## Environment Variables
+All of these run in CI on every push and pull request.
 
-See `env.template` for required Firebase configuration.
+## Operations
 
-AI API keys are configured per-user in the Settings page and stored locally in the browser.
+`SECURITY_SETUP.md` covers Firestore rules, the admin allowlist, and the two scheduled
+jobs that keep card data current: Scryfall → Firestore here, and the Forge engine + card
+scripts in the server repo.

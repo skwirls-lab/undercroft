@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,6 +27,10 @@ import {
   LogIn,
 } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
+import { Alcove, Eyebrow } from '@/components/brand/Alcove';
+import { motion } from 'framer-motion';
+import { rise, riseStagger } from '@/lib/motion';
+import { Crown } from 'lucide-react';
 
 export default function DecksPage() {
   return <AuthGuard><DecksContent /></AuthGuard>;
@@ -161,14 +164,17 @@ function DecksContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 pb-2 pt-6">
-        <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">My Decks</h1>
+    <div className="flex flex-1 flex-col">
+      <header className="mx-auto flex w-full max-w-5xl items-end justify-between gap-4 px-5 pb-4 pt-8 sm:px-10 sm:pt-12">
+        <div className="flex flex-col gap-1.5">
+          <p className="eyebrow">The vault</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">My Decks</h1>
+        </div>
 
         <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>
           <DialogTrigger
             render={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90">
                 <Plus className="h-4 w-4" />
                 Import Deck
               </Button>
@@ -176,23 +182,19 @@ function DecksContent() {
           />
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 font-display text-xl">
                 <Upload className="h-5 w-5 text-gold" />
                 Import Decklist
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4">
               {importResult ? (
-                // Show import results
                 <div className="flex flex-col gap-3">
-                  {/* Scryfall resolution */}
                   <div className="flex items-center gap-2 text-sm">
                     {importResult.unresolved.length === 0 ? (
                       <>
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <span className="text-green-400">
-                          All {importResult.resolved} cards resolved in Scryfall.
-                        </span>
+                        <span className="text-green-400">All {importResult.resolved} cards resolved in Scryfall.</span>
                       </>
                     ) : (
                       <>
@@ -205,7 +207,6 @@ function DecksContent() {
                     )}
                   </div>
 
-                  {/* Forge resolution */}
                   {importResult.forgeSubstituted.length === 0 && importResult.forgeUnresolvable.length === 0 ? (
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -225,9 +226,7 @@ function DecksContent() {
 
                   {importResult.unresolved.length > 0 && (
                     <div className="max-h-28 overflow-y-auto rounded border border-border/30 bg-card/50 p-2">
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        Not found in Scryfall:
-                      </p>
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Not found in Scryfall:</p>
                       {importResult.unresolved.map((name) => (
                         <p key={name} className="text-xs text-destructive">{name}</p>
                       ))}
@@ -236,12 +235,10 @@ function DecksContent() {
 
                   {importResult.forgeSubstituted.length > 0 && (
                     <div className="max-h-28 overflow-y-auto rounded border border-blue-500/20 bg-blue-500/5 p-2">
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-blue-400/70">
-                        Forge substitutions (reprints → originals):
-                      </p>
-                      {importResult.forgeSubstituted.map((s) => (
-                        <p key={s.original} className="text-xs text-blue-300">
-                          {s.original} → <span className="text-blue-400 font-medium">{s.forgeName}</span>
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-blue-400/70">Forge substitutions (reprints → originals):</p>
+                      {importResult.forgeSubstituted.map((sub) => (
+                        <p key={sub.original} className="text-xs text-blue-300">
+                          {sub.original} → <span className="font-medium text-blue-400">{sub.forgeName}</span>
                         </p>
                       ))}
                     </div>
@@ -249,56 +246,41 @@ function DecksContent() {
 
                   {importResult.forgeUnresolvable.length > 0 && (
                     <div className="max-h-28 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 p-2">
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-red-400/70">
-                        Not found in Forge (won&apos;t work in-game):
-                      </p>
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-red-400/70">Not found in Forge (won&apos;t work in-game):</p>
                       {importResult.forgeUnresolvable.map((name) => (
                         <p key={name} className="text-xs text-red-400">{name}</p>
                       ))}
                     </div>
                   )}
 
-                  <Button onClick={closeAndReset}>Done</Button>
+                  <Button onClick={closeAndReset} className="bg-gold text-gold-foreground hover:bg-gold/90">Done</Button>
                 </div>
               ) : (
-                // Show import form
                 <>
                   <div>
                     <Label htmlFor="deckName">Deck Name</Label>
-                    <Input
-                      id="deckName"
-                      placeholder="My Commander Deck"
-                      value={deckName}
-                      onChange={(e) => setDeckName(e.target.value)}
-                    />
+                    <Input id="deckName" placeholder="My Commander Deck" value={deckName} onChange={(e) => setDeckName(e.target.value)} />
                   </div>
                   <div>
-                    <Label htmlFor="deckText">
-                      Decklist (one card per line, e.g. &quot;1 Sol Ring&quot;)
-                    </Label>
+                    <Label htmlFor="deckText">Decklist (one card per line, e.g. &quot;1 Sol Ring&quot;)</Label>
                     <textarea
                       id="deckText"
-                      className="mt-1 min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="mt-1 min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder={`Commander: Atraxa, Praetors' Voice\n1 Sol Ring\n1 Arcane Signet\n1 Command Tower\n38 Plains\n...`}
                       value={deckText}
                       onChange={(e) => setDeckText(e.target.value)}
                     />
+                    <p className="mt-1.5 text-xs text-muted-foreground">Moxfield, Archidekt, MTGGoldfish and plain-text exports all work.</p>
                   </div>
                   <Button
                     onClick={handleImport}
                     disabled={!deckName.trim() || !deckText.trim() || importing}
-                    className="gap-2"
+                    className="gap-2 bg-gold text-gold-foreground hover:bg-gold/90"
                   >
                     {importing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {importStep || 'Resolving cards...'}
-                      </>
+                      <><Loader2 className="h-4 w-4 animate-spin" />{importStep || 'Resolving cards...'}</>
                     ) : (
-                      <>
-                        <Upload className="h-4 w-4" />
-                        Import &amp; Resolve
-                      </>
+                      <><Upload className="h-4 w-4" />Import &amp; Resolve</>
                     )}
                   </Button>
                 </>
@@ -308,8 +290,8 @@ function DecksContent() {
         </Dialog>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl p-6">
-        {/* Sync status banner */}
+      <main className="mx-auto w-full max-w-5xl px-5 pb-10 sm:px-10">
+        {/* Sync status */}
         {!authLoading && !user && (
           <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
             <div className="flex items-center gap-2 text-sm text-amber-400">
@@ -333,101 +315,87 @@ function DecksContent() {
             <div className="flex items-center gap-2">
               <CloudOff className="h-4 w-4 shrink-0" />
               <span>
-                Couldn&apos;t load your decks. This list is empty because the load failed, not
-                because you have no decks — don&apos;t re-import yet.
+                Couldn&apos;t load your decks. This list is empty because the load failed, not because you have no
+                decks — don&apos;t re-import yet.
               </span>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => loadFromFirestore(syncedUserId)}
-              className="shrink-0 gap-1 text-destructive hover:text-destructive"
-            >
+            <Button size="sm" variant="ghost" onClick={() => loadFromFirestore(syncedUserId)} className="shrink-0 gap-1 text-destructive hover:text-destructive">
               Retry
             </Button>
           </div>
         )}
         {user && syncedUserId && !isSyncing && !syncFailed && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-2 text-xs text-green-400">
-            <Cloud className="h-3.5 w-3.5" />
+          <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
+            <Cloud className="h-3.5 w-3.5 text-gold/70" />
             Synced to cloud as {user.displayName || user.email}
           </div>
         )}
 
         {decks.length === 0 && !isSyncing && !syncFailed ? (
-          <div className="flex flex-col items-center gap-4 py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border/50 bg-card">
-              <Upload className="h-8 w-8 text-muted-foreground" />
+          <Alcove className="flex flex-col items-center gap-4 px-6 pb-12 pt-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/20">
+              <Upload className="h-8 w-8" />
             </div>
-            <p className="text-muted-foreground">
-              No decks yet. Import a decklist to get started.
-            </p>
-            <Button onClick={() => setImportOpen(true)} className="gap-1">
+            <p className="font-display text-xl font-bold">The vault is empty</p>
+            <p className="max-w-sm text-sm text-muted-foreground">Import a decklist to get started. Paste from Moxfield, Archidekt or anywhere else.</p>
+            <Button onClick={() => setImportOpen(true)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90">
               <Plus className="h-4 w-4" />
               Import Your First Deck
             </Button>
-          </div>
+          </Alcove>
         ) : (
-          <div className="grid gap-3">
-            {decks.map((deck) => {
-              const totalCards = deck.totalCards || deck.cards.reduce((s, c) => s + c.quantity, 0);
-              const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
-              const fullyResolved = hasResolution && deck.unresolvedCount === 0;
+          <>
+            <Eyebrow className="mb-4">{decks.length} deck{decks.length === 1 ? '' : 's'}</Eyebrow>
+            <motion.div variants={riseStagger(0.06)} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {decks.map((deck) => {
+                const totalCards = deck.totalCards || deck.cards.reduce((sum, c) => sum + c.quantity, 0);
+                const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
+                const fullyResolved = hasResolution && deck.unresolvedCount === 0;
 
-              return (
-                <Card key={deck.id}>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-base">{deck.name}</CardTitle>
-                      {fullyResolved && (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      )}
-                      {hasResolution && !fullyResolved && (
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {!hasResolution && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleResolve(deck.id)}
-                          className="gap-1 text-muted-foreground"
-                          title="Resolve card names against database"
-                        >
-                          <Search className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeDeck(deck.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {deck.commanderName || 'No commander set'} &middot;{' '}
-                      {totalCards} cards &middot; {deck.format}
-                    </p>
-                    {hasResolution && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {deck.resolvedCount} resolved
-                        {deck.unresolvedCount > 0 && (
-                          <span className="text-amber-500">
-                            {' '}&middot; {deck.unresolvedCount} unresolved
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                return (
+                  <motion.div key={deck.id} variants={rise}>
+                    <Alcove className="group flex h-full flex-col px-5 pb-4 pt-8 transition-colors hover:border-gold/30">
+                      <div className="mb-3 flex items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold ring-1 ring-gold/20">
+                          <Crown className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-display text-lg font-bold leading-tight">{deck.name}</h3>
+                          <p className="truncate text-sm text-muted-foreground">{deck.commanderName || 'No commander set'}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/30 pt-3">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{totalCards} cards</span>
+                          {hasResolution && (
+                            <>
+                              <span className="text-border">·</span>
+                              {fullyResolved ? (
+                                <span className="flex items-center gap-1 text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-amber-400"><AlertCircle className="h-3.5 w-3.5" />{deck.unresolvedCount} unresolved</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          {!hasResolution && (
+                            <Button variant="ghost" size="icon-sm" onClick={() => handleResolve(deck.id)} className="text-muted-foreground hover:text-gold" title="Resolve card names against database" aria-label="Resolve card names">
+                              <Search className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon-sm" onClick={() => removeDeck(deck.id)} className="text-muted-foreground hover:text-destructive" aria-label="Delete deck">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Alcove>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </>
         )}
       </main>
     </div>

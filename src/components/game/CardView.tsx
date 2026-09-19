@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import type { CardInstance } from '@/lib/gameTypes';
-import { getLandProducibleColors, getEffectiveLandCardData } from '@/lib/OracleTextParser';
+import { getLandProducibleColors } from '@/lib/OracleTextParser';
 import { useCardPreview } from './CardPreviewContext';
 import { ManaSymbol, parseManaSymbols } from './ManaSymbol';
 
@@ -49,19 +49,23 @@ function getDisplayPT(card: CardInstance): { power: string; toughness: string; b
 }
 
 function isToken(card: CardInstance): boolean {
-  // Token check based on type line or name
   const typeLine = card.cardData.typeLine.toLowerCase();
   const name = card.cardData.name.toLowerCase();
   return typeLine.includes('token') || name.includes('token');
 }
 
 export type CardViewMode = 'pip' | 'art' | 'full';
-
 export type CombatRole = 'attacking' | 'blocking' | 'none';
+export interface CardSize {
+  w: number;
+  h: number;
+}
 
 interface CardViewProps {
   card: CardInstance;
   mode?: CardViewMode;
+  /** Explicit pixel size. When absent, the card sizes itself from the viewport. */
+  size?: CardSize;
   onClick?: (card: CardInstance) => void;
   onDoubleClick?: (card: CardInstance) => void;
   selected?: boolean;
@@ -71,99 +75,84 @@ interface CardViewProps {
   className?: string;
 }
 
-
+/** Frame colour by the card's colour identity — the one place colour is decorative. */
 function getCardColorClass(card: CardInstance): string {
   const colors = card.cardData.colors;
   if (!colors || colors.length === 0) {
-    if (card.cardData.typeLine.toLowerCase().includes('land')) return 'border-amber-700/80 shadow-[0_0_8px_rgba(180,83,9,0.2)]';
-    return 'border-zinc-500/80 shadow-[0_0_8px_rgba(113,113,122,0.2)]';
+    if (card.cardData.typeLine.toLowerCase().includes('land')) return 'border-amber-700/70';
+    return 'border-zinc-500/60';
   }
-  if (colors.length > 1) return 'border-amber-400/80 shadow-[0_0_8px_rgba(251,191,36,0.2)]';
+  if (colors.length > 1) return 'border-amber-400/70';
   const colorMap: Record<string, string> = {
-    W: 'border-amber-200/80 shadow-[0_0_8px_rgba(253,230,138,0.2)]',
-    U: 'border-blue-500/80 shadow-[0_0_8px_rgba(59,130,246,0.2)]',
-    B: 'border-zinc-700/80 shadow-[0_0_8px_rgba(63,63,70,0.2)]',
-    R: 'border-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.2)]',
-    G: 'border-green-500/80 shadow-[0_0_8px_rgba(34,197,94,0.2)]',
+    W: 'border-amber-100/70',
+    U: 'border-blue-400/70',
+    B: 'border-zinc-600/80',
+    R: 'border-red-500/70',
+    G: 'border-green-500/70',
   };
-  return colorMap[colors[0]] || 'border-zinc-500/80';
+  return colorMap[colors[0]] || 'border-zinc-500/60';
+}
+
+/** Type-line accent for the no-art slab, so a glance still says "creature" or "land". */
+function slabTone(typeLine: string): string {
+  const t = typeLine.toLowerCase();
+  if (t.includes('creature')) return 'from-[oklch(0.24_0.03_40)]';
+  if (t.includes('land')) return 'from-[oklch(0.22_0.03_100)]';
+  if (t.includes('planeswalker')) return 'from-[oklch(0.24_0.04_300)]';
+  if (t.includes('artifact')) return 'from-[oklch(0.24_0.01_60)]';
+  if (t.includes('enchantment')) return 'from-[oklch(0.22_0.03_320)]';
+  if (t.includes('instant') || t.includes('sorcery')) return 'from-[oklch(0.22_0.03_240)]';
+  return 'from-[oklch(0.22_0.014_55)]';
 }
 
 // ==================== PIP VIEW ====================
-// Compact view for opponents — mini art + name + P/T
+// Compact chip — lands, and opponents' boards at a glance.
 function PipView({ card, className }: { card: CardInstance; className?: string }) {
   const face = getActiveFace(card);
   const isCreature = face.typeLine.toLowerCase().includes('creature');
   const isLand = face.typeLine.toLowerCase().includes('land');
   const isTapped = card.tapped;
   const artCropUrl = face.artCrop;
-
-  // For lands, show producible mana dots instead of mana cost pips
-  const effectiveData = getEffectiveLandCardData(card.cardData);
   const landColors = isLand ? getLandProducibleColors(card.cardData) : [];
 
   return (
     <div
       className={cn(
         'flex items-center rounded-md border font-medium leading-none transition-all',
-        'h-[clamp(28px,4vmin,1000px)] gap-[clamp(4px,0.6vmin,1000px)] px-[clamp(4px,0.5vmin,1000px)] text-[clamp(9px,1.4vmin,1000px)]',
+        'h-[clamp(26px,3.6vmin,34px)] gap-[clamp(4px,0.6vmin,6px)] px-[clamp(5px,0.6vmin,8px)] text-[clamp(10px,1.4vmin,12px)]',
         getCardColorClass(card),
-        isTapped ? 'rotate-3 opacity-60' : '',
+        isTapped ? 'rotate-[6deg] opacity-55' : '',
         'bg-card/90 backdrop-blur-sm',
         className
       )}
     >
-      {/* Mini art thumbnail */}
       {artCropUrl && !isLand ? (
-        <div className="relative shrink-0 overflow-hidden rounded" style={{ width: 'clamp(20px,3vmin,1000px)', height: 'clamp(20px,3vmin,1000px)' }}>
+        <div className="relative shrink-0 overflow-hidden rounded" style={{ width: 'clamp(18px,2.6vmin,24px)', height: 'clamp(18px,2.6vmin,24px)' }}>
           <Image src={artCropUrl} alt="" fill sizes="24px" className="object-cover" unoptimized />
         </div>
       ) : (
         <div className="flex shrink-0 gap-0.5">
           {isLand
-            ? landColors.slice(0, 3).map((color) => (
-                <ManaSymbol key={color} symbol={color} size="xs" />
-              ))
-            : parseManaSymbols(card.cardData.manaCost).slice(0, 3).map((sym, i) => (
-                <ManaSymbol key={i} symbol={sym} size="xs" />
-              ))
-          }
+            ? landColors.slice(0, 3).map((color) => <ManaSymbol key={color} symbol={color} size="xs" />)
+            : parseManaSymbols(card.cardData.manaCost).slice(0, 3).map((sym, i) => <ManaSymbol key={i} symbol={sym} size="xs" />)}
         </div>
       )}
 
-      {/* Name */}
-      <span className="truncate text-foreground/90 min-w-0">
+      <span className="min-w-0 truncate text-foreground/90">
         {face.name.length > 18 ? face.name.slice(0, 16) + '…' : face.name}
       </span>
 
-      {/* Right side badges */}
-      <div className="ml-auto flex items-center gap-1 shrink-0">
-        {/* Counters */}
-        {(card.counters['+1/+1'] || 0) > 0 && (
-          <span className="font-bold text-green-400" style={{ fontSize: 'clamp(7px,1vmin,1000px)' }}>+{card.counters['+1/+1']}</span>
-        )}
-        {/* Attachments */}
+      <div className="ml-auto flex shrink-0 items-center gap-1">
+        {(card.counters['+1/+1'] || 0) > 0 && <span className="text-[0.85em] font-bold text-green-400">+{card.counters['+1/+1']}</span>}
         {card.attachmentNames.length > 0 && (
-          <span className="font-bold text-amber-400" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)' }} title={card.attachmentNames.join(', ')}>
-            {card.attachmentNames.length}x⚔
-          </span>
+          <span className="text-[0.75em] font-bold text-amber-400" title={card.attachmentNames.join(', ')}>{card.attachmentNames.length}x⚔</span>
         )}
-        {/* Token */}
-        {isToken(card) && (
-          <span className="font-bold text-purple-400" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)' }}>TKN</span>
-        )}
-        {/* Damage */}
-        {card.damage > 0 && (
-          <span className="font-bold text-red-400" style={{ fontSize: 'clamp(8px,1.2vmin,1000px)' }}>-{card.damage}</span>
-        )}
-        {/* P/T */}
+        {isToken(card) && <span className="text-[0.75em] font-bold text-purple-400">TKN</span>}
+        {card.damage > 0 && <span className="text-[0.85em] font-bold text-red-400">-{card.damage}</span>}
         {isCreature && card.cardData.power && (() => {
           const pt = getDisplayPT(card);
           return (
-            <span className={cn(
-              'rounded font-bold',
-              pt.boosted ? 'bg-green-900/60 text-green-300' : 'bg-black/40 text-white'
-            )} style={{ fontSize: 'clamp(8px,1.2vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)' }}>
+            <span className={cn('rounded px-1 py-px text-[0.85em] font-bold', pt.boosted ? 'bg-green-900/60 text-green-300' : 'bg-black/40 text-white')}>
               {pt.power}/{pt.toughness}
             </span>
           );
@@ -174,136 +163,129 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
 }
 
 // ==================== ART CROP VIEW ====================
-// Battlefield card — art crop with name/P/T frame overlay
-function ArtView({ card, className }: { card: CardInstance; className?: string }) {
+// Battlefield card — art crop with a name plate; every dimension derives from --card-w so
+// the card scales as one object when the row resizes it.
+function ArtView({ card, size, className }: { card: CardInstance; size?: CardSize; className?: string }) {
   const face = getActiveFace(card);
   const isCreature = face.typeLine.toLowerCase().includes('creature');
   const isTapped = card.tapped;
   const artCropUrl = face.artCrop;
+  const pt = isCreature && card.cardData.power ? getDisplayPT(card) : null;
+  const hasArt = !!artCropUrl;
+
+  // A custom property is not in CSSProperties' type; it is in the browser's.
+  const style = {
+    width: size ? size.w : 'clamp(72px,10vmin,140px)',
+    height: size ? size.h : 'clamp(100px,14vmin,196px)',
+    ['--card-w' as string]: size ? `${size.w}px` : 'clamp(72px,10vmin,140px)',
+  } as React.CSSProperties;
 
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-lg border-2 transition-all group',
+        'group relative overflow-hidden rounded-[calc(var(--card-w)*0.09)] border-[1.5px] transition-[filter,transform] duration-300',
         getCardColorClass(card),
-        isTapped ? 'rotate-[4deg] brightness-75' : '',
+        isTapped ? 'rotate-[7deg] brightness-[0.62] saturate-[0.7]' : '',
         className
       )}
-      style={{ width: 'clamp(72px,10vmin,1000px)', height: 'clamp(100px,14vmin,1000px)' }}
+      style={style}
     >
-      {artCropUrl ? (
-        <Image
-          src={artCropUrl}
-          alt={face.name}
-          fill
-          sizes="96px"
-          className="object-cover"
-          unoptimized
-        />
+      {hasArt ? (
+        <Image src={artCropUrl} alt={face.name} fill sizes="200px" className="object-cover" unoptimized />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-card px-1 text-center text-[10px] text-muted-foreground">
-          {face.name}
+        // No art yet (or none available): a carved slab that still tells you what the card is.
+        <div className={cn('flex h-full w-full flex-col justify-between bg-gradient-to-b to-[oklch(0.14_0.012_55)] p-[calc(var(--card-w)*0.07)]', slabTone(face.typeLine))}>
+          <div className="min-h-0 flex-1 overflow-hidden pt-[calc(var(--card-w)*0.16)]">
+            <p className="font-display font-bold leading-[1.05] text-foreground" style={{ fontSize: 'calc(var(--card-w) * 0.13)' }}>
+              {face.name}
+            </p>
+            <p className="mt-[calc(var(--card-w)*0.03)] truncate text-muted-foreground" style={{ fontSize: 'calc(var(--card-w) * 0.085)' }}>
+              {face.typeLine.replace(/^(Legendary |Basic )?/, '').split(' — ')[0]}
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Top dark strip for mana cost */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-end bg-gradient-to-b from-black/60 to-transparent" style={{ gap: 'clamp(2px,0.3vmin,1000px)', padding: 'clamp(2px,0.3vmin,1000px) clamp(3px,0.4vmin,1000px) clamp(8px,1.2vmin,1000px)' }}>
-        {parseManaSymbols(face.manaCost).slice(0, 5).map((sym, i) => (
-          <ManaSymbol key={i} symbol={sym} size="xs" className="shadow-sm" />
+      {/* Mana cost, top right */}
+      <div
+        className="absolute inset-x-0 top-0 flex items-center justify-end bg-gradient-to-b from-black/70 to-transparent"
+        style={{ gap: 'calc(var(--card-w) * 0.02)', padding: 'calc(var(--card-w) * 0.035) calc(var(--card-w) * 0.045) calc(var(--card-w) * 0.12)' }}
+      >
+        {parseManaSymbols(face.manaCost).slice(0, 6).map((sym, i) => (
+          <ManaSymbol key={i} symbol={sym} size="xs" className="shadow-sm" style={{ width: 'calc(var(--card-w) * 0.13)', height: 'calc(var(--card-w) * 0.13)', fontSize: 'calc(var(--card-w) * 0.07)' }} />
         ))}
       </div>
 
-      {/* Name overlay at bottom */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent" style={{ padding: 'clamp(12px,2vmin,1000px) clamp(4px,0.6vmin,1000px) clamp(3px,0.4vmin,1000px)' }}>
-        <p className="truncate font-semibold leading-tight text-white drop-shadow-md" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>
-          {face.name}
-        </p>
-      </div>
+      {/* Name plate, bottom — only over art; the slab already shows the name */}
+      {hasArt && (
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/92 via-black/70 to-transparent" style={{ padding: 'calc(var(--card-w) * 0.16) calc(var(--card-w) * 0.06) calc(var(--card-w) * 0.045)' }}>
+          <p className="truncate font-semibold leading-tight text-white drop-shadow-md" style={{ fontSize: 'calc(var(--card-w) * 0.115)', paddingRight: pt ? 'calc(var(--card-w) * 0.42)' : undefined }}>
+            {face.name}
+          </p>
+        </div>
+      )}
 
-      {/* P/T badge — bottom right corner, larger */}
-      {isCreature && card.cardData.power && (() => {
-        const pt = getDisplayPT(card);
-        return (
-          <div className={cn(
-            'absolute right-0 bottom-0 rounded-tl-md font-black shadow-lg',
-            pt.boosted ? 'bg-green-800 text-green-200' : 'bg-black/80 text-white'
-          )} style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(4px,0.6vmin,1000px)' }}>
-            {pt.power}/{pt.toughness}
-          </div>
-        );
-      })()}
+      {/* P/T, bottom right */}
+      {pt && (
+        <div
+          className={cn('absolute bottom-0 right-0 rounded-tl-md font-black tabular-nums shadow-lg', pt.boosted ? 'bg-green-800 text-green-100' : 'bg-black/85 text-white')}
+          style={{ fontSize: 'calc(var(--card-w) * 0.13)', padding: 'calc(var(--card-w) * 0.015) calc(var(--card-w) * 0.06)' }}
+        >
+          {pt.power}/{pt.toughness}
+        </div>
+      )}
 
-      {/* Token badge */}
+      {/* Token */}
       {isToken(card) && (
-        <div className="absolute left-0 bottom-3.5 rounded-r bg-purple-600/90 font-bold text-purple-100 shadow" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)' }}>
+        <div className="absolute left-0 rounded-r bg-purple-600/90 font-bold text-purple-100 shadow" style={{ top: 'calc(var(--card-w) * 0.2)', fontSize: 'calc(var(--card-w) * 0.075)', padding: '1px calc(var(--card-w) * 0.05)' }}>
           TOKEN
         </div>
       )}
 
-      {/* Attachments indicator */}
+      {/* Attachments */}
       {card.attachmentNames.length > 0 && (
-        <div className="absolute right-0 top-5 rounded-l bg-amber-600/90 font-bold text-amber-100 shadow truncate" style={{ fontSize: 'clamp(6px,0.9vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(3px,0.4vmin,1000px)', maxWidth: 'clamp(50px,8vmin,1000px)' }}>
+        <div className="absolute right-0 truncate rounded-l bg-amber-600/90 font-bold text-amber-50 shadow" style={{ top: 'calc(var(--card-w) * 0.36)', fontSize: 'calc(var(--card-w) * 0.075)', padding: '1px calc(var(--card-w) * 0.05)', maxWidth: '80%' }}>
           {card.attachmentNames.length === 1 ? card.attachmentNames[0] : `${card.attachmentNames.length} attached`}
         </div>
       )}
 
-      {/* Damage indicator */}
+      {/* Damage */}
       {card.damage > 0 && (
-        <div className="absolute left-0 top-0.5 rounded-r bg-red-600/90 font-bold text-white shadow" style={{ fontSize: 'clamp(9px,1.3vmin,1000px)', padding: 'clamp(1px,0.2vmin,1000px) clamp(4px,0.6vmin,1000px)' }}>
+        <div className="absolute left-0 top-[2%] rounded-r bg-red-600/90 font-bold text-white shadow" style={{ fontSize: 'calc(var(--card-w) * 0.1)', padding: '1px calc(var(--card-w) * 0.06)' }}>
           -{card.damage}
         </div>
       )}
 
-      {/* Tapped overlay */}
-      {isTapped && (
-        <div className="absolute inset-0 bg-black/20" />
+      {/* Modifier dot — keywords or counters present. Bottom-left, clear of the name. */}
+      {(card.cardData.keywords.length > 0 || Object.keys(card.counters).length > 0) && (
+        <div className="absolute rounded-full bg-gold shadow-[0_0_6px_var(--gold-glow-strong)]" style={{ left: 'calc(var(--card-w) * 0.05)', bottom: 'calc(var(--card-w) * 0.05)', width: 'calc(var(--card-w) * 0.08)', height: 'calc(var(--card-w) * 0.08)' }} />
       )}
 
-      {/* Modifier dot — single indicator when card has keywords, counters, or attachments */}
-      {(card.cardData.keywords.length > 0 || Object.keys(card.counters).length > 0) && (
-        <div className="absolute left-0.5 top-5 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.6)]" style={{ width: 'clamp(6px,0.9vmin,1000px)', height: 'clamp(6px,0.9vmin,1000px)' }} />
+      {/* Summoning sick */}
+      {card.summoningSick && isCreature && (
+        <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(0,0,0,0.18)_6px_8px)]" title="Summoning sick" />
       )}
     </div>
   );
 }
 
 // ==================== FULL CARD VIEW ====================
-// Full card image — used for hand cards and hover/click previews
-function FullView({ card, className }: { card: CardInstance; className?: string }) {
+function FullView({ card, size, className }: { card: CardInstance; size?: CardSize; className?: string }) {
   const face = getActiveFace(card);
   const imageUrl = face.normal;
+  const style = size ? { width: size.w, height: size.h } : { width: 'clamp(140px,20vmin,1000px)', height: 'clamp(196px,28vmin,1000px)' };
 
   return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-xl border-2 shadow-lg transition-all',
-        getCardColorClass(card),
-        className
-      )}
-      style={{ width: 'clamp(140px,20vmin,1000px)', height: 'clamp(196px,28vmin,1000px)' }}
-    >
+    <div className={cn('relative overflow-hidden rounded-xl border-2 shadow-lg transition-all', getCardColorClass(card), className)} style={style}>
       {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={face.name}
-          fill
-          sizes="190px"
-          className="object-cover"
-          unoptimized
-        />
+        <Image src={imageUrl} alt={face.name} fill sizes="190px" className="object-cover" unoptimized />
       ) : (
         <div className="flex h-full w-full flex-col gap-2 bg-card p-3">
-          <p className="text-sm font-bold">{face.name}</p>
+          <p className="font-display text-sm font-bold">{face.name}</p>
           <p className="text-[10px] text-muted-foreground">{face.manaCost}</p>
           <p className="text-xs text-muted-foreground">{face.typeLine}</p>
-          <p className="flex-1 text-[10px] leading-tight text-foreground/80">
-            {face.oracleText}
-          </p>
-          {card.cardData.power && (
-            <p className="self-end text-sm font-bold">
-              {card.cardData.power}/{card.cardData.toughness}
-            </p>
-          )}
+          <p className="flex-1 text-[10px] leading-tight text-foreground/80">{face.oracleText}</p>
+          {card.cardData.power && <p className="self-end text-sm font-bold">{card.cardData.power}/{card.cardData.toughness}</p>}
         </div>
       )}
     </div>
@@ -314,6 +296,7 @@ function FullView({ card, className }: { card: CardInstance; className?: string 
 export function CardView({
   card,
   mode = 'art',
+  size,
   onClick,
   onDoubleClick,
   selected = false,
@@ -330,31 +313,29 @@ export function CardView({
       className={cn(
         'relative inline-block transition-all duration-150',
         interactive && 'cursor-pointer hover:brightness-110',
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg',
+        selected && 'rounded-lg ring-2 ring-primary ring-offset-2 ring-offset-background',
         highlighted && 'card-glow-strong',
-        combatRole === 'attacking' && 'ring-2 ring-red-500/80 ring-offset-1 ring-offset-background rounded-lg shadow-[0_0_12px_rgba(239,68,68,0.4)]',
-        combatRole === 'blocking' && 'ring-2 ring-blue-500/80 ring-offset-1 ring-offset-background rounded-lg shadow-[0_0_12px_rgba(59,130,246,0.4)]',
+        combatRole === 'attacking' && 'rounded-lg shadow-[0_0_12px_rgba(239,68,68,0.4)] ring-2 ring-red-500/80 ring-offset-1 ring-offset-background',
+        combatRole === 'blocking' && 'rounded-lg shadow-[0_0_12px_rgba(59,130,246,0.4)] ring-2 ring-blue-500/80 ring-offset-1 ring-offset-background',
         className
       )}
       onClick={() => { setPreviewCard(card); onClick?.(card); }}
       onDoubleClick={() => onDoubleClick?.(card)}
     >
       {mode === 'pip' && <PipView card={card} />}
-      {mode === 'art' && <ArtView card={card} />}
-      {mode === 'full' && <FullView card={card} />}
+      {mode === 'art' && <ArtView card={card} size={size} />}
+      {mode === 'full' && <FullView card={card} size={size} />}
 
-      {/* Combat role badge */}
       {combatRole === 'attacking' && (
-        <div className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-md">
+        <div className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-md">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="m21 11-6 6"/></svg>
         </div>
       )}
       {combatRole === 'blocking' && (
-        <div className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow-md">
+        <div className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow-md">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
         </div>
       )}
-
     </div>
   );
 }

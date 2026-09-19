@@ -26,7 +26,7 @@ function consolidateRecent(events: GameEvent[], maxItems = 6): string[] {
     const who = (data.playerName as string) || '';
 
     // Skip phase/turn noise for the ticker
-    if (ev.type === 'PHASE_CHANGED' || ev.type === 'GAME_STARTED') {
+    if (ev.type === 'PHASE_CHANGED' || ev.type === 'GAME_STARTED' || ev.type === 'OPENING_HANDS') {
       i--;
       continue;
     }
@@ -109,6 +109,7 @@ function formatEventFull(event: GameEvent): string {
 
   switch (event.type) {
     case 'GAME_STARTED': return '▸ Game started';
+    case 'OPENING_HANDS': return '▸ Opening hands dealt';
     case 'TURN_STARTED': return `─ Turn ${data.turnNumber ?? 1} — ${(data.activePlayer as string) || who}`;
     case 'PHASE_CHANGED': return `› ${String(data.phase ?? '').replace(/_/g, ' ')}`;
     case 'CARD_DRAWN': return data.isOwn ? `+ Drew ${card || 'a card'}` : `+ ${who} drew a card`;

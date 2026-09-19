@@ -5,6 +5,8 @@ import { useAuth } from '@/lib/firebase/auth';
 import { useDeckStore } from '@/store/deckStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { upsertUserProfile } from '@/lib/firebase/firestore';
+import { isDevMock } from '@/lib/devMock';
+import { DEV_MOCK_DECKS } from '@/dev/mockDecks';
 
 /**
  * Wires Firebase Auth state to deck store Firestore sync.
@@ -41,6 +43,12 @@ export function useFirestoreSync() {
     if (previousUid !== null && previousUid !== uid) {
       clearSync();
       clearUserSettings();
+    }
+
+    if (uid && user && isDevMock()) {
+      // Development-only: no Firestore to talk to, so seed a few decks instead.
+      useDeckStore.setState({ decks: DEV_MOCK_DECKS, syncedUserId: uid, isSyncing: false, syncFailed: false });
+      return;
     }
 
     if (uid && user) {

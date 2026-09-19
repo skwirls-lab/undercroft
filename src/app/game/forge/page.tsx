@@ -16,15 +16,15 @@ import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { cn } from '@/lib/utils';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
-import type { CardInstance } from '@/lib/gameTypes';
+import type { CardInstance, GameAction } from '@/lib/gameTypes';
 import { PhaseTracker } from '@/components/game/PhaseTracker';
+import { Keystone } from '@/components/brand/Keystone';
+import { useFitToRow } from '@/hooks/useFitToRow';
 import {
-  ArrowLeft,
   Loader2,
   Flag,
   RotateCcw,
   Hand as HandIcon,
-  ChevronUp,
   ArrowRight,
   FastForward,
 } from 'lucide-react';
@@ -37,7 +37,7 @@ import {
 
 const HUMAN_PLAYER_ID = 'player-human';
 
-function ForgeGamePage() {
+export function ForgeGamePage() {
   const router = useRouter();
   const {
     connectionStatus,
@@ -132,6 +132,14 @@ function ForgeGamePage() {
   const isMyTurn = gameState?.turn.activePlayerId === HUMAN_PLAYER_ID;
   const inCombatPhase = gameState?.turn.phase === 'combat';
 
+  // Count transitions INTO priority so the bar's sweep replays each time it becomes yours.
+  const [prioritySweep, setPrioritySweep] = useState(0);
+  const hadPriority = React.useRef(false);
+  useEffect(() => {
+    if (hasPriorityForActions && !hadPriority.current) setPrioritySweep((n) => n + 1);
+    hadPriority.current = !!hasPriorityForActions;
+  }, [hasPriorityForActions]);
+
   const handlePassPriority = useCallback(() => {
     const action = legalActions.find((a: { type: string }) => a.type === 'PASS_PRIORITY');
     if (action) performAction(action);
@@ -190,10 +198,8 @@ function ForgeGamePage() {
       <div className="flex h-[100dvh] flex-col overflow-hidden">
         {/* ─── HEADER: nav | phase tracker | nav buttons ─── */}
         <header className="flex items-center border-b border-border/30 shrink-0" style={{ gap: 'clamp(4px,1vmin,1000px)', padding: 'clamp(2px,0.5vmin,1000px) clamp(6px,1.5vmin,1000px)', minHeight: 'clamp(32px,5vh,1000px)' }}>
-          <Link href="/" className="shrink-0">
-            <Button variant="ghost" size="sm" className="p-0" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Home">
-              <ArrowLeft style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
-            </Button>
+          <Link href="/" className="flex shrink-0 items-center px-1" title="Home" aria-label="Home">
+            <Keystone size={30} />
           </Link>
           {gameState && (
             <div className="flex-1 min-w-0 mx-1">
@@ -251,7 +257,6 @@ function ForgeGamePage() {
           <GameBoard
             currentPlayerId={HUMAN_PLAYER_ID}
             hideHand
-            hideCommandZone
             hidePhaseTracker
             hideActionBar
             className="h-full"
@@ -261,34 +266,19 @@ function ForgeGamePage() {
             onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
             externalExpandedPlayerId={expandedPlayerId}
             onExpandedPlayerChange={setExpandedPlayerId}
-            expandedHandContent={
-              <div>
-                <div className="flex items-center" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(4px,0.6vmin,1000px)' }}>
-                  <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
-                  <span className="font-bold uppercase tracking-wider text-muted-foreground/60" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>Hand · {handCards.length}</span>
-                </div>
-                <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-                  <Hand
-                    cards={handCards}
-                    legalActions={handLegalActions}
-                    // Deliberately does NOT close the overlay: you usually want to play
-                    // several things in a row while looking at your board.
-                    onPlayCard={handleForgePlayCard}
-                    isActive={!!hasPriority && !isGameOver}
-                    layout="grid"
-                  />
-                </div>
-              </div>
-            }
           />
           <ForgeChoiceOverlay />
         </div>
 
         {/* ─── PRIORITY BAR: centered above hand ─── */}
-        <div className={cn(
-          'shrink-0 flex items-center justify-center border-t border-border/20',
-          hasPriorityForActions && !isGameOver ? 'bg-gold/5' : 'bg-card/30'
-        )} style={{ gap: 'clamp(6px,1.5vmin,1000px)', padding: 'clamp(6px,1.2vmin,1000px) clamp(8px,2vmin,1000px)' }}>
+        <div
+          key={prioritySweep}
+          className={cn(
+            'relative shrink-0 flex items-center justify-center overflow-hidden border-t border-border/20',
+            hasPriorityForActions && !isGameOver ? 'bg-gold/[0.06] sweep' : 'bg-card/30'
+          )}
+          style={{ gap: 'clamp(6px,1.5vmin,1000px)', padding: 'clamp(6px,1.2vmin,1000px) clamp(8px,2vmin,1000px)' }}
+        >
           {(isProcessing || isAwaitingServer) && <Loader2 className="animate-spin text-gold" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />}
           {hasPriorityForActions && !isProcessing && !isAwaitingServer && !isGameOver && (
             <span className="relative" style={{ width: 'clamp(8px,1.5vmin,1000px)', height: 'clamp(8px,1.5vmin,1000px)' }}>
@@ -327,21 +317,15 @@ function ForgeGamePage() {
           </Button>
         </div>
 
-        {/* ─── COLLAPSED HAND: peek strip, tap to expand ─── */}
-        <div
-          className="shrink-0 border-t border-border/20 bg-background/95 backdrop-blur-xl shadow-[0_-4px_16px_rgba(0,0,0,0.3)] flex items-center cursor-pointer"
-          style={{ height: 'clamp(36px, 6vh, 1000px)', padding: '0 clamp(8px,2vmin,1000px)' }}
-          onClick={() => setExpandedPlayerId(HUMAN_PLAYER_ID)}
-        >
-          <HandIcon className="text-muted-foreground/60" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)', marginRight: 'clamp(6px,1.2vmin,1000px)' }} />
-          <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider" style={{ fontSize: 'clamp(10px,2.2vmin,1000px)' }}>
-            Hand · {handCards.length}
-          </span>
-          {commandZoneCards.length > 0 && (
-            <span className="text-muted-foreground/40" style={{ fontSize: 'clamp(10px,2.2vmin,1000px)', marginLeft: 'clamp(4px,1vmin,1000px)' }}>· Cmd {commandZoneCards.length}</span>
-          )}
-          <ChevronUp className="text-muted-foreground/40 ml-auto" style={{ width: 'clamp(14px,2.5vmin,1000px)', height: 'clamp(14px,2.5vmin,1000px)' }} />
-        </div>
+        {/* ─── HAND STRIP: playable from the main view; tap the plaque for the full board ─── */}
+        <HandStrip
+          cards={handCards}
+          legalActions={handLegalActions}
+          onPlayCard={handleForgePlayCard}
+          isActive={!!hasPriority && !isGameOver}
+          commanderCount={commandZoneCards.length}
+          onOpenBoard={() => setExpandedPlayerId(HUMAN_PLAYER_ID)}
+        />
       </div>
 
       {pendingExit && (
@@ -390,6 +374,45 @@ function ForgeGamePage() {
 
       <CardPreviewFloating />
     </CardPreviewProvider>
+  );
+}
+
+// ============================================================
+// HandStrip — the hand along the bottom of the main view. Cards are sized to the strip's
+// height so it never grows; it scrolls sideways under a thumb. Replaces a bar that only
+// said "Hand · 9" and made you open the board to play anything.
+// ============================================================
+function HandStrip({
+  cards, legalActions, onPlayCard, isActive, commanderCount, onOpenBoard,
+}: {
+  cards: CardInstance[];
+  legalActions: GameAction[];
+  onPlayCard: (card: CardInstance) => void;
+  isActive: boolean;
+  commanderCount: number;
+  onOpenBoard: () => void;
+}) {
+  const { ref, boxH } = useFitToRow<HTMLDivElement>({ count: 1, gap: 0, aspect: 1.4, maxW: 999, minW: 1, maxLines: 1 });
+  const h = Math.max(0, Math.round(boxH * 0.86));
+  const size = { h, w: Math.round(h / 1.4) };
+  return (
+    <div className="flex shrink-0 items-stretch border-t border-border/40 bg-background/85 backdrop-blur-xl" style={{ height: 'clamp(92px, 14vh, 132px)' }}>
+      <button
+        onClick={onOpenBoard}
+        className="flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-r border-border/30 text-muted-foreground/70 transition-colors hover:bg-muted/30 hover:text-gold"
+        title="Open your board"
+        aria-label="Open your board"
+      >
+        <HandIcon className="h-4 w-4" />
+        <span className="text-[10px] font-semibold tabular-nums">{cards.length}</span>
+        {commanderCount > 0 && <span className="text-[9px] text-muted-foreground/50">cmd {commanderCount}</span>}
+      </button>
+      <div ref={ref} className="min-w-0 flex-1">
+        {h > 0 && (
+          <Hand cards={cards} legalActions={legalActions} onPlayCard={onPlayCard} isActive={isActive} layout="strip" cardSize={size} className="h-full" />
+        )}
+      </div>
+    </div>
   );
 }
 
