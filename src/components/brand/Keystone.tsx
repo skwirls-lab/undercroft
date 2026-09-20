@@ -4,21 +4,22 @@ import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * The five colours of Magic, set into an arch as its voussoirs — the wedge stones — with
- * white at the keystone. This is the mark that says "Commander" without a word: it appears
- * in the app bar, on the landing arch, and lights up in sequence as the loading indicator.
+ * The five colours of Magic, set into an arch as its voussoirs — the wedge stones. This is
+ * the mark that says "Commander" without a word: it appears in the app bar, on the landing
+ * arch, on the favicon and home-screen icon, and lights up in sequence as the loading
+ * indicator.
  *
- * Order follows the colour wheel clockwise from the keystone: W at the crown, then U and G
- * on the shoulders, B and R at the springing line. Reading left to right that is G W U on
- * top with R and B below — the way the pentagon on a card back reads if you tilt it.
+ * The order is WUBRG, left to right, the way every Magic player reads the five colours: white
+ * at the left springing, blue on the shoulder, black at the keystone, red on the right
+ * shoulder, green at the right springing. Any other order reads as wrong at a glance.
  */
 
 const GEMS: Array<{ id: 'W' | 'U' | 'B' | 'R' | 'G'; color: string; hi: string }> = [
-  { id: 'R', color: 'var(--color-mana-red)', hi: '#f0a090' },
-  { id: 'G', color: 'var(--color-mana-green)', hi: '#a6e0b0' },
   { id: 'W', color: 'var(--color-mana-white)', hi: '#ffffff' },
   { id: 'U', color: 'var(--color-mana-blue)', hi: '#a8cdf0' },
   { id: 'B', color: 'var(--color-mana-black)', hi: '#9a92a6' },
+  { id: 'R', color: 'var(--color-mana-red)', hi: '#f0a090' },
+  { id: 'G', color: 'var(--color-mana-green)', hi: '#a6e0b0' },
 ];
 
 // Angles across the top of a semicircle, left springing (180°) to right (0°).
@@ -83,12 +84,12 @@ export function Keystone({ size = 44, loading = false, piers = size >= 56, class
         </>
       )}
 
-      {/* Voussoir gems along the arc, keystone (W) at the crown. */}
+      {/* Voussoir gems along the arc, WUBRG left to right; the keystone (B) sits at the crown. */}
       {GEMS.map((g, i) => {
         const a = (ANGLES[i] * Math.PI) / 180;
         const x = cx + r * Math.cos(a);
         const y = cy - r * Math.sin(a);
-        const isKey = g.id === 'W';
+        const isKey = g.id === 'B';
         return (
           <g key={g.id} className={loading ? 'ks-gem' : undefined} style={loading ? { animationDelay: `${i * 0.14}s` } : undefined}>
             {/* Gold setting */}

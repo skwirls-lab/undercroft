@@ -3,29 +3,31 @@
 import { useCallback, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Swords, Pencil, Check, MoreHorizontal, FileText, RefreshCw, Trash2, Crown,
-  AlertCircle, CheckCircle2, Loader2, Library, Lock,
+  Loader2, Library, Lock, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Alcove, Eyebrow } from '@/components/brand/Alcove';
 import { ManaSymbol } from '@/components/game/ManaSymbol';
 import { useDeckStore, parseDecklist, deckTotals, mergeEntries, type Deck, type DeckEntry } from '@/store/deckStore';
 import { useCardRecords } from '@/hooks/useCardRecords';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { groupDeck, deckColorIdentity, manaCurve, frontFace, verifyEntries } from '@/lib/deckCards';
+import { groupDeck, deckColorIdentity, manaCurve, frontFace, verifyEntries, primeCardRecord } from '@/lib/deckCards';
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 import { CardTile } from './CardTile';
 import { CardLightbox } from './CardLightbox';
-import { AddCardSearch } from './AddCardSearch';
+import { CardSearchPanel } from './CardSearchPanel';
+import { DeckCheckBadge, DeckCheckDialog } from './DeckCheck';
+import { checkDeck, canBeCommander, fitsIdentity } from '@/lib/deckRules';
 import { AccentDot, ShelfDialog } from './Shelves';
 import { rise, riseStagger, settle } from '@/lib/motion';
 import { cn } from '@/lib/utils';
@@ -38,6 +40,7 @@ import { cn } from '@/lib/utils';
  */
 export function DeckDetail({ deckId }: { deckId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const deck = useDeckStore((s) => s.decks.find((d) => d.id === deckId));
   const isSyncing = useDeckStore((s) => s.isSyncing);
   const shelves = useDeckStore((s) => s.shelves);
@@ -45,10 +48,14 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const { can } = useEntitlements();
   const canEdit = can('deck.edit');
 
-  const [editing, setEditing] = useState(false);
+  // `?edit=1` (from "New deck") opens straight into edit mode with the search box ready.
+  const [editing, setEditing] = useState(() => searchParams.get('edit') === '1');
   // The name is drafted locally while editing and written once on Done, not per keystroke:
   // every store update is a Firestore write.
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [checkOpen, setCheckOpen] = useState(false);
+  /** A search result being read, before it is in the deck. */
+  const [previewRecord, setPreviewRecord] = useState<ScryfallCardRecord | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [openCard, setOpenCard] = useState<string | null>(null);
   const [textOpen, setTextOpen] = useState(false);
@@ -63,6 +70,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const curve = useMemo(() => (deck ? manaCurve(deck.cards, records) : []), [deck, records]);
   const commanderRecord = deck?.commanderName ? records.get(deck.commanderName) ?? null : null;
   const banner = commanderRecord ? frontFace(commanderRecord).art : undefined;
+  const check = useMemo(() => checkDeck(deck ?? { cards: [], commanderName: '' }, records), [deck, records]);
 
   // ── Edits ───────────────────────────────────────────────────────────────────
   // Optimistic: the store (and Firestore behind it) updates at once; verification of any
@@ -97,6 +105,15 @@ export function DeckDetail({ deckId }: { deckId: string }) {
 
   const addCard = useCallback(async (rec: ScryfallCardRecord) => {
     if (!deck) return;
+    // The one rule enforced at the door: a card outside the commander's colours never goes in.
+    // Everything else (size, singleton) is reported by the deck check, since a deck in progress
+    // is allowed to be wrong on the way to being right.
+    const cmd = deck.commanderName ? records.get(deck.commanderName) : null;
+    if (cmd && rec.name !== deck.commanderName && !fitsIdentity(rec, cmd.color_identity ?? [])) {
+      toast.error(`${rec.name} is outside ${deck.commanderName}'s colour identity.`);
+      return;
+    }
+    primeCardRecord(rec);
     const existing = deck.cards.find((e) => e.cardName === rec.name);
     const next = existing
       ? deck.cards.map((e) => (e.cardName === rec.name ? { ...e, quantity: e.quantity + 1 } : e))
@@ -110,14 +127,16 @@ export function DeckDetail({ deckId }: { deckId: string }) {
     } catch (err) {
       console.error('[DeckDetail] verify after add failed:', err);
     }
-  }, [deck, commit, patchVerified]);
+  }, [deck, records, commit, patchVerified]);
 
   const makeCommander = useCallback((name: string) => {
     if (!deck) return;
+    const rec = records.get(name);
+    if (rec && !canBeCommander(rec)) { toast.error(`${name} cannot be a commander.`); return; }
     const has = deck.cards.some((e) => e.cardName === name);
     commit(has ? deck.cards : [...deck.cards, { cardName: name, quantity: 1 }], { commanderName: name });
     toast.success(`${name} now leads the deck.`);
-  }, [deck, commit]);
+  }, [deck, records, commit]);
 
   const reverify = useCallback(async (cards?: DeckEntry[], extra: Partial<Deck> = {}) => {
     const source = cards ?? deck?.cards;
@@ -181,15 +200,13 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   }
 
   const shelf = shelves.find((s) => s.id === deck.shelfId) ?? null;
-  const total = deck.totalCards || deck.cards.reduce((s, c) => s + c.quantity, 0);
+  // Always from the entries: a stored total can lag behind an edit made elsewhere.
+  const total = deck.cards.reduce((s, c) => s + c.quantity, 0);
   const lands = sections.find((s) => s.group === 'Lands')?.count ?? 0;
   const nonland = curve.reduce((a, b) => a + b, 0);
   const avgMv = nonland > 0 ? (curve.reduce((sum, n, mv) => sum + n * mv, 0) / nonland).toFixed(2) : '–';
-  const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
-  const notInForge = deck.cards.filter((c) => c.resolved && c.forgeResolved === false).length;
-  const ready = hasResolution && deck.unresolvedCount === 0 && notInForge === 0;
   const openEntry = openCard ? deck.cards.find((e) => e.cardName === openCard) ?? null : null;
-  const inDeck = new Set(deck.cards.map((c) => c.cardName));
+  const inDeck = new Map(deck.cards.map((c) => [c.cardName, c.quantity]));
   const curveMax = Math.max(1, ...curve);
 
   return (
@@ -269,18 +286,21 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                       <MoreHorizontal />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel className="text-xs text-muted-foreground">Shelf</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => moveDeckToShelf(deck.id, null)} className={cn(!deck.shelfId && 'text-gold')}>
-                        <Library /> In the open
-                      </DropdownMenuItem>
-                      {shelves.map((s) => (
-                        <DropdownMenuItem key={s.id} onClick={() => moveDeckToShelf(deck.id, s.id)} className={cn(deck.shelfId === s.id && 'text-gold')}>
-                          <AccentDot accent={s.accent} className="mx-1" /> {s.name}
+                      {/* A menu label is a group part in Base UI and must sit inside a group. */}
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Shelf</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => moveDeckToShelf(deck.id, null)} className={cn(!deck.shelfId && 'text-gold')}>
+                          <Library /> In the open
                         </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuItem onClick={() => setShelfOpen(true)} disabled={!can('vault.shelves')}>
-                        <span className="mx-1 text-xs">+</span> New shelf…
-                      </DropdownMenuItem>
+                        {shelves.map((s) => (
+                          <DropdownMenuItem key={s.id} onClick={() => moveDeckToShelf(deck.id, s.id)} className={cn(deck.shelfId === s.id && 'text-gold')}>
+                            <AccentDot accent={s.accent} className="mx-1" /> {s.name}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuItem onClick={() => setShelfOpen(true)} disabled={!can('vault.shelves')}>
+                          <span className="mx-1 text-xs">+</span> New shelf…
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setTextOpen(true)} disabled={!canEdit}><FileText /> Edit as text</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => reverify()} disabled={verifying}><RefreshCw /> Re-verify cards</DropdownMenuItem>
@@ -305,26 +325,27 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                   ))}
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                  {verifying ? (
-                    <span className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin text-gold" /> Verifying…</span>
-                  ) : ready ? (
-                    <span className="flex items-center gap-1.5 text-emerald-300"><CheckCircle2 className="h-4 w-4" /> Ready to play</span>
-                  ) : hasResolution ? (
-                    <span className="flex items-center gap-1.5 text-amber-300"><AlertCircle className="h-4 w-4" />{deck.unresolvedCount > 0 && `${deck.unresolvedCount} unknown`}{deck.unresolvedCount > 0 && notInForge > 0 && ' · '}{notInForge > 0 && `${notInForge} not in Forge`}</span>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => reverify()} className="gap-1.5 text-muted-foreground hover:text-gold"><RefreshCw /> Verify cards</Button>
-                  )}
+                  <DeckCheckBadge check={check} verifying={verifying} onClick={() => setCheckOpen(true)} />
                 </div>
               </div>
             </div>
           </Alcove>
         </motion.div>
 
-        {/* Add card — edit mode only, sticky so it follows you down a long list */}
-        <AnimatePresence>
+        {/* Add cards — edit mode only */}
+        <AnimatePresence initial={false}>
           {editing && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={settle} className="sticky top-2 z-20 mt-4 sm:top-16">
-              <AddCardSearch inDeck={inDeck} onAdd={addCard} className="drop-shadow-xl" />
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={settle} className="mt-4">
+              <Alcove flat className="px-4 pb-4 pt-4 sm:px-5">
+                <Eyebrow className="mb-3"><span className="flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add cards</span></Eyebrow>
+                <CardSearchPanel
+                  identity={commanderRecord ? (commanderRecord.color_identity ?? []) : null}
+                  inDeck={inDeck}
+                  onAdd={addCard}
+                  onOpen={(rec) => setPreviewRecord(rec)}
+                  autoFocus={searchParams.get('edit') === '1'}
+                />
+              </Alcove>
             </motion.div>
           )}
         </AnimatePresence>
@@ -356,22 +377,24 @@ export function DeckDetail({ deckId }: { deckId: string }) {
           {deck.cards.length === 0 && (
             <Alcove flat className="flex flex-col items-center gap-3 px-6 py-12 text-center">
               <p className="font-display text-lg font-bold">This deck is empty</p>
-              <p className="max-w-sm text-sm text-muted-foreground">Turn on Edit and search for cards, or paste a list with “Edit as text”.</p>
+              <p className="max-w-sm text-sm text-muted-foreground">Press Edit and search for cards above, or paste a list with “Edit as text”.</p>
             </Alcove>
           )}
         </motion.div>
       </div>
 
-      {/* Reader */}
+      {/* Reader — a deck card with edit controls, or a search result read-only */}
       <CardLightbox
-        entry={openEntry}
-        record={openEntry ? records.get(openEntry.cardName) ?? null : null}
-        isCommander={!!openEntry && openEntry.cardName === deck.commanderName}
-        onClose={() => setOpenCard(null)}
-        onQuantity={canEdit ? (q) => openEntry && setQuantity(openEntry.cardName, q) : undefined}
-        onRemove={canEdit ? () => openEntry && removeCard(openEntry.cardName) : undefined}
-        onMakeCommander={canEdit ? () => openEntry && makeCommander(openEntry.cardName) : undefined}
+        entry={previewRecord ? { cardName: previewRecord.name, quantity: 0, resolved: true } : openEntry}
+        record={previewRecord ?? (openEntry ? records.get(openEntry.cardName) ?? null : null)}
+        isCommander={!previewRecord && !!openEntry && openEntry.cardName === deck.commanderName}
+        onClose={() => { setOpenCard(null); setPreviewRecord(null); }}
+        onQuantity={canEdit && !previewRecord ? (q) => openEntry && setQuantity(openEntry.cardName, q) : undefined}
+        onRemove={canEdit && !previewRecord ? () => openEntry && removeCard(openEntry.cardName) : undefined}
+        onMakeCommander={canEdit && !previewRecord ? () => openEntry && makeCommander(openEntry.cardName) : undefined}
       />
+
+      <DeckCheckDialog open={checkOpen} onOpenChange={setCheckOpen} check={check} onOpenCard={(name) => { setCheckOpen(false); setOpenCard(name); }} />
 
       {/* Edit as text */}
       <Dialog open={textOpen} onOpenChange={setTextOpen}>

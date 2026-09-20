@@ -7,6 +7,7 @@ import { Crown, Minus, Plus, Trash2 } from 'lucide-react';
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 import type { DeckEntry } from '@/store/deckStore';
 import { frontFace } from '@/lib/deckCards';
+import { canBeCommander } from '@/lib/deckRules';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +30,7 @@ interface CardLightboxProps {
 export function CardLightbox({ entry, record, isCommander, onQuantity, onRemove, onMakeCommander, onClose }: CardLightboxProps) {
   const face = record ? frontFace(record) : null;
   const canEdit = !!onQuantity;
-  const isLegendaryCreature = !!face && /legendary/i.test(face.typeLine) && /creature/i.test(face.typeLine);
+  const isLegendaryCreature = !!record && canBeCommander(record);
 
   return (
     <Dialog open={entry !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -68,18 +69,18 @@ export function CardLightbox({ entry, record, isCommander, onQuantity, onRemove,
 
               <div className="mt-auto flex flex-col gap-3 border-t border-border/40 pt-4">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Flag ok={entry.resolved !== false && !!record} label={record ? 'In card database' : 'Not in card database'} />
+                  {entry.quantity > 0 && <Flag ok={entry.resolved !== false && !!record} label={record ? 'In card database' : 'Not in card database'} />}
                   {entry.resolved && <Flag ok={entry.forgeResolved !== false} label={entry.forgeResolved === false ? 'Not playable in Forge' : entry.forgeName && entry.forgeName !== entry.cardName ? `Plays as ${entry.forgeName}` : 'Playable in Forge'} />}
                   {isCommander && <span className="flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 font-semibold text-gold"><Crown className="h-3 w-3" /> Commander</span>}
                 </div>
 
                 {canEdit && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center overflow-hidden rounded-lg border border-border/60">
+                    {!isCommander && <div className="flex items-center overflow-hidden rounded-lg border border-border/60">
                       <Button variant="ghost" size="icon-sm" aria-label="One fewer" disabled={entry.quantity <= 1} onClick={() => onQuantity?.(entry.quantity - 1)} className="rounded-none text-foreground"><Minus /></Button>
                       <span className="min-w-[2.5rem] text-center text-sm font-bold tabular-nums">{entry.quantity}</span>
                       <Button variant="ghost" size="icon-sm" aria-label="One more" onClick={() => onQuantity?.(entry.quantity + 1)} className="rounded-none text-foreground"><Plus /></Button>
-                    </div>
+                    </div>}
                     {!isCommander && onMakeCommander && (
                       <Button variant="outline" size="sm" onClick={onMakeCommander} disabled={!isLegendaryCreature && !!record} title={!isLegendaryCreature && record ? 'Only a legendary creature can lead the deck' : undefined} className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold">
                         <Crown /> Make commander
