@@ -259,6 +259,33 @@ Client-side account separation was hardened alongside this:
   existed to clear a stored LLM API key; that setting is gone with the engine it configured,
   but resetting on a shared browser is still the right behaviour.)
 
+## 9. Launch checklist
+
+Everything the app needs before it is advertised, in order. Each item names where it is
+explained above.
+
+1. **Firestore rules** pasted with your UID in the allowlist (§1, §4). `npm run test:rules`
+   is green in CI; the deployed copy must match the file in this repo.
+2. **Vercel environment variables**, Production and Preview:
+   - `FIREBASE_SERVICE_ACCOUNT` (§3)
+   - `OPENROUTER_API_KEY`, optionally `NEXT_PUBLIC_SITE_URL` (§6)
+   - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (§7)
+   - `NEXT_PUBLIC_ADMIN_UIDS` with your UID (§5)
+   - `NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1` — the paywall switch, last (§7 step 7)
+3. **Stripe**: the product and price, the webhook endpoint with its five events, the
+   Customer Portal enabled; one test-mode subscription and cancellation walked through (§7).
+4. **The Archivist**: Settings → Administration → Model shows the OpenRouter slug you have
+   confirmed on openrouter.ai/models; allowances set; one real call made and its row seen in
+   `archivistLog` (§6). Set a credit limit on the key.
+5. **Your own account**: grant yourself Patron from the Administration section so the switch
+   never locks the keeper out (§5).
+6. **A fresh account**: sign in with a second Google account and walk the free tier: two
+   decks, the third refused with the Patron sheet, random opponents only, the two-AI pod,
+   ten Archivist requests, the tours and the Apprentice. Then Become a Patron in test mode
+   and see every lock open.
+7. **The game server** (still open, below): before a public URL, put the Forge server behind
+   authentication or an origin check and cap concurrent games.
+
 ## Still open
 
 `POST /api/ai` — the unauthenticated open proxy — has been deleted, along with the orphaned

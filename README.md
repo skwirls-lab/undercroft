@@ -202,17 +202,26 @@ plan; `firestore.rules` forbids it. `SECURITY_SETUP.md` §7 has the Stripe setup
 
 ```
 src/
-├── app/               # Routes: landing/dashboard, decks, game setup, game board, admin, dev
+├── app/               # Routes: landing/dashboard, decks, game setup, game board, learn, admin, dev
+│   └── api/           # Route handlers: me, archivist, billing (checkout, portal, webhook)
 ├── components/
 │   ├── brand/         # Keystone, Arch, Alcove — the Undercroft visual identity
 │   ├── decks/         # Deck page, builder search, deck check, card tiles, reader, shelves
-│   ├── game/          # Board, seats, cards, hand, prompts
+│   ├── game/          # Board, seats, cards, hand, prompts, the Apprentice strip and prompt guide
+│   ├── archivist/     # The Archivist's sheet, in-game panel, commander ideas, notices
+│   ├── learn/         # The lessons index, a lesson with diagrams and quiz
+│   ├── tour/          # The spotlight tour overlay
+│   ├── patron/        # The Patron sheet and upsell provider
+│   ├── admin/         # The Administration section of Settings
 │   └── ui/            # shadcn primitives
-├── hooks/             # useFitToRow, useCardRecords, useEntitlements, useMediaQuery, Firestore sync
-├── lib/               # Forge client + adapter, deck cards + verification, opponent decks, entitlements
-├── store/             # Zustand: decks, settings, game state
-└── dev/               # Mock game and mock decks for the development harness
-scripts/               # Tests, protocol check, card sync, screenshot sweep
+├── content/           # Typed content: lessons, guides (phase, step, prompt, issue), tours
+├── hooks/             # useEntitlements, useArchivist, useTour, useCardRecords, useFitToRow, Firestore sync
+├── lib/               # Forge client + adapter, deck cards + verification, entitlements, plan, metering,
+│   ├── archivist/     #   prompts, contexts, client
+│   └── server/        #   Admin SDK, bearer auth, app config, metering, Stripe, billing store
+├── store/             # Zustand: decks, settings, app config, game state
+└── dev/               # Mock game, decks, cards and admin data for the development harness
+scripts/               # Tests, protocol check, card sync, screenshot sweep, tour walk
 ```
 
 ## Icons
