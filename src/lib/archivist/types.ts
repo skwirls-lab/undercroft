@@ -22,7 +22,8 @@ export const IMPROVE_GOALS: Array<{ id: ImproveGoal; label: string }> = [
 export interface DeckContext {
   name: string;
   commander: { name: string; typeLine: string; oracleText: string; identity: string[] } | null;
-  cards: Array<{ name: string; qty: number; type: string; mv: number; cost: string }>;
+  /** Every card with its printed text (trimmed): the model must never have to guess what a card does. */
+  cards: Array<{ name: string; qty: number; type: string; mv: number; cost: string; text: string }>;
   total: number;
   lands: number;
   curve: number[];
@@ -43,7 +44,7 @@ export interface MatchContext {
     commanderDamage: Record<string, number>;
     commander: { name: string; zone: 'command' | 'battlefield' | 'elsewhere'; castCount: number } | null;
     hand: Array<{ name: string; cost: string; type: string; oracle: string }>;
-    battlefield: Array<{ name: string; type: string; tapped: boolean; pt?: string }>;
+    battlefield: Array<{ name: string; type: string; tapped: boolean; pt?: string; text?: string }>;
     graveyard: string[];
     libraryCount: number;
     manaAvailable: number;
@@ -89,7 +90,7 @@ export type ArchivistPayload =
   | { task: 'deck.strategy'; deck: DeckContext }
   | { task: 'commander.ideas'; wish: string }
   | { task: 'match.advice'; match: MatchContext; question: string }
-  | { task: 'rules.question'; question: string; match?: MatchContext }
+  | { task: 'rules.question'; question: string; match?: MatchContext; deck?: DeckContext }
   | { task: 'game.recap'; recap: RecapContext };
 
 export interface ArchivistRequest {

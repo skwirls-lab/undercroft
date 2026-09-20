@@ -72,7 +72,7 @@ export function DeckArchivistSheet({ open, onOpenChange, context, deckNames, onS
     setAsked(true);
     if (which === 'improve') { await ask({ task: 'deck.improve', deck: context, goal: g }); return; }
     if (which === 'strategy') { await ask({ task: 'deck.strategy', deck: context }); return; }
-    if (which === 'ask') { if (!q.trim()) return; await ask({ task: 'rules.question', question: `About the deck "${context.name}" (${context.commander?.name ?? 'no commander'}): ${q.trim()}` }); return; }
+    if (which === 'ask') { if (!q.trim()) return; await ask({ task: 'rules.question', question: q.trim(), deck: context }); return; }
     const raw = await ask({ task: 'deck.swaps', deck: context, goal: g });
     if (raw == null) return;
     const parsed = parseSwaps(raw, deckNames, context.commander?.name ?? '');
