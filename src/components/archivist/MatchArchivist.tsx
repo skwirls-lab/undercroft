@@ -43,7 +43,7 @@ export function MatchArchivist({ youId, onClose, mode, initialAsk }: Props) {
   }
   return (
     <Sheet open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent side="bottom" showCloseButton={false} className="h-[72dvh] gap-0 rounded-t-2xl border-border/40 p-0" data-dev-archivist-panel>
+      <SheetContent side="bottom" showCloseButton={false} className="flex flex-col gap-0 overflow-hidden rounded-t-2xl border-border/40 p-0 data-[side=bottom]:h-[72dvh] data-[side=bottom]:max-h-[72dvh]" data-dev-archivist-panel>
         <SheetTitle className="sr-only">The Archivist</SheetTitle>
         {inner}
       </SheetContent>
