@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { GraduationCap, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useLessonSheet } from '@/store/lessonSheetStore';
 import { LESSON_BY_ID } from '@/content/lessons';
@@ -23,7 +26,7 @@ export function LessonSheet() {
     if (!ref?.section || !bodyRef.current) return;
     const t = setTimeout(() => {
       const el = bodyRef.current?.querySelector<HTMLElement>(`[data-section="${ref.section}"]`);
-      const scroller = el?.closest<HTMLElement>('[data-dev-lesson-sheet]');
+      const scroller = el?.closest<HTMLElement>('[data-dev-lesson-scroll]');
       if (!el || !scroller) return;
       // Scroll the drawer itself, not the page behind it.
       const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 12;
@@ -34,9 +37,22 @@ export function LessonSheet() {
 
   return (
     <Sheet open={!!lesson} onOpenChange={(v) => { if (!v) close(); }}>
-      <SheetContent side={narrow ? 'bottom' : 'right'} className={narrow ? 'h-[88dvh] gap-0 overflow-y-auto rounded-t-2xl p-0' : 'w-full gap-0 overflow-y-auto p-0 sm:max-w-xl'} data-dev-lesson-sheet>
+      {/* The height must carry the side variant's prefix: the base style sets a bottom sheet
+          to h-auto, which otherwise wins and lets the drawer grow to the lesson's full
+          length, top and close button off the screen and nothing left to scroll. */}
+      <SheetContent
+        side={narrow ? 'bottom' : 'right'}
+        showCloseButton={false}
+        className={cn('flex flex-col gap-0 overflow-hidden p-0', narrow ? 'data-[side=bottom]:h-[88dvh] data-[side=bottom]:max-h-[88dvh] rounded-t-2xl' : 'w-full sm:max-w-xl')}
+        data-dev-lesson-sheet
+      >
         <SheetTitle className="sr-only">{lesson?.title ?? 'Lesson'}</SheetTitle>
-        <div ref={bodyRef}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border/40 px-4 py-2">
+          <GraduationCap className="h-4 w-4 shrink-0 text-gold" />
+          <p className="min-w-0 flex-1 truncate text-sm font-medium">{lesson?.title}</p>
+          <Button variant="ghost" size="icon-sm" onClick={close} aria-label="Close the lesson" className="text-muted-foreground" data-dev-lesson-close><X className="h-4 w-4" /></Button>
+        </div>
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-dev-lesson-scroll>
           {lesson && <LessonView lesson={lesson} embedded onNavigate={(id) => open({ lesson: id })} />}
         </div>
       </SheetContent>
