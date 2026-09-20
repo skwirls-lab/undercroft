@@ -29,7 +29,7 @@ created in the console.
 | Path | Read | Write |
 |---|---|---|
 | `/cards/{cardId}` | any signed-in user | admins only (`isAdmin()` — add your UID) |
-| `/users/{userId}` | that user only | that user only |
+| `/users/{userId}` | that user only | that user only, except the `plan` field (billing webhook only) |
 | `/users/{userId}/decks/{deckId}` | that user only | that user only |
 | anything else | denied | denied |
 
@@ -43,7 +43,12 @@ Two changes from the previous version:
   collection is a standing bill-drain vector. It now requires sign-in. Nothing in the app
   reads cards before sign-in, so this costs no functionality.
 
-Per-user isolation (`/users/**`) was already correct and is unchanged.
+Per-user isolation (`/users/**`) was already correct. One addition since: the profile
+document now also holds the vault's shelves, and is where a subscription `plan` will live.
+The rule refuses any client write that creates or changes `plan`, so when paid tiers go live
+nobody can promote themselves from the browser console. Nothing enforces plans yet
+(`ENFORCE_ENTITLEMENTS` in `src/lib/entitlements.ts` is `false`), so pasting this rule update
+is not urgent — but it must be in place before that switch is flipped.
 
 ## 2. Updating the card database for a new set
 

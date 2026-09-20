@@ -227,7 +227,7 @@ export class ForgeGameClient {
     commander?: string,
     playerName?: string,
     aiCount?: number,
-    aiDecks?: Array<{ deckList: string[]; commander?: string }>,
+    aiDecks?: Array<{ deckList: string[]; commander?: string; name?: string }>,
   ) {
     this.send('start_game', {
       deckList,
