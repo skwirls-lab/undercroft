@@ -101,6 +101,17 @@ function deckToFirestore(deck: Deck): DocumentData {
     createdAt: deck.createdAt,
     updatedAt: deck.updatedAt,
     shelfId: deck.shelfId ?? null,
+    legality: deck.legality ?? null,
+  };
+}
+
+function legalityFromFirestore(v: DocumentData | null | undefined): Deck['legality'] {
+  if (!v || typeof v.legal !== 'boolean') return null;
+  return {
+    legal: v.legal,
+    issues: typeof v.issues === 'number' ? v.issues : 0,
+    summary: Array.isArray(v.summary) ? v.summary.filter((s: unknown) => typeof s === 'string') : [],
+    checkedAt: typeof v.checkedAt === 'number' ? v.checkedAt : 0,
   };
 }
 
@@ -117,6 +128,7 @@ function deckFromFirestore(id: string, data: DocumentData): Deck {
     createdAt: data.createdAt ?? Date.now(),
     updatedAt: data.updatedAt ?? Date.now(),
     shelfId: data.shelfId ?? null,
+    legality: legalityFromFirestore(data.legality),
   };
 }
 
@@ -154,6 +166,7 @@ export async function updateDeckInFirestore(
   if (updates.commanderName !== undefined) data.commanderName = updates.commanderName;
   if (updates.cards !== undefined) data.cards = updates.cards.map(entryToFirestore);
   if (updates.shelfId !== undefined) data.shelfId = updates.shelfId;
+  if (updates.legality !== undefined) data.legality = updates.legality;
   if (updates.format !== undefined) data.format = updates.format;
   if (updates.resolvedCount !== undefined) data.resolvedCount = updates.resolvedCount;
   if (updates.unresolvedCount !== undefined) data.unresolvedCount = updates.unresolvedCount;

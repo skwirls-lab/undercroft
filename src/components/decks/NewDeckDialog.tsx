@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDeckStore, type Deck } from '@/store/deckStore';
 import { searchCards } from '@/lib/cardSearch';
-import { frontFace, primeCardRecord, verifyEntries } from '@/lib/deckCards';
+import { frontFace, primeCardRecord, verifyEntries, assessDeck } from '@/lib/deckCards';
 import { identityOf } from '@/lib/deckRules';
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 import { ManaSymbol } from '@/components/game/ManaSymbol';
@@ -92,7 +92,8 @@ function NewDeckForm({ shelfId, onDone }: { shelfId: string | null; onDone: () =
     // Forge check in the background; the page shows the result when it lands.
     try {
       const report = await verifyEntries(deck.cards);
-      updateDeck(deck.id, { cards: report.cards });
+      const legality = await assessDeck({ cards: report.cards, commanderName: deck.commanderName });
+      updateDeck(deck.id, { cards: report.cards, legality });
     } catch (err) {
       console.error('[NewDeck] verify failed:', err);
     }

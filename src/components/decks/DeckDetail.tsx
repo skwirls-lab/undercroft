@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -27,7 +27,7 @@ import { CardTile } from './CardTile';
 import { CardLightbox } from './CardLightbox';
 import { CardSearchPanel } from './CardSearchPanel';
 import { DeckCheckBadge, DeckCheckDialog } from './DeckCheck';
-import { checkDeck, canBeCommander, fitsIdentity } from '@/lib/deckRules';
+import { checkDeck, canBeCommander, fitsIdentity, summarizeCheck, sameLegality } from '@/lib/deckRules';
 import { AccentDot, ShelfDialog } from './Shelves';
 import { rise, riseStagger, settle } from '@/lib/motion';
 import { cn } from '@/lib/utils';
@@ -63,7 +63,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const [shelfOpen, setShelfOpen] = useState(false);
 
   const names = useMemo(() => (deck ? deck.cards.map((c) => c.cardName) : []), [deck]);
-  const { records } = useCardRecords(names);
+  const { records, loading: recordsLoading } = useCardRecords(names);
 
   const sections = useMemo(() => (deck ? groupDeck(deck.cards, records, deck.commanderName) : []), [deck, records]);
   const identity = useMemo(() => (deck ? deckColorIdentity(deck.cards, records, deck.commanderName) : []), [deck, records]);
@@ -71,6 +71,15 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const commanderRecord = deck?.commanderName ? records.get(deck.commanderName) ?? null : null;
   const banner = commanderRecord ? frontFace(commanderRecord).art : undefined;
   const check = useMemo(() => checkDeck(deck ?? { cards: [], commanderName: '' }, records), [deck, records]);
+
+  // The vault and the setup screen read a stored verdict rather than loading every card. Keep
+  // it current: whenever the live check settles on a different answer, write it once.
+  useEffect(() => {
+    if (!deck || recordsLoading || verifying) return;
+    const next = summarizeCheck(check);
+    if (sameLegality(deck.legality, next)) return;
+    useDeckStore.getState().updateDeck(deck.id, { legality: next });
+  }, [deck, check, recordsLoading, verifying]);
 
   // ── Edits ───────────────────────────────────────────────────────────────────
   // Optimistic: the store (and Firestore behind it) updates at once; verification of any

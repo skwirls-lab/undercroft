@@ -31,6 +31,7 @@ const SCREENS = [
   { name: 'new-deck', path: '/decks', click: '[data-dev-new-deck]', type: ['[data-dev-cmdr-search]', 'kre'] },
   { name: 'setup', path: '/game?deck=mock-atraxa' },
   { name: 'setup-opponent', path: '/game?deck=mock-atraxa', click: '[data-dev-seat="0"]' },
+  { name: 'setup-warning', path: '/game?deck=mock-atraxa', click: '[data-dev-start]' },
   { name: 'settings', path: '/', click: 'button[aria-label="Settings"]:visible' },
   { name: 'board', path: '/dev/board' },
   { name: 'board-me', path: '/dev/board?open=me' },

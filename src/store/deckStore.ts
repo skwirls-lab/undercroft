@@ -8,6 +8,7 @@ import {
   deleteDeckFromFirestore,
 } from '@/lib/firebase/firestore';
 import type { Plan } from '@/lib/entitlements';
+import type { DeckLegality } from '@/lib/deckRules';
 
 export interface DeckEntry {
   cardName: string;
@@ -48,6 +49,8 @@ export interface Deck {
   updatedAt: number;
   /** Shelf the deck is filed on, or null/undefined for none. */
   shelfId?: string | null;
+  /** Last Commander-rules verdict, or null/undefined if the deck has never been checked. */
+  legality?: DeckLegality | null;
 }
 
 interface DeckStore {

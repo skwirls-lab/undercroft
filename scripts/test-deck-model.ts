@@ -10,7 +10,7 @@ import { AI_DECKS } from '../src/lib/aiDecks';
 import { can, limit, parsePlan, ENFORCE_ENTITLEMENTS } from '../src/lib/entitlements';
 import { deckTotals, mergeEntries, type Deck, type DeckEntry } from '../src/store/deckStore';
 import type { ScryfallCardRecord } from '../src/lib/cardTypes';
-import { checkDeck, canBeCommander, maxCopies, fitsIdentity, identityOf } from '../src/lib/deckRules';
+import { checkDeck, canBeCommander, maxCopies, fitsIdentity, identityOf, summarizeCheck, sameLegality } from '../src/lib/deckRules';
 import { buildScryfallQuery } from '../src/lib/cardSearch';
 
 let failures = 0;
@@ -146,6 +146,10 @@ check('reports off-identity (Bolt in Atraxa)', kinds.has('off-identity') && mess
 check('reports unknown and not-in-forge', kinds.has('unknown') && kinds.has('not-in-forge'));
 check('reports missing commander', checkDeck({ commanderName: '', cards: [] }, rulesRecords).issues.some((i) => i.kind === 'no-commander'));
 check('reports a commander that cannot command', checkDeck({ commanderName: 'Craterhoof', cards: [{ cardName: 'Craterhoof', quantity: 1, resolved: true }] }, rulesRecords).issues.some((i) => i.kind === 'bad-commander'));
+
+const verdict = summarizeCheck(messy);
+check('summarizeCheck keeps the count and one line per issue', verdict.legal === false && verdict.issues === messy.issues.length && verdict.summary.length === messy.issues.length);
+check('sameLegality ignores the timestamp', sameLegality({ ...verdict, checkedAt: 1 }, verdict) && !sameLegality(null, verdict) && !sameLegality(summarizeCheck(legal), verdict));
 
 console.log('scryfall query');
 check('single word is a bare name match', buildScryfallQuery('rift') === 'rift legal:commander');
