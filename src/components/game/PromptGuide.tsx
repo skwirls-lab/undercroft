@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { GraduationCap, ExternalLink } from 'lucide-react';
+import { GraduationCap, BookOpen } from 'lucide-react';
 import { useSettingsStore } from '@/store/settingsStore';
-import { PROMPT_GUIDE, lessonHref } from '@/content/lessons';
+import { PROMPT_GUIDE } from '@/content/lessons';
+import { useLessonSheet } from '@/store/lessonSheetStore';
 
 /**
  * The Apprentice's line at the foot of a server prompt: what is being asked and how to
@@ -20,7 +20,7 @@ export function PromptGuide({ choiceType }: { choiceType: string }) {
       <p className="min-w-0 flex-1 leading-snug text-foreground/85">
         <span className="font-medium text-foreground">{guide.what}</span> {guide.how}
         {guide.ref && (
-          <Link href={lessonHref(guide.ref)} target="_blank" rel="noopener" className="ml-1.5 inline-flex items-center gap-0.5 whitespace-nowrap text-gold/80 hover:text-gold">Learn more <ExternalLink className="h-3 w-3" /></Link>
+          <button type="button" onClick={() => useLessonSheet.getState().open(guide.ref!)} className="ml-1.5 inline-flex items-center gap-0.5 whitespace-nowrap text-gold/80 hover:text-gold">Learn more <BookOpen className="h-3 w-3" /></button>
         )}
       </p>
     </div>

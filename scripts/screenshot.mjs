@@ -19,6 +19,7 @@ const only = (process.argv.find((a) => a.startsWith('--only=')) ?? '').replace('
 
 const SCREENS = [
   { name: 'landing', path: '/', signedOut: true },
+  { name: 'landing-plans', path: '/', signedOut: true, scrollTo: '[data-dev-plan-comparison]' },
   { name: 'dashboard', path: '/' },
   { name: 'decks', path: '/decks' },
   { name: 'decks-shelf', path: '/decks', click: '[role="tab"]:has-text("Tournament")' },
@@ -54,6 +55,9 @@ const SCREENS = [
   { name: 'learn-keywords', path: '/learn/keywords' },
   { name: 'board', path: '/dev/board' },
   { name: 'board-apprentice-off', path: '/dev/board?apprentice=0' },
+  { name: 'lesson-drawer', path: '/dev/board?lesson=the-stack%23stack' },
+  { name: 'board-leave', path: '/dev/board', click: '[data-dev-home]' },
+  { name: 'return-banner', path: '/dev/board', clicks: ['[data-dev-home]', 'button:has-text("Leave, keep playing later")'], wait: 1200 },
   { name: 'board-archivist', path: '/dev/board?archivist=1' },
   { name: 'board-archivist-advice', path: '/dev/board?archivist=advice', wait: 4500 },
   { name: 'board-archivist-free', path: '/dev/board?archivist=1&plan=free' },
@@ -99,6 +103,12 @@ for (const vp of VIEWPORTS) {
       if (screen.click) {
         await page.locator(screen.click).first().click();
         await page.waitForTimeout(600);
+      }
+      if (screen.clicks) {
+        for (const sel of screen.clicks) {
+          await page.locator(sel).first().click();
+          await page.waitForTimeout(600);
+        }
       }
       if (screen.scrollTo) {
         await page.locator(screen.scrollTo).first().scrollIntoViewIfNeeded();

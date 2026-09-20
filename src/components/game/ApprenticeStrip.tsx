@@ -1,12 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
-import { GraduationCap, X, ExternalLink } from 'lucide-react';
+import { GraduationCap, X, BookOpen } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
-import { STEP_GUIDE, PHASE_GUIDE, PROMPT_GUIDE, NOTES, lessonHref, type ApprenticeNote } from '@/content/lessons';
+import { STEP_GUIDE, PHASE_GUIDE, PROMPT_GUIDE, NOTES, type ApprenticeNote, type LessonRef } from '@/content/lessons';
+import { useLessonSheet } from '@/store/lessonSheetStore';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { cn } from '@/lib/utils';
 
@@ -48,16 +48,16 @@ export function ApprenticeStrip({ youId, className }: { youId: string; className
   const phase = PHASE_GUIDE[gameState.turn.phase];
 
   let text: string;
-  let href: string;
+  let ref: LessonRef;
   let tone: 'note' | 'prompt' | 'step' = 'step';
   if (note && seen.dismissed !== note.id) {
-    text = note.text; href = lessonHref(note.ref); tone = 'note';
+    text = note.text; ref = note.ref; tone = 'note';
   } else if (prompt && pendingChoice && pendingChoice.choiceType !== 'choose_action') {
-    text = `${prompt.what} ${prompt.how}`; href = lessonHref(prompt.ref ?? step.ref); tone = 'prompt';
+    text = `${prompt.what} ${prompt.how}`; ref = prompt.ref ?? step.ref; tone = 'prompt';
   } else {
     const who = gameState.turn.activePlayerId === youId ? 'Your' : `${gameState.players.find((p) => p.id === gameState.turn.activePlayerId)?.name ?? 'Their'}'s`;
     text = `${who} ${phase.title.toLowerCase()} — ${step.line} ${isYou ? step.canDo : ''}`.trim();
-    href = lessonHref(step.ref);
+    ref = step.ref;
   }
 
   const dismiss = () => { if (note) setSeen((s) => ({ ...s, ids: [...s.ids, note.id], dismissed: note.id })); };
@@ -86,9 +86,9 @@ export function ApprenticeStrip({ youId, className }: { youId: string; className
           {text}
         </motion.p>
       </AnimatePresence>
-      <Link href={href} target="_blank" rel="noopener" className="flex shrink-0 items-center gap-1 text-gold/80 hover:text-gold" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }} title="Open the lesson in a new tab">
-        Learn more <ExternalLink style={{ width: 'clamp(9px,1.5vmin,1000px)', height: 'clamp(9px,1.5vmin,1000px)' }} />
-      </Link>
+      <button type="button" onClick={() => useLessonSheet.getState().open(ref)} className="flex shrink-0 items-center gap-1 text-gold/80 hover:text-gold" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }} title="Open the lesson beside the table" data-dev-learn-more>
+        Learn more <BookOpen style={{ width: 'clamp(9px,1.5vmin,1000px)', height: 'clamp(9px,1.5vmin,1000px)' }} />
+      </button>
       {tone === 'note' && (
         <button type="button" onClick={dismiss} aria-label="Dismiss" className="shrink-0 text-muted-foreground hover:text-foreground"><X style={{ width: 'clamp(11px,2vmin,1000px)', height: 'clamp(11px,2vmin,1000px)' }} /></button>
       )}
