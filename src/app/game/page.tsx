@@ -65,7 +65,7 @@ function GameSetupContent() {
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
   // While decks are still loading from Firestore we must not treat "none" as "none exist".
   const canStart = !!selectedDeck || (decks.length === 0 && !isSyncing);
-  const canCustomOpponents = can('ai.customDecks');
+  const canCustomOpponents = can('opponents.choose');
   const canFourPlayer = can('game.fourPlayer');
 
   const commanderNames = useMemo(() => decks.map((d) => d.commanderName).filter(Boolean), [decks]);

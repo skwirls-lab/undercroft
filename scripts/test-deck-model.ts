@@ -161,7 +161,7 @@ check('empty text still yields a valid query', buildScryfallQuery('', { commande
 
 console.log('entitlements');
 check('enforcement is off before launch', ENFORCE_ENTITLEMENTS === false);
-check('everything is allowed while enforcement is off', can('free', 'deck.edit') && can('free', 'ai.customDecks') && can('free', 'vault.shelves'));
+check('everything is allowed while enforcement is off', can('free', 'opponents.choose') && can('free', 'archivist.match') && can('free', 'vault.shelves'));
 check('limits are unbounded while enforcement is off', limit('free', 'vault.maxDecks') === Infinity);
 check('unknown plan values read as free', parsePlan('gold') === 'free' && parsePlan(undefined) === 'free' && parsePlan('patron') === 'patron');
 

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/firebase/auth';
 import { useSettingsSheet } from '@/components/SettingsSheet';
+import { useAppConfigStore } from '@/store/appConfigStore';
+import { Megaphone } from 'lucide-react';
 import { Keystone } from '@/components/brand/Keystone';
 import { Library, Settings, Swords, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -27,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const { openSettings } = useSettingsSheet();
+  const notice = useAppConfigStore((s) => s.config.notice);
 
   const hidden = loading || !user || HIDDEN_ON.some((p) => pathname.startsWith(p));
   if (hidden) return <>{children}</>;
@@ -87,6 +90,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </div>
       </header>
+
+      {/* Admin notice — one line, every player, until the admin clears it */}
+      {notice && (
+        <div role="status" className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-200">
+          <Megaphone className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />
+          {notice}
+        </div>
+      )}
 
       <div className="flex flex-1 flex-col pb-[calc(3.9rem+env(safe-area-inset-bottom))] sm:pb-0">{children}</div>
 

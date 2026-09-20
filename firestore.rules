@@ -4,8 +4,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Admin allowlist. Put your own Firebase UID here and leave it here — you are the only
-    // admin, and the admin pages (/admin/populate-cards, /admin/import-missing-cards) are how
-    // the card database gets updated when a new set releases. Find your UID at
+    // admin. Admins can refresh the card database, change the app-wide settings in
+    // Settings → Administration, and grant or revoke Patron by hand. Find your UID at
     // Firebase Console -> Authentication -> Users.
     //
     // Keep this list in step with NEXT_PUBLIC_ADMIN_UIDS in the app config. That variable only
@@ -20,6 +20,15 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Fields on a profile that only the server (billing webhook, usage metering) or an admin
+    // may set. A player who could write these could promote themselves or reset their quota.
+    function touchesProtected(keys) {
+      return keys.hasAny([
+        'plan', 'planSource', 'patronUntil', 'planNote', 'usage',
+        'stripeCustomerId', 'stripeSubscriptionId', 'subscriptionStatus'
+      ]);
+    }
+
     // Global card data — readable by any signed-in player, writable only by an admin.
     //
     // Reads are restricted to authenticated users because this collection holds ~90k
@@ -31,17 +40,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // User profiles — users can read/write their own profile. The profile also carries the
-    // vault's shelves (a small array) and, one day, `plan`: the subscription tier. `plan` is
-    // set only by a billing webhook with admin credentials, never by the app, so a client
-    // write that touches it is refused. Nothing enforces plans yet (see
-    // src/lib/entitlements.ts), but the rule is in place so flipping enforcement on cannot
-    // be undone from the browser console.
+    // App-wide configuration (config/app): the Archivist's master switch and model, the
+    // monthly allowances, the notice banner. Every signed-in player reads it; an admin
+    // writes it from the Settings panel.
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Monthly usage totals and the per-call log, written by the server with admin
+    // credentials (which bypass these rules). Admins read them in the Settings panel;
+    // nobody writes them from a browser.
+    match /stats/{statId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /archivistLog/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // User profiles. A player reads and writes their own, except the protected fields
+    // above. An admin may read any profile (the email lookup in the Settings panel lists
+    // the collection) and change exactly the plan fields — never the shelves or anything
+    // else that belongs to the player.
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && !('plan' in request.resource.data);
-      allow update: if isOwner(userId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan']);
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && !touchesProtected(request.resource.data.keys());
+      allow update: if (isOwner(userId)
+          && !touchesProtected(request.resource.data.diff(resource.data).affectedKeys()))
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['plan', 'planSource', 'patronUntil', 'planNote']));
       allow delete: if isOwner(userId);
     }
 

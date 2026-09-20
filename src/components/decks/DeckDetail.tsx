@@ -46,7 +46,8 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const shelves = useDeckStore((s) => s.shelves);
   const { updateDeck, removeDeck, moveDeckToShelf, addShelf } = useDeckStore();
   const { can } = useEntitlements();
-  const canEdit = can('deck.edit');
+  // Building and editing are free on every plan; the vault size is what a free player hits.
+  const canEdit = true;
 
   // `?edit=1` (from "New deck") opens straight into edit mode with the search box ready.
   const [editing, setEditing] = useState(() => searchParams.get('edit') === '1');

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/firebase/auth';
 import { useDeckStore } from '@/store/deckStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useAppConfigStore } from '@/store/appConfigStore';
 import { upsertUserProfile } from '@/lib/firebase/firestore';
 import { isDevMock } from '@/lib/devMock';
 import { DEV_MOCK_DECKS, DEV_MOCK_SHELVES } from '@/dev/mockDecks';
@@ -44,6 +45,9 @@ export function useFirestoreSync() {
       clearSync();
       clearUserSettings();
     }
+
+    // App-wide config (allowances, notice, whether the Archivist is resting) follows sign-in.
+    if (uid) void useAppConfigStore.getState().refresh();
 
     if (uid && user && isDevMock()) {
       // Development-only: no Firestore to talk to, so seed a few decks instead.

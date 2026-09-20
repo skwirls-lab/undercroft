@@ -7,7 +7,7 @@ import {
   updateDeckInFirestore,
   deleteDeckFromFirestore,
 } from '@/lib/firebase/firestore';
-import type { Plan } from '@/lib/entitlements';
+import { resolvePlan, EMPTY_PLAN_PROFILE, type Plan, type PlanProfile } from '@/lib/plan';
 import type { DeckLegality } from '@/lib/deckRules';
 
 export interface DeckEntry {
@@ -56,8 +56,10 @@ export interface Deck {
 interface DeckStore {
   decks: Deck[];
   shelves: Shelf[];
-  /** Subscription plan from the profile document. Read-only here; see lib/entitlements. */
+  /** The resolved plan (an expired grant reads as free). Read-only here; see lib/entitlements. */
   plan: Plan;
+  /** The raw plan fields from the profile document: source, expiry, usage. */
+  profile: PlanProfile;
   activeDeckId: string | null;
   syncedUserId: string | null;
   isSyncing: boolean;
@@ -228,6 +230,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   decks: [],
   shelves: [],
   plan: 'free',
+  profile: EMPTY_PLAN_PROFILE,
   activeDeckId: null,
   syncedUserId: null,
   syncFailed: false,
@@ -330,7 +333,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     // so clearSync does not run) could leave the previous user's decks on screen.
     const { syncedUserId: previousUid } = get();
     if (previousUid && previousUid !== uid) {
-      set({ decks: [], shelves: [], plan: 'free', activeDeckId: null });
+      set({ decks: [], shelves: [], plan: 'free', profile: EMPTY_PLAN_PROFILE, activeDeckId: null });
     }
 
     set({ isSyncing: true, syncedUserId: uid, syncFailed: false });
@@ -339,7 +342,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       // A fast A -> B switch can let A's request resolve after B's. Applying it would show B
       // another user's decks, and any later edit would write them into B's account.
       if (get().syncedUserId !== uid) return;
-      set({ decks, shelves: profile.shelves, plan: profile.plan, isSyncing: false, syncFailed: false });
+      set({ decks, shelves: profile.shelves, plan: resolvePlan(profile.plan), profile: profile.plan, isSyncing: false, syncFailed: false });
     } catch (error) {
       console.error('Failed to load decks from Firestore:', error);
       if (get().syncedUserId !== uid) return;
@@ -360,7 +363,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   },
 
   clearSync: () => {
-    set({ syncedUserId: null, decks: [], shelves: [], plan: 'free', activeDeckId: null, syncFailed: false });
+    set({ syncedUserId: null, decks: [], shelves: [], plan: 'free', profile: EMPTY_PLAN_PROFILE, activeDeckId: null, syncFailed: false });
   },
 }));
 
