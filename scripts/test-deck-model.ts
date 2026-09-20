@@ -152,12 +152,14 @@ check('summarizeCheck keeps the count and one line per issue', verdict.legal ===
 check('sameLegality ignores the timestamp', sameLegality({ ...verdict, checkedAt: 1 }, verdict) && !sameLegality(null, verdict) && !sameLegality(summarizeCheck(legal), verdict));
 
 console.log('scryfall query');
-check('single word is a bare name match', buildScryfallQuery('rift') === 'rift legal:commander');
-check('multi-word input is quoted', buildScryfallQuery('sol ring') === 'name:"sol ring" legal:commander');
-check('identity filter uses id<=', buildScryfallQuery('x', { identity: ['W', 'U', 'B', 'G'] }) === 'x legal:commander id<=wubg');
-check('colourless identity is id<=c', buildScryfallQuery('x', { identity: [] }).endsWith('id<=c'));
-check('commander-only adds is:commander', buildScryfallQuery('atraxa', { commanderOnly: true }) === 'atraxa legal:commander is:commander');
-check('empty text still yields a valid query', buildScryfallQuery('', { commanderOnly: true }) === 'legal:commander is:commander');
+const TAIL = ' game:paper prefer:oldest';
+check('single word is a bare name match', buildScryfallQuery('rift') === 'rift legal:commander' + TAIL);
+check('multi-word input is quoted', buildScryfallQuery('sol ring') === 'name:"sol ring" legal:commander' + TAIL);
+check('identity filter uses id<=', buildScryfallQuery('x', { identity: ['W', 'U', 'B', 'G'] }) === 'x legal:commander id<=wubg' + TAIL);
+check('colourless identity is id<=c', buildScryfallQuery('x', { identity: [] }).includes('id<=c'));
+check('commander-only adds is:commander', buildScryfallQuery('atraxa', { commanderOnly: true }) === 'atraxa legal:commander is:commander' + TAIL);
+check('empty text still yields a valid query', buildScryfallQuery('', { commanderOnly: true }) === 'legal:commander is:commander' + TAIL);
+check('every search asks for the oldest paper printing', buildScryfallQuery('x').endsWith('game:paper prefer:oldest'));
 
 console.log('entitlements');
 check('enforcement is off before launch', ENFORCE_ENTITLEMENTS === false);

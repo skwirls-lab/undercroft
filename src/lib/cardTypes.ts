@@ -49,5 +49,9 @@ export interface ScryfallCardRecord {
   legalities: Record<string, string>;
   set: string;
   set_name: string;
+  /** Release date of this printing, YYYY-MM-DD; absent on records stored before it was kept. */
+  released_at?: string;
+  /** The printing the app shows for this card: the oldest ordinary paper one, marked by the sync. */
+  preferred?: boolean;
   rarity: string;
 }

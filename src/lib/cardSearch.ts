@@ -37,6 +37,8 @@ export function buildScryfallQuery(text: string, opts: SearchOptions = {}): stri
   parts.push('legal:commander');
   if (opts.commanderOnly) parts.push('is:commander');
   if (opts.identity) parts.push(`id<=${opts.identity.length ? opts.identity.join('').toLowerCase() : 'c'}`);
+  // One printing per card (unique=cards): the oldest paper one, the art most players know.
+  parts.push('game:paper', 'prefer:oldest');
   return parts.join(' ');
 }
 
