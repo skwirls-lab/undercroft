@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/firebase/auth';
 import { usePatron } from '@/components/patron/PatronSheet';
+import { PlanComparison } from '@/components/patron/PlanComparison';
+import { PATRON_PRICE_LABEL } from '@/lib/entitlements';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useDeckStore } from '@/store/deckStore';
 import { cn } from '@/lib/utils';
@@ -196,6 +198,25 @@ function MarketingPage() {
             <StepCard step={1} title="Sign In" description="Sign in with Google — your decks sync across devices automatically." />
             <StepCard step={2} title="Import a Deck" description="Paste a Commander decklist or use one of the built-in starter decks." />
             <StepCard step={3} title="Play" description="Choose your opponents, shuffle up, and battle. The full Commander experience." />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Plans ──────────────────────────── */}
+      <section className="relative z-10 px-5 py-14 sm:px-10" id="plans">
+        <div className="mx-auto max-w-3xl">
+          <Eyebrow className="mb-3 justify-center [&>span:last-child]:hidden">Start free. Stay free, or go further.</Eyebrow>
+          <p className="mx-auto mb-8 max-w-xl text-center text-sm leading-relaxed text-muted-foreground">
+            Everything you need to play is free: the engine, the deck builder, the lessons, two decks and a pod of three.
+            Patrons pay <strong className="font-semibold text-foreground">{PATRON_PRICE_LABEL}</strong> for an unlimited vault, hand-picked opponents, full pods and the Archivist at the table. Cancel any time.
+          </p>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={settle}
+          >
+            <PlanComparison />
           </motion.div>
         </div>
       </section>

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/firebase/auth';
 import { useSettingsSheet } from '@/components/SettingsSheet';
 import { useAppConfigStore } from '@/store/appConfigStore';
+import { useForgeGameStore } from '@/store/forgeGameStore';
 import { Megaphone } from 'lucide-react';
 import { Keystone } from '@/components/brand/Keystone';
 import { Library, Settings, Swords, Home, GraduationCap } from 'lucide-react';
@@ -31,6 +32,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { openSettings } = useSettingsSheet();
   const notice = useAppConfigStore((s) => s.config.notice);
+  // A match left running behind the rest of the app (the keystone, a lesson, the vault).
+  const matchRunning = useForgeGameStore((s) => s.connectionStatus === 'connected' && s.gameState !== null && !s.isGameOver);
 
   const hidden = loading || !user || HIDDEN_ON.some((p) => pathname.startsWith(p));
   if (hidden) return <>{children}</>;
@@ -98,6 +101,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Megaphone className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />
           {notice}
         </div>
+      )}
+
+      {/* A match is waiting: one line, every page, until it ends */}
+      {matchRunning && (
+        <Link href="/game/forge" className="flex items-center justify-center gap-2 border-b border-gold/30 bg-gold/10 px-4 py-2 text-center text-xs font-medium text-gold transition-colors hover:bg-gold/15" data-dev-return-banner>
+          <Swords className="h-3.5 w-3.5" />
+          A match is in progress — return to the table
+        </Link>
       )}
 
       <div className="flex flex-1 flex-col pb-[calc(3.9rem+env(safe-area-inset-bottom))] sm:pb-0">{children}</div>

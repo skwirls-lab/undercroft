@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useForgeGameStore } from '@/store/forgeGameStore';
@@ -27,6 +26,8 @@ import { MatchArchivist, type MatchAsk } from '@/components/archivist/MatchArchi
 import { ApprenticeStrip } from '@/components/game/ApprenticeStrip';
 import { useTour } from '@/hooks/useTour';
 import { TourOverlay } from '@/components/tour/Tour';
+import { LessonSheet } from '@/components/learn/LessonSheet';
+import { useLessonSheet } from '@/store/lessonSheetStore';
 import {
   Loader2,
   Flag,
@@ -134,7 +135,7 @@ export function ForgeGamePage() {
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   // Concede and New Game both end the run, both were instant, and they sit ~4px apart in a
   // 28px header. Confirm before either.
-  const [pendingExit, setPendingExit] = useState<'concede' | 'new-game' | null>(null);
+  const [pendingExit, setPendingExit] = useState<'concede' | 'new-game' | 'home' | null>(null);
 
   // The Archivist: a book in the header opens a panel beside the board (a bottom sheet on a
   // phone). The Settings switch hides the book entirely; the plan decides whether the panel
@@ -158,6 +159,8 @@ export function ForgeGamePage() {
     else if (v === '1') openArchivist(null);
     const a = new URLSearchParams(window.location.search).get('apprentice');
     if (a === '0' || a === '1') useSettingsStore.getState().setApprenticeMode(a === '1');
+    const l = new URLSearchParams(window.location.search).get('lesson');
+    if (l) useLessonSheet.getState().open({ lesson: l.split('#')[0], section: l.split('#')[1] });
   }, [openArchivist]);
 
   // Action bar state
@@ -232,9 +235,12 @@ export function ForgeGamePage() {
       <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         {/* ─── HEADER: nav | phase tracker | nav buttons ─── */}
         <header className="flex items-center border-b border-border/30 shrink-0" style={{ gap: 'clamp(4px,1vmin,1000px)', padding: 'clamp(2px,0.5vmin,1000px) clamp(6px,1.5vmin,1000px)', minHeight: 'clamp(32px,5vh,1000px)' }}>
-          <Link href="/" className="flex shrink-0 items-center px-1" title="Home" aria-label="Home">
+          {/* Leaving the table is a question, not a tap: the match keeps running behind the
+              rest of the app and the shell's banner brings you back, but a stray tap should
+              not take you away mid-turn. */}
+          <button type="button" onClick={() => setPendingExit('home')} className="flex shrink-0 items-center px-1" title="Leave the table" aria-label="Leave the table" data-dev-home>
             <Keystone size={30} />
-          </Link>
+          </button>
           {gameState && (
             <div className="flex-1 min-w-0 mx-1" data-tour="board-phase">
               <PhaseTracker
@@ -245,18 +251,18 @@ export function ForgeGamePage() {
             </div>
           )}
           <div className="flex items-center shrink-0" style={{ gap: 'clamp(2px,0.5vmin,1000px)' }}>
-            <Button variant="ghost" size="sm" onClick={() => setApprenticeMode(!apprenticeMode)} className={cn('p-0', apprenticeMode ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title={apprenticeMode ? 'Apprentice mode on' : 'Apprentice mode off'} aria-label="Apprentice mode" aria-pressed={apprenticeMode} data-dev-apprentice-toggle>
+            <Button variant="ghost" size="sm" onClick={() => setApprenticeMode(!apprenticeMode)} className={cn('p-0', apprenticeMode ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(26px,3.4vh,36px)', height: 'clamp(26px,3.4vh,36px)' }} title={apprenticeMode ? 'Apprentice mode on' : 'Apprentice mode off'} aria-label="Apprentice mode" aria-pressed={apprenticeMode} data-dev-apprentice-toggle>
               <GraduationCap style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
             {archivistAvailable && (
-              <Button variant="ghost" size="sm" onClick={() => (archivistOpen ? setArchivistOpen(false) : openArchivist(null))} className={cn('p-0', archivistOpen ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Ask the Archivist" aria-label="Ask the Archivist" aria-pressed={archivistOpen} data-dev-archivist data-tour="board-archivist">
+              <Button variant="ghost" size="sm" onClick={() => (archivistOpen ? setArchivistOpen(false) : openArchivist(null))} className={cn('p-0', archivistOpen ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(26px,3.4vh,36px)', height: 'clamp(26px,3.4vh,36px)' }} title="Ask the Archivist" aria-label="Ask the Archivist" aria-pressed={archivistOpen} data-dev-archivist data-tour="board-archivist">
                 <BookOpen style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setPendingExit('concede')} className="p-0 text-red-400" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Concede" aria-label="Concede">
+            <Button variant="ghost" size="sm" onClick={() => setPendingExit('concede')} className="p-0 text-red-400" style={{ width: 'clamp(26px,3.4vh,36px)', height: 'clamp(26px,3.4vh,36px)' }} title="Concede" aria-label="Concede">
               <Flag style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setPendingExit('new-game')} className="p-0 text-muted-foreground" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="New Game" aria-label="Abandon game and start a new one">
+            <Button variant="ghost" size="sm" onClick={() => setPendingExit('new-game')} className="p-0 text-muted-foreground" style={{ width: 'clamp(26px,3.4vh,36px)', height: 'clamp(26px,3.4vh,36px)' }} title="New Game" aria-label="Abandon game and start a new one">
               <RotateCcw style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
           </div>
@@ -403,37 +409,42 @@ export function ForgeGamePage() {
             className="relative z-10 mx-4 w-full max-w-sm rounded-xl border border-border/40 bg-card p-5 shadow-2xl"
           >
             <h2 id="exit-dialog-title" className="text-base font-semibold">
-              {pendingExit === 'concede' ? 'Concede this game?' : 'Abandon this game?'}
+              {pendingExit === 'concede' ? 'Concede this game?' : pendingExit === 'home' ? 'Leave the table?' : 'Abandon this game?'}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {pendingExit === 'concede'
                 ? 'You will lose the game immediately. This cannot be undone.'
-                : 'The current game will be ended and you will return to setup.'}
+                : pendingExit === 'home'
+                  ? 'Your match keeps running. A banner at the top of every page brings you back to it. Reloading the page or closing the tab does end it.'
+                  : 'The current game will be ended and you will return to setup.'}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setPendingExit(null)}>
                 Keep playing
               </Button>
               <Button
-                className="bg-red-600 text-white hover:bg-red-700"
+                className={pendingExit === 'home' ? 'bg-gold text-gold-foreground hover:bg-gold/90' : 'bg-red-600 text-white hover:bg-red-700'}
                 onClick={() => {
                   const action = pendingExit;
                   setPendingExit(null);
                   if (action === 'concede') {
                     concede();
+                  } else if (action === 'home') {
+                    router.push('/');
                   } else {
                     disconnect();
                     router.push('/game');
                   }
                 }}
               >
-                {pendingExit === 'concede' ? 'Concede' : 'Abandon game'}
+                {pendingExit === 'concede' ? 'Concede' : pendingExit === 'home' ? 'Leave, keep playing later' : 'Abandon game'}
               </Button>
             </div>
           </div>
         </div>
       )}
 
+      <LessonSheet />
       <CardPreviewFloating />
     </CardPreviewProvider>
   );

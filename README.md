@@ -114,8 +114,8 @@ for new players and lives in two places:
   these controls (`PROMPT_GUIDE`, one entry per server prompt). Notes fire once per game the
   first time something matters: the stack, the commander leaving its zone, life at 10 or
   less, seven poison, fifteen commander damage. Every prompt panel carries the same guide
-  at its foot. "Learn more" opens the lesson in a new tab. The deck check's issues each get a
-  "Why?" link to the rule they break.
+  at its foot. "Learn more" opens the lesson in a drawer beside the table, so the match is
+  never left. The deck check's issues each get a "Why?" link to the rule they break.
 
 Content is typed data in `src/content/lessons/`. `npm run test:lessons` checks that every
 phase, step and server prompt the overlay renders has a guide, every quiz answer is in
@@ -167,6 +167,13 @@ the server's codes to one typed error. When the admin switch is off every entry 
 script so the whole path can be exercised without a key; the dev harness does the same in
 mock mode (`/decks/mock-atraxa?archivist=improve|swaps|strategy`,
 `/dev/board?archivist=advice|recap`).
+
+## Leaving the table
+
+A match keeps running while you visit the rest of the app: the keystone in the game header
+asks before leaving, and a gold banner at the top of every page returns you to the table
+until the game ends. Reloading the page or closing the tab does end it (the engine session is
+a live socket; there is no reconnect yet).
 
 ## Administration
 

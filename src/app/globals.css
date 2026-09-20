@@ -176,8 +176,10 @@
    * .arch-top the arch cap alone, for anything that should read as an opening.
    */
   .arch-top {
-    border-top-left-radius: 50% 28%;
-    border-top-right-radius: 50% 28%;
+    /* The curve's height is capped: a percentage alone grows with the panel, and on a tall
+       panel (a lesson quiz) the corners were still curving in where the first line sits. */
+    border-top-left-radius: 50% min(28%, 56px);
+    border-top-right-radius: 50% min(28%, 56px);
   }
   .alcove {
     position: relative;

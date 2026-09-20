@@ -11,14 +11,23 @@ import { KEYWORDS, LESSONS, type Lesson, type QuizQuestion } from '@/content/les
 import { rise, riseStagger } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
-/** One lesson: sections with their diagrams, the glossary when it is that lesson, a quiz at the end. */
-export function LessonView({ lesson }: { lesson: Lesson }) {
+/**
+ * One lesson: sections with their diagrams, the glossary when it is that lesson, a quiz at
+ * the end. `embedded` is the drawer form used during a match: tighter, no route links,
+ * prev/next handed to the caller.
+ */
+export function LessonView({ lesson, embedded, onNavigate }: { lesson: Lesson; embedded?: boolean; onNavigate?: (id: string) => void }) {
   const index = LESSONS.findIndex((l) => l.id === lesson.id);
   const prev = index > 0 ? LESSONS[index - 1] : null;
   const next = index < LESSONS.length - 1 ? LESSONS[index + 1] : null;
+  // A plain function, not a component: it must not remount on every render.
+  const nav = (target: Lesson, className: string, children: React.ReactNode) =>
+    embedded && onNavigate
+      ? <button type="button" onClick={() => onNavigate(target.id)} className={className}>{children}</button>
+      : <Link href={`/learn/${target.id}`} className={className}>{children}</Link>;
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 pb-16 pt-6 sm:px-8 sm:pt-8">
-      <Link href="/learn" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-gold"><ArrowLeft className="h-4 w-4" /> All lessons</Link>
+    <div className={cn('mx-auto w-full max-w-3xl', embedded ? 'px-4 pb-10 pt-5 sm:px-5' : 'px-5 pb-16 pt-6 sm:px-8 sm:pt-8')}>
+      {!embedded && <Link href="/learn" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-gold"><ArrowLeft className="h-4 w-4" /> All lessons</Link>}
       <motion.div variants={riseStagger(0.06, 0.05)} initial="hidden" animate="show" className="flex flex-col gap-6">
         <motion.header variants={rise}>
           <p className="eyebrow">{lesson.eyebrow}</p>
@@ -27,7 +36,7 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
         </motion.header>
 
         {lesson.sections.map((s) => (
-          <motion.section key={s.id} id={s.id} variants={rise} className="scroll-mt-20">
+          <motion.section key={s.id} id={embedded ? undefined : s.id} data-section={s.id} variants={rise} className="scroll-mt-20">
             <Alcove flat className="px-5 py-5 sm:px-6">
               <Eyebrow className="mb-3">{s.heading}</Eyebrow>
               {s.diagram && <Diagram kind={s.diagram} />}
@@ -46,8 +55,8 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
         )}
 
         <motion.nav variants={rise} className="flex items-center justify-between gap-3 pt-2">
-          {prev ? <Link href={`/learn/${prev.id}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold"><ArrowLeft className="h-4 w-4" /> {prev.title}</Link> : <span />}
-          {next ? <Link href={`/learn/${next.id}`} className="flex items-center gap-1.5 text-sm font-medium text-gold hover:underline">{next.title} <ArrowRight className="h-4 w-4" /></Link> : <span />}
+          {prev ? nav(prev, 'flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold', <><ArrowLeft className="h-4 w-4" /> {prev.title}</>) : <span />}
+          {next ? nav(next, 'flex items-center gap-1.5 text-sm font-medium text-gold hover:underline', <>{next.title} <ArrowRight className="h-4 w-4" /></>) : <span />}
         </motion.nav>
       </motion.div>
     </div>
