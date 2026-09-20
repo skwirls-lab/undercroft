@@ -51,7 +51,13 @@ export function useFirestoreSync() {
 
     if (uid && user && isDevMock()) {
       // Development-only: no Firestore to talk to, so seed a few decks instead.
-      useDeckStore.setState({ decks: DEV_MOCK_DECKS, shelves: DEV_MOCK_SHELVES, syncedUserId: uid, isSyncing: false, syncFailed: false });
+      // The mock tester is a Patron by admin grant, so every Archivist entry point renders;
+      // `?plan=free` on any URL previews the free-tier state instead.
+      const free = new URLSearchParams(window.location.search).get('plan') === 'free';
+      const profile = free
+        ? { plan: 'free' as const, planSource: null, patronUntil: null, planNote: null, usage: {}, subscriptionStatus: null }
+        : { plan: 'patron' as const, planSource: 'admin' as const, patronUntil: null, planNote: 'Dev mock', usage: {}, subscriptionStatus: null };
+      useDeckStore.setState({ decks: DEV_MOCK_DECKS, shelves: DEV_MOCK_SHELVES, plan: profile.plan, profile, syncedUserId: uid, isSyncing: false, syncFailed: false });
       return;
     }
 

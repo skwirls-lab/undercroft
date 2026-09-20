@@ -139,7 +139,7 @@ Your pinned version is in `FORGE_VERSION` (currently `forge-2.0.12`; upstream is
 
 ## 3. The server side: FIREBASE_SERVICE_ACCOUNT on Vercel
 
-Route handlers (`/api/me` today; the Archivist and billing next) run on Vercel with the
+Route handlers (`/api/me`, `/api/archivist`; billing next) run on Vercel with the
 Firebase Admin SDK. They need the same service-account JSON the card-sync Action uses:
 
 1. Vercel → Project → Settings → Environment Variables.
@@ -179,7 +179,32 @@ monthly allowances, post a notice banner, grant or revoke Patron by email (with 
 expiry — a grant made here is never undone by billing), and see this month's usage with an
 estimated cost once you enter the model's per-token rates.
 
-## 6. Sign-in and account separation
+## 6. The Archivist: OPENROUTER_API_KEY on Vercel
+
+The Archivist calls OpenRouter from `/api/archivist`, never from the browser.
+
+1. Create a key at openrouter.ai → Keys. Set a monthly credit limit on it there; the app's
+   own allowances (Settings → Administration) cap requests per player, the key's limit caps
+   the bill.
+2. Vercel → Environment Variables → `OPENROUTER_API_KEY` (Production and Preview). Redeploy.
+3. Optional: `NEXT_PUBLIC_SITE_URL` (sent as the referer OpenRouter shows in its dashboard).
+4. Confirm the model id. The default, `deepseek/deepseek-v4-flash-0731`, is what the
+   Administration section shows in **Model**; check it against openrouter.ai/models and
+   change it there if the slug differs — no deploy needed.
+5. First real call: open a deck, **Ask the Archivist → Improve this deck**. Then in
+   Firestore look at `archivistLog` (one row per call: uid, task, model, tokens, ms) and
+   `stats/{YYYY-MM}`. Settings → Administration → Usage shows the same numbers with a cost
+   estimate once the per-token rates are entered.
+
+Without the key the route answers 503 "not configured" and every entry point shows the
+resting notice. `ARCHIVIST_STUB=1` (a Preview deployment, or `next dev`) answers from a
+canned script with auth and metering still applied, for testing the path without spending.
+
+The plan gate is enforced on the server whether or not `NEXT_PUBLIC_ENFORCE_ENTITLEMENTS`
+is set: in-match advice, the post-game recap and commander ideas are Patron features; deck
+advice and rules questions are on every plan within the allowance.
+
+## 7. Sign-in and account separation
 
 Sign-in is Google OAuth via Firebase Auth. If sign-in already works on your deployed site,
 your production domain is already authorized and there is nothing to do here — none of these
