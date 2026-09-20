@@ -8,6 +8,7 @@ import {
   deleteDeckFromFirestore,
 } from '@/lib/firebase/firestore';
 import { resolvePlan, EMPTY_PLAN_PROFILE, type Plan, type PlanProfile } from '@/lib/plan';
+import { useSettingsStore } from '@/store/settingsStore';
 import type { DeckLegality } from '@/lib/deckRules';
 
 export interface DeckEntry {
@@ -343,6 +344,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       // another user's decks, and any later edit would write them into B's account.
       if (get().syncedUserId !== uid) return;
       set({ decks, shelves: profile.shelves, plan: resolvePlan(profile.plan), profile: profile.plan, isSyncing: false, syncFailed: false });
+      if (profile.toursDone.length) useSettingsStore.getState().mergeToursDone(profile.toursDone);
     } catch (error) {
       console.error('Failed to load decks from Firestore:', error);
       if (get().syncedUserId !== uid) return;

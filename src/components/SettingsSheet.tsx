@@ -7,7 +7,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useDeckStore } from '@/store/deckStore';
 import { useAuth } from '@/lib/firebase/auth';
 import { sfxCastSpell } from '@/lib/audio';
-import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon, GraduationCap } from 'lucide-react';
+import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon, GraduationCap, Footprints } from 'lucide-react';
+import { TOURS, TOUR_NAMES } from '@/content/tours';
 import Link from 'next/link';
 import { Keystone } from '@/components/brand/Keystone';
 import { SectionLabel, ToggleRow } from '@/components/settings/controls';
@@ -55,8 +56,9 @@ export function SettingsSheetProvider({ children }: { children: React.ReactNode 
 }
 
 function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { sfxEnabled, sfxVolume, reduceMotion, apprenticeMode, setSfxEnabled, setSfxVolume, setReduceMotion, setApprenticeMode } =
+  const { sfxEnabled, sfxVolume, reduceMotion, apprenticeMode, showTours, toursDone, setSfxEnabled, setSfxVolume, setReduceMotion, setApprenticeMode, setShowTours, resetTours, requestTour } =
     useSettingsStore();
+  const firstDeckId = useDeckStore((s) => s.decks[0]?.id ?? null);
   const { user, signOut } = useAuth();
   const decks = useDeckStore((s) => s.decks);
 
@@ -135,6 +137,31 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
               icon={<GraduationCap className="h-4 w-4" />}
             />
             <Link href="/learn" onClick={() => onOpenChange(false)} className="px-1 text-xs text-gold underline-offset-4 hover:underline">Read the lessons →</Link>
+            <ToggleRow
+              label="Show tutorials"
+              hint="A short guided tour of the controls the first time you open each screen."
+              checked={showTours}
+              onChange={setShowTours}
+              icon={<Footprints className="h-4 w-4" />}
+            />
+            <div className="flex flex-col gap-1.5 px-1" data-dev-tours>
+              <p className="text-xs text-muted-foreground">Replay a tour{toursDone.length ? ` · ${toursDone.length} of ${TOUR_NAMES.length} seen` : ''}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {TOUR_NAMES.map((name) => {
+                  const t = TOURS[name];
+                  // The table tour runs in the next game; the others open their screen now.
+                  const href = name === 'deck' ? (firstDeckId ? `/decks/${encodeURIComponent(firstDeckId)}` : '/decks') : name === 'board' ? '/game' : t.path;
+                  return (
+                    <Link key={name} href={href} onClick={() => { requestTour(name); onOpenChange(false); }} className="rounded-full border border-border/50 px-3 py-1 text-xs text-foreground/90 transition-colors hover:border-gold/40 hover:text-gold" title={name === 'board' ? 'Runs when the next game starts' : undefined}>
+                      {t.title}{toursDone.includes(name) ? ' ✓' : ''}
+                    </Link>
+                  );
+                })}
+                {toursDone.length > 0 && (
+                  <button type="button" onClick={resetTours} className="rounded-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground">Reset all</button>
+                )}
+              </div>
+            </div>
           </section>
 
           <ArchivistSettings />

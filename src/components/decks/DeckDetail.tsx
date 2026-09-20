@@ -32,6 +32,8 @@ import { AccentDot, ShelfDialog } from './Shelves';
 import { DeckArchivistSheet, type DeckTask } from '@/components/archivist/DeckArchivistSheet';
 import { deckContext } from '@/lib/archivist/context';
 import { loadCardRecords } from '@/lib/deckCards';
+import { useTour } from '@/hooks/useTour';
+import { TourOverlay } from '@/components/tour/Tour';
 import { rise, riseStagger, settle } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
@@ -74,6 +76,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
 
   const names = useMemo(() => (deck ? deck.cards.map((c) => c.cardName) : []), [deck]);
   const { records, loading: recordsLoading } = useCardRecords(names);
+  const tour = useTour('deck', { ready: !!deck && !recordsLoading && !editing });
 
   const sections = useMemo(() => (deck ? groupDeck(deck.cards, records, deck.commanderName) : []), [deck, records]);
   const identity = useMemo(() => (deck ? deckColorIdentity(deck.cards, records, deck.commanderName) : []), [deck, records]);
@@ -263,6 +266,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
 
   return (
     <div className="flex flex-1 flex-col">
+      {tour.active && <TourOverlay tour={tour.tour} onDone={tour.finish} />}
       <div className="mx-auto w-full max-w-6xl px-5 pb-12 pt-6 sm:px-10 sm:pt-8">
         {/* Back */}
         <Link href="/decks" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-gold">
@@ -318,10 +322,10 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                     <Button onClick={finishEditing} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Check /> Done</Button>
                   ) : (
                     <>
-                      <Button variant="outline" onClick={() => setArchivistOpen(true)} className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold" data-dev-archivist>
+                      <Button variant="outline" onClick={() => setArchivistOpen(true)} className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold" data-dev-archivist data-tour="deck-archivist">
                         <BookOpen /> <span className="hidden sm:inline">Ask the</span> Archivist
                       </Button>
-                      <Link href={`/game?deck=${encodeURIComponent(deck.id)}`}>
+                      <Link href={`/game?deck=${encodeURIComponent(deck.id)}`} data-tour="deck-play">
                         <Button className="gap-1.5 bg-gold text-gold-foreground shadow-[0_0_24px_var(--gold-glow)] hover:bg-gold/90"><Swords /> Play</Button>
                       </Link>
                       <Button
@@ -330,6 +334,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                         disabled={!canEdit}
                         title={canEdit ? undefined : 'Deck editing is a Patron feature'}
                         className="gap-1.5 border-border/60 text-foreground"
+                        data-tour="deck-edit"
                       >
                         {canEdit ? <Pencil /> : <Lock />} Edit
                       </Button>
@@ -379,7 +384,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                     </div>
                   ))}
                 </div>
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-2" data-tour="deck-check">
                   <DeckCheckBadge check={check} verifying={verifying} onClick={() => setCheckOpen(true)} />
                 </div>
               </div>
@@ -410,7 +415,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
           {sections.map((section) => (
             <motion.section key={section.group} variants={rise} className="flex flex-col gap-3">
               <Eyebrow>{section.group} <span className="ml-1 text-gold/40">· {section.count}</span></Eyebrow>
-              <div className={cn('grid gap-2.5 sm:gap-3', section.group === 'Commander' ? 'grid-cols-3 sm:grid-cols-5 lg:grid-cols-7' : 'grid-cols-3 sm:grid-cols-5 lg:grid-cols-7')}>
+              <div className={cn('grid gap-2.5 sm:gap-3', section.group === 'Commander' ? 'grid-cols-3 sm:grid-cols-5 lg:grid-cols-7' : 'grid-cols-3 sm:grid-cols-5 lg:grid-cols-7')} data-tour={section.group === 'Commander' ? 'deck-tile' : undefined}>
                 <AnimatePresence initial={false}>
                   {section.entries.map(({ entry, record }) => (
                     <CardTile

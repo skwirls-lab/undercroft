@@ -15,6 +15,8 @@ import { useDeckStore, type Deck, type Shelf, type ShelfAccent } from '@/store/d
 import { useAuth } from '@/lib/firebase/auth';
 import { useCardRecords } from '@/hooks/useCardRecords';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { useTour } from '@/hooks/useTour';
+import { TourOverlay } from '@/components/tour/Tour';
 import { verifyEntries, assessDeck, frontFace, type VerifyReport } from '@/lib/deckCards';
 import { LegalityBadge } from '@/components/decks/DeckCheck';
 import {
@@ -53,6 +55,7 @@ function DecksContent() {
   const [importStep, setImportStep] = useState('');
   const [importResult, setImportResult] = useState<VerifyReport | null>(null);
 
+  const tour = useTour('vault', { ready: !isSyncing && !authLoading && !!user });
   const maxDecks = limit('vault.maxDecks');
   const atDeckLimit = decks.length >= maxDecks;
   const canShelve = can('vault.shelves');
@@ -103,6 +106,7 @@ function DecksContent() {
 
   return (
     <div className="flex flex-1 flex-col">
+      {tour.active && <TourOverlay tour={tour.tour} onDone={tour.finish} />}
       <header className="mx-auto flex w-full max-w-6xl items-end justify-between gap-4 px-5 pb-4 pt-8 sm:px-10 sm:pt-12">
         <div className="flex flex-col gap-1.5">
           <p className="eyebrow">The vault</p>
@@ -116,6 +120,7 @@ function DecksContent() {
             onClick={() => setNewDeckOpen(true)}
             title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined}
             data-dev-new-deck
+            data-tour="vault-new"
             className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
           >
             {atDeckLimit ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -124,7 +129,7 @@ function DecksContent() {
         <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>
           <DialogTrigger
             render={
-              <Button size="sm" variant="outline" disabled={atDeckLimit} title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 border-border/60 text-foreground">
+              <Button size="sm" variant="outline" disabled={atDeckLimit} title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 border-border/60 text-foreground" data-tour="vault-import">
                 <Upload className="h-4 w-4" />
                 Import
               </Button>
@@ -212,7 +217,7 @@ function DecksContent() {
         ) : (
           <>
             {/* Shelf strip */}
-            <div role="tablist" aria-label="Shelves" className="no-scrollbar -mx-5 mb-5 flex items-center gap-2 overflow-x-auto px-5 sm:-mx-0 sm:flex-wrap sm:px-0">
+            <div role="tablist" aria-label="Shelves" data-tour="vault-shelves" className="no-scrollbar -mx-5 mb-5 flex items-center gap-2 overflow-x-auto px-5 sm:-mx-0 sm:flex-wrap sm:px-0">
               <ShelfChip label="All decks" count={decks.length} selected={filter === 'all'} onClick={() => setFilter('all')} />
               {shelves.map((s) => (
                 <ShelfChip key={s.id} label={s.name} accent={s.accent} count={decks.filter((d) => d.shelfId === s.id).length} selected={filter === s.id} onClick={() => setFilter(s.id)} />
@@ -322,7 +327,7 @@ function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, on
       <div className="mx-5 flex items-center gap-2 border-t border-border/30 py-2.5 text-xs text-muted-foreground">
         <span className="shrink-0">{totalCards} cards</span>
         <span className="text-border">·</span>
-        <LegalityBadge legality={deck.legality} />
+        <span data-tour="vault-badge" className="flex shrink-0 items-center"><LegalityBadge legality={deck.legality} /></span>
         {shelf && <span className="ml-auto flex min-w-0 items-center gap-1.5 truncate"><AccentDot accent={shelf.accent} /><span className="truncate">{shelf.name}</span></span>}
 
         <DropdownMenu>

@@ -123,6 +123,23 @@ range, and every link lands on a lesson and section that exist — so a new prom
 ship without an explanation. Toggle: Settings → Learning, the cap in the game header, or the
 switch on /learn. Harness: `/dev/board?apprentice=0`, `?choice=attackers`.
 
+## Tutorials (tours)
+
+Four guided tours of Undercroft's own controls, one per screen: the vault, a deck, setting
+up a game, and the table (plaques, the (i), the phase tracker, Pass and auto-pass, the hand
+strip and how paying works, the stack, the log, the Archivist). A spotlight cuts a hole in a
+dark mask over one control at a time with a card beside it; arrows move, Escape leaves. On a
+phone the card docks to whichever half the control is not in. A step whose control is not on
+the page (a Patron feature, an empty stack) is skipped.
+
+Each tour runs once, the first time its screen opens, while Settings → Learning → "Show
+tutorials" is on; completion is remembered on the device and mirrored to the profile
+(`users/{uid}.toursDone`) so another device does not replay it. Settings lists the tours to
+replay; the table tour replays with the next game. Content is `src/content/tours.ts`; anchors
+are `data-tour` attributes on the existing components. `npm run test:tours` (Playwright,
+against the mock dev server) walks every tour at phone and desktop and checks that each
+step's target is on the page, in the viewport and not covered by the card.
+
 ## The Archivist
 
 The Archivist is the resident helper: a keeper of records who has read every card. It is
@@ -205,6 +222,7 @@ npm run test:entitlements # the price list under both launch-switch positions, p
 npm run test:metering     # Archivist allowance arithmetic
 npm run test:archivist    # prompt builders, context serialisation, swap/idea parsing
 npm run test:lessons      # Apprentice content: every phase, step and prompt explained; quiz and link integrity
+npm run test:tours        # every tour step resolves and is visible at phone and desktop (needs the mock dev server)
 npm run test:rules        # firestore.rules against the emulator (needs Java)
 npx next build
 ```

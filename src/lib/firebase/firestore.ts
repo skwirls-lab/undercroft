@@ -198,13 +198,15 @@ export async function deleteDeckFromFirestore(
 export interface VaultProfile {
   shelves: Shelf[];
   plan: PlanProfile;
+  /** Tours the player has finished on any device. */
+  toursDone: string[];
 }
 
 const SHELF_ACCENTS = new Set(['gold', 'W', 'U', 'B', 'R', 'G']);
 
 export async function loadVaultProfile(uid: string): Promise<VaultProfile> {
   const db = getFirebaseDb();
-  if (!db) return { shelves: [], plan: parsePlanProfile(null) };
+  if (!db) return { shelves: [], plan: parsePlanProfile(null), toursDone: [] };
 
   const snap = await getDoc(doc(db, 'users', uid));
   const data = snap.exists() ? snap.data() : {};
@@ -218,7 +220,14 @@ export async function loadVaultProfile(uid: string): Promise<VaultProfile> {
           createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
         }))
     : [];
-  return { shelves, plan: parsePlanProfile(data as Record<string, unknown>) };
+  const toursDone = Array.isArray(data.toursDone) ? data.toursDone.filter((t: unknown): t is string => typeof t === 'string') : [];
+  return { shelves, plan: parsePlanProfile(data as Record<string, unknown>), toursDone };
+}
+
+export async function saveToursDone(uid: string, toursDone: string[]): Promise<void> {
+  const db = getFirebaseDb();
+  if (!db) return;
+  await setDoc(doc(db, 'users', uid), { toursDone }, { merge: true });
 }
 
 export async function saveShelves(uid: string, shelves: Shelf[]): Promise<void> {

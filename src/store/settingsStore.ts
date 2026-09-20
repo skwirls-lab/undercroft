@@ -13,12 +13,23 @@ interface SettingsStore {
   archivistInMatch: boolean;
   /** The Apprentice: rules guidance under the game header and on every prompt. On for new players. */
   apprenticeMode: boolean;
+  /** Guided tours of the controls on first visit to each screen. */
+  showTours: boolean;
+  /** Tours already seen, here or on another device (mirrored through the profile). */
+  toursDone: string[];
+  /** A tour asked for from Settings; it runs the next time its screen opens, done or not. */
+  requestedTour: string | null;
 
   setSfxEnabled: (enabled: boolean) => void;
   setSfxVolume: (volume: number) => void;
   setReduceMotion: (reduce: boolean) => void;
   setArchivistInMatch: (on: boolean) => void;
   setApprenticeMode: (on: boolean) => void;
+  setShowTours: (on: boolean) => void;
+  markTourDone: (name: string) => void;
+  mergeToursDone: (names: string[]) => void;
+  resetTours: () => void;
+  requestTour: (name: string | null) => void;
 
   /**
    * Reset the preferences that belong to a person rather than to this device.
@@ -34,6 +45,9 @@ const DEFAULTS = {
   reduceMotion: false,
   archivistInMatch: true,
   apprenticeMode: true,
+  showTours: true,
+  toursDone: [] as string[],
+  requestedTour: null as string | null,
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -53,6 +67,14 @@ export const useSettingsStore = create<SettingsStore>()(
       setReduceMotion: (reduce) => set({ reduceMotion: reduce }),
       setArchivistInMatch: (on) => set({ archivistInMatch: on }),
       setApprenticeMode: (on) => set({ apprenticeMode: on }),
+      setShowTours: (on) => set({ showTours: on }),
+      markTourDone: (name) => set((s) => (s.toursDone.includes(name) ? s : { toursDone: [...s.toursDone, name] })),
+      mergeToursDone: (names) => set((s) => {
+        const merged = [...new Set([...s.toursDone, ...names])];
+        return merged.length === s.toursDone.length ? s : { toursDone: merged };
+      }),
+      resetTours: () => set({ toursDone: [] }),
+      requestTour: (name) => set({ requestedTour: name }),
 
       clearUserSettings: () => {
         setSfxEnabled(DEFAULTS.sfxEnabled);
@@ -69,6 +91,9 @@ export const useSettingsStore = create<SettingsStore>()(
         reduceMotion: state.reduceMotion,
         archivistInMatch: state.archivistInMatch,
         apprenticeMode: state.apprenticeMode,
+        showTours: state.showTours,
+        toursDone: state.toursDone,
+        requestedTour: state.requestedTour,
       }),
       // Persisted values must be pushed into the audio module after rehydration, or the
       // in-memory gates stay at their defaults and ignore the user's choices.

@@ -140,6 +140,7 @@ export function EventTicker({ events, currentPlayerId, className }: EventTickerP
     <>
       {/* Thin ticker strip */}
       <button
+        data-tour="board-ticker"
         onClick={() => setLogOpen(true)}
         className={cn(
           'flex items-center text-left w-full shrink-0 border-b border-border/10',

@@ -25,6 +25,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { MatchArchivist, type MatchAsk } from '@/components/archivist/MatchArchivist';
 import { ApprenticeStrip } from '@/components/game/ApprenticeStrip';
+import { useTour } from '@/hooks/useTour';
+import { TourOverlay } from '@/components/tour/Tour';
 import {
   Loader2,
   Flag,
@@ -138,6 +140,8 @@ export function ForgeGamePage() {
   // phone). The Settings switch hides the book entirely; the plan decides whether the panel
   // answers. Nothing is sent until the player asks.
   const archivistInMatch = useSettingsStore((s) => s.archivistInMatch);
+  // The table tour waits for the opening hand to be kept, so the spotlight lands on the board.
+  const tour = useTour('board', { ready: connectionStatus === 'connected' && !!gameState && !pendingChoice?.choiceType.startsWith('mulligan') });
   const apprenticeMode = useSettingsStore((s) => s.apprenticeMode);
   const setApprenticeMode = useSettingsStore((s) => s.setApprenticeMode);
   const { canStrict } = useEntitlements();
@@ -232,7 +236,7 @@ export function ForgeGamePage() {
             <Keystone size={30} />
           </Link>
           {gameState && (
-            <div className="flex-1 min-w-0 mx-1">
+            <div className="flex-1 min-w-0 mx-1" data-tour="board-phase">
               <PhaseTracker
                 turn={gameState.turn}
                 activePlayerName={gameState.players.find(p => p.id === gameState.turn.activePlayerId)?.name || '?'}
@@ -245,7 +249,7 @@ export function ForgeGamePage() {
               <GraduationCap style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
             {archivistAvailable && (
-              <Button variant="ghost" size="sm" onClick={() => (archivistOpen ? setArchivistOpen(false) : openArchivist(null))} className={cn('p-0', archivistOpen ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Ask the Archivist" aria-label="Ask the Archivist" aria-pressed={archivistOpen} data-dev-archivist>
+              <Button variant="ghost" size="sm" onClick={() => (archivistOpen ? setArchivistOpen(false) : openArchivist(null))} className={cn('p-0', archivistOpen ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Ask the Archivist" aria-label="Ask the Archivist" aria-pressed={archivistOpen} data-dev-archivist data-tour="board-archivist">
                 <BookOpen style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
               </Button>
             )}
@@ -340,6 +344,7 @@ export function ForgeGamePage() {
           </span>
           <Button
             size="sm"
+            data-tour="board-pass"
             onClick={handlePassPriority}
             disabled={!hasPriorityForActions || isGameOver || isAwaitingServer}
             className={cn(
@@ -357,6 +362,7 @@ export function ForgeGamePage() {
             className={cn(autoPassUntilNextTurn && 'bg-amber-600 hover:bg-amber-700 text-white')}
             style={{ height: 'clamp(28px,4.5vh,1000px)', padding: '0 clamp(8px,2vmin,1000px)', fontSize: 'clamp(10px,2vmin,1000px)' }}
             title="Auto-pass"
+            data-tour="board-autopass"
           >
             <FastForward style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} />
           </Button>
@@ -373,6 +379,7 @@ export function ForgeGamePage() {
         />
       </div>
 
+      {tour.active && <TourOverlay tour={tour.tour} onDone={tour.finish} />}
       {archivistOpen && archivistAvailable && (
         <MatchArchivist
           youId={HUMAN_PLAYER_ID}
@@ -451,7 +458,7 @@ function HandStrip({
   const h = Math.max(0, Math.round(boxH * 0.86));
   const size = { h, w: Math.round(h / 1.4) };
   return (
-    <div className="flex shrink-0 items-stretch border-t border-border/40 bg-background/85 backdrop-blur-xl" style={{ height: 'clamp(92px, 14vh, 132px)' }}>
+    <div className="flex shrink-0 items-stretch border-t border-border/40 bg-background/85 backdrop-blur-xl" style={{ height: 'clamp(92px, 14vh, 132px)' }} data-tour="board-hand">
       <button
         onClick={onOpenBoard}
         className="flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-r border-border/30 text-muted-foreground/70 transition-colors hover:bg-muted/30 hover:text-gold"
