@@ -35,21 +35,24 @@ export async function askArchivist(
   if (isDevMock()) return mockAnswer(payload, onChunk, signal);
 
   const auth = getFirebaseAuth();
-  const token = await auth?.currentUser?.getIdToken();
-  if (!token) throw new ArchivistError('unauthenticated', 'Sign in to ask the Archivist.');
-
-  let res: Response;
-  try {
-    res = await fetch('/api/archivist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ payload, messages: history }),
-      signal,
-    });
-  } catch (err) {
-    if ((err as Error)?.name === 'AbortError') throw err;
-    throw new ArchivistError('network', 'Could not reach the Archivist.');
-  }
+  const send = async (forceRefresh: boolean): Promise<Response> => {
+    const token = await auth?.currentUser?.getIdToken(forceRefresh);
+    if (!token) throw new ArchivistError('unauthenticated', 'Sign in to ask the Archivist.');
+    try {
+      return await fetch('/api/archivist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ payload, messages: history }),
+        signal,
+      });
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') throw err;
+      throw new ArchivistError('network', 'Could not reach the Archivist.');
+    }
+  };
+  // A stale cached token earns one retry with a fresh one before the player sees an error.
+  let res = await send(false);
+  if (res.status === 401) res = await send(true);
 
   if (!res.ok) {
     let code: ArchivistErrorCode = 'server';

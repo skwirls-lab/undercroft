@@ -41,6 +41,7 @@ export function stateFromError(err: ArchivistError): AccessState | 'error' {
     case 'disabled': return 'resting';
     case 'patron': return 'patron';
     case 'quota': return 'quota';
+    case 'server-config': return 'resting';
     default: return 'error';
   }
 }

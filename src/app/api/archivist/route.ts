@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser, AuthError, jsonError } from '@/lib/server/auth';
+import { requireUser, errorResponse, jsonError } from '@/lib/server/auth';
 import { getAppConfig } from '@/lib/server/appConfig';
 import { reserveCall, recordCall, QuotaError } from '@/lib/server/metering';
 import { resolvePlan } from '@/lib/plan';
@@ -45,7 +45,8 @@ export async function POST(request: Request) {
   try {
     uid = (await requireUser(request)).uid;
   } catch (err) {
-    if (err instanceof AuthError) return jsonError(err.status, 'unauthenticated', err.message);
+    const res = errorResponse(err);
+    if (res) return res;
     throw err;
   }
 
