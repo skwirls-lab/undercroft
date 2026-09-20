@@ -8,7 +8,7 @@ import { groupDeck, groupFor, manaCurve, deckColorIdentity, frontFace } from '..
 import { resolveOpponents, describeChoice, vaultDeckPlayableByAI, vaultDeckToForge, SURPRISE } from '../src/lib/opponentDecks';
 import { AI_DECKS } from '../src/lib/aiDecks';
 import { can, limit, parsePlan, ENFORCE_ENTITLEMENTS } from '../src/lib/entitlements';
-import { deckTotals, type Deck, type DeckEntry } from '../src/store/deckStore';
+import { deckTotals, mergeEntries, type Deck, type DeckEntry } from '../src/store/deckStore';
 import type { ScryfallCardRecord } from '../src/lib/cardTypes';
 
 let failures = 0;
@@ -65,6 +65,8 @@ check('identity from commander', deckColorIdentity(entries, records, 'Atraxa').j
 check('identity from cards when no commander', deckColorIdentity(entries.filter((e) => e.cardName !== 'Atraxa'), records, '').join('') === 'UG');
 check('deckTotals counts unresolved names once', deckTotals([...entries, { cardName: 'Typo', quantity: 2, resolved: false }]).unresolvedCount === 1);
 check('deckTotals sums quantities', deckTotals(entries).totalCards === 16);
+const merged = mergeEntries([{ cardName: 'Forest', quantity: 3 }, { cardName: 'Sol Ring', quantity: 1 }, { cardName: 'Forest', quantity: 2 }]);
+check('mergeEntries folds repeated names and keeps order', merged.length === 2 && merged[0].cardName === 'Forest' && merged[0].quantity === 5);
 
 console.log('frontFace');
 const dfc = rec('Front // Back', 'Sorcery // Land', 3, [], {

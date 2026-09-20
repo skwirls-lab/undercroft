@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Alcove, Eyebrow } from '@/components/brand/Alcove';
 import { ManaSymbol } from '@/components/game/ManaSymbol';
-import { useDeckStore, parseDecklist, deckTotals, type Deck, type DeckEntry } from '@/store/deckStore';
+import { useDeckStore, parseDecklist, deckTotals, mergeEntries, type Deck, type DeckEntry } from '@/store/deckStore';
 import { useCardRecords } from '@/hooks/useCardRecords';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { groupDeck, deckColorIdentity, manaCurve, frontFace, verifyEntries } from '@/lib/deckCards';
@@ -46,6 +46,9 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const canEdit = can('deck.edit');
 
   const [editing, setEditing] = useState(false);
+  // The name is drafted locally while editing and written once on Done, not per keystroke:
+  // every store update is a Firestore write.
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [openCard, setOpenCard] = useState<string | null>(null);
   const [textOpen, setTextOpen] = useState(false);
@@ -135,11 +138,21 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   }, [deck, commit]);
 
   const replaceFromText = useCallback((text: string) => {
-    const { cards, commanderName } = parseDecklist(text);
+    const parsed = parseDecklist(text);
+    const cards = mergeEntries(parsed.cards);
+    const commanderName = parsed.commanderName;
     if (cards.length === 0) { toast.error('No cards found in that list.'); return; }
     setTextOpen(false);
     void reverify(cards, { commanderName: commanderName || deck?.commanderName || '' });
   }, [deck, reverify]);
+
+  const startEditing = () => { setNameDraft(deck?.name ?? ''); setEditing(true); };
+  const finishEditing = () => {
+    const next = nameDraft?.trim();
+    if (deck && next && next !== deck.name) updateDeck(deck.id, { name: next });
+    setNameDraft(null);
+    setEditing(false);
+  };
 
   const confirmDelete = () => {
     if (!deck) return;
@@ -210,8 +223,9 @@ export function DeckDetail({ deckId }: { deckId: string }) {
 
                   {editing ? (
                     <Input
-                      value={deck.name}
-                      onChange={(e) => updateDeck(deck.id, { name: e.target.value })}
+                      value={nameDraft ?? deck.name}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      onBlur={() => { const next = nameDraft?.trim(); if (next && next !== deck.name) updateDeck(deck.id, { name: next }); }}
                       aria-label="Deck name"
                       className="mt-2 h-12 max-w-xl border-gold/40 bg-background/60 font-display text-2xl font-bold sm:text-3xl"
                     />
@@ -232,7 +246,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                 {/* Actions */}
                 <div className="flex shrink-0 items-center gap-2">
                   {editing ? (
-                    <Button onClick={() => setEditing(false)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Check /> Done</Button>
+                    <Button onClick={finishEditing} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Check /> Done</Button>
                   ) : (
                     <>
                       <Link href={`/game?deck=${encodeURIComponent(deck.id)}`}>
@@ -240,7 +254,7 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                       </Link>
                       <Button
                         variant="outline"
-                        onClick={() => canEdit && setEditing(true)}
+                        onClick={() => canEdit && startEditing()}
                         disabled={!canEdit}
                         title={canEdit ? undefined : 'Deck editing is a Patron feature'}
                         className="gap-1.5 border-border/60 text-foreground"

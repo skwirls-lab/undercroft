@@ -85,6 +85,20 @@ export function countCards(cards: DeckEntry[]): number {
   return cards.reduce((sum, c) => sum + c.quantity, 0);
 }
 
+/**
+ * Fold repeated names into one entry. A pasted list can name a card twice ("1 Forest" in two
+ * sections); the deck page keys tiles by name and edits by name, so each name must appear once.
+ */
+export function mergeEntries(cards: DeckEntry[]): DeckEntry[] {
+  const byName = new Map<string, DeckEntry>();
+  for (const c of cards) {
+    const prev = byName.get(c.cardName);
+    if (prev) byName.set(c.cardName, { ...prev, quantity: prev.quantity + c.quantity });
+    else byName.set(c.cardName, { ...c });
+  }
+  return [...byName.values()];
+}
+
 /** Recompute the derived counts after the card list changes. */
 export function deckTotals(cards: DeckEntry[]): Pick<Deck, 'totalCards' | 'resolvedCount' | 'unresolvedCount'> {
   const resolvedCount = cards.filter((c) => c.resolved).length;
@@ -251,7 +265,9 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   setActiveDeck: (id) => set({ activeDeckId: id }),
 
   importDeckFromText: (text, name) => {
-    const { cards, commanderName } = parseDecklist(text);
+    const parsed = parseDecklist(text);
+    const cards = mergeEntries(parsed.cards);
+    const commanderName = parsed.commanderName;
 
     const deck: Deck = {
       id: newId('deck'),
