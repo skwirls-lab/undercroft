@@ -59,6 +59,11 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+    // Stripe's idempotency ledger: one document per webhook event, server-written.
+    match /stripeEvents/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
 
     // User profiles. A player reads and writes their own, except the protected fields
     // above. An admin may read any profile (the email lookup in the Settings panel lists

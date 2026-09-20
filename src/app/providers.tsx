@@ -6,15 +6,18 @@ import { FirestoreSyncProvider } from './FirestoreSyncProvider';
 import { SettingsSheetProvider } from '@/components/SettingsSheet';
 import { AppShell } from '@/components/AppShell';
 import { MotionPreference } from '@/components/MotionPreference';
+import { PatronProvider } from '@/components/patron/PatronSheet';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <FirestoreSyncProvider>
         <MotionPreference />
-        <SettingsSheetProvider>
-          <AppShell>{children}</AppShell>
-        </SettingsSheetProvider>
+        <PatronProvider>
+          <SettingsSheetProvider>
+            <AppShell>{children}</AppShell>
+          </SettingsSheetProvider>
+        </PatronProvider>
       </FirestoreSyncProvider>
     </AuthProvider>
   );

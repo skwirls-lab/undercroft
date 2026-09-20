@@ -176,14 +176,27 @@ this month's usage. Server-side code lives in `src/lib/server/` (Admin SDK, bear
 auth, config cache, usage metering) and is reached through route handlers under
 `src/app/api/`. `SECURITY_SETUP.md` has the environment variables and the rules.
 
-## Plans and paywalls
+## Plans and the Patron tier
 
-Nothing is paid yet, but the seam is in: `src/lib/entitlements.ts` is the single price list
-(`FEATURES`, `LIMITS`) and `useEntitlements()` is what a screen asks before showing a gated
-control. Deck editing, shelves, custom opponent decks, the deck cap and the four-player pod all
-go through it. The launch switch is the `NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1` environment variable: while it
-is unset every gate answers yes. A player's plan is read from `users/{uid}.plan`, which the Firestore rules forbid
-the client from writing — only a billing webhook with admin credentials may set it.
+Two plans. **Free**: two decks in the vault, the deck builder and deck check, random house
+opponents, pods of up to three, ten Archivist requests a month, the Apprentice and the
+tutorials. **Patron ($4.99/month)**: unlimited decks, shelves, choose what each opponent
+plays, four-player pods, the Archivist at the table and after the game, commander ideas,
+and a larger monthly allowance.
+
+`src/lib/entitlements.ts` is the single price list (`FEATURES`, `LIMITS`); `useEntitlements()`
+is what a screen asks before showing a gated control, and every locked control opens the
+**Patron sheet** with the reason rather than sitting dead. The launch switch is
+`NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1`: while it is unset every vault, opponent and pod gate
+answers yes. The Archivist's plan gate and allowance are enforced on the server regardless.
+A free account with more than two decks keeps them all: the two most recently touched stay
+live, the rest are **read-only** (badge, banner, not playable) until the player becomes a Patron.
+
+Billing is Stripe Checkout and the Customer Portal (`/api/billing/checkout`, `/portal`) with a
+webhook (`/api/billing/webhook`) that sets `users/{uid}.plan`; the policy is the pure function
+in `src/lib/billing.ts` (`npm run test:billing`): active or trialing → Patron, anything else →
+free, an admin grant is never touched, every event applied once. The client never writes the
+plan; `firestore.rules` forbids it. `SECURITY_SETUP.md` §7 has the Stripe setup.
 
 ## Project Structure
 
@@ -223,6 +236,7 @@ npm run test:metering     # Archivist allowance arithmetic
 npm run test:archivist    # prompt builders, context serialisation, swap/idea parsing
 npm run test:lessons      # Apprentice content: every phase, step and prompt explained; quiz and link integrity
 npm run test:tours        # every tour step resolves and is visible at phone and desktop (needs the mock dev server)
+npm run test:billing      # the Stripe webhook policy against recorded event shapes
 npm run test:rules        # firestore.rules against the emulator (needs Java)
 npx next build
 ```

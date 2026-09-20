@@ -79,6 +79,9 @@ await check('an admin reads the stats', assertSucceeds(getDoc(doc(admin, 'stats'
 await check('nobody writes the stats from a browser', assertFails(setDoc(doc(admin, 'stats', '2026-09'), { calls: 0 })));
 await check('nobody writes the log from a browser', assertFails(setDoc(doc(admin, 'archivistLog', 'x'), { uid: 'x' })));
 await check('a player cannot read the log', assertFails(getDoc(doc(alice, 'archivistLog', 'x'))));
+await check('nobody writes the Stripe ledger from a browser', assertFails(setDoc(doc(admin, 'stripeEvents', 'evt_1'), { type: 'x' })));
+await check('a player cannot read the Stripe ledger', assertFails(getDoc(doc(alice, 'stripeEvents', 'evt_1'))));
+await check('a player cannot link a Stripe customer to themselves', assertFails(updateDoc(doc(alice, 'users', ALICE), { stripeCustomerId: 'cus_1' })));
 
 console.log('cards and decks');
 await check('a player reads a card', assertSucceeds(getDoc(doc(alice, 'cards', 'c1'))));

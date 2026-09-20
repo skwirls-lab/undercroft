@@ -139,7 +139,7 @@ Your pinned version is in `FORGE_VERSION` (currently `forge-2.0.12`; upstream is
 
 ## 3. The server side: FIREBASE_SERVICE_ACCOUNT on Vercel
 
-Route handlers (`/api/me`, `/api/archivist`; billing next) run on Vercel with the
+Route handlers (`/api/me`, `/api/archivist`, `/api/billing/*`) run on Vercel with the
 Firebase Admin SDK. They need the same service-account JSON the card-sync Action uses:
 
 1. Vercel → Project → Settings → Environment Variables.
@@ -204,7 +204,38 @@ The plan gate is enforced on the server whether or not `NEXT_PUBLIC_ENFORCE_ENTI
 is set: in-match advice, the post-game recap and commander ideas are Patron features; deck
 advice and rules questions are on every plan within the allowance.
 
-## 7. Sign-in and account separation
+## 7. Billing: Stripe on Vercel
+
+The Patron tier is a Stripe subscription. Nothing about cards touches Undercroft; the app
+only learns "this uid is a Patron" from Stripe's webhook.
+
+1. **Product and price.** Stripe Dashboard → Products → add "Undercroft Patron", recurring,
+   $4.99 / month. Copy the price id (`price_...`).
+2. **Webhook endpoint.** Developers → Webhooks → add `https://<your domain>/api/billing/webhook`
+   with the events `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+   Copy the signing secret (`whsec_...`).
+3. **Customer Portal.** Settings → Billing → Customer portal: enable cancellation and
+   payment-method updates (that is all the app links to).
+4. **Vercel environment variables** (Production; use test-mode keys on Preview):
+   `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and
+   `NEXT_PUBLIC_SITE_URL` (where Stripe sends players back, e.g. `https://undercroft.app`).
+   Redeploy.
+5. **Rules.** Paste `firestore.rules` again (section 1): it adds `stripeEvents/{id}`, the
+   webhook's idempotency ledger, and `npm run test:rules` covers it.
+6. **Try it in test mode** with card `4242 4242 4242 4242`: Settings → the plan row →
+   Become a Patron. After Checkout the player lands on `/?patron=welcome`, the webhook sets
+   `plan: 'patron', planSource: 'stripe'` on their profile, and the Patron plaque appears on
+   the dashboard. Cancel from the portal: the profile shows `subscriptionStatus: 'canceling'`
+   and `patronUntil` until the period ends, then the deletion event makes it free.
+7. **Switch the paywall on** when you are ready to advertise: `NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1`
+   on Vercel and redeploy. Until then every vault, opponent and pod gate answers yes for
+   everyone; the Archivist's plan gate and allowance are enforced regardless.
+
+What the webhook will never do: revoke or overwrite a plan whose `planSource` is `admin`.
+Grants from the Administration section stay until you revoke them there.
+
+## 8. Sign-in and account separation
 
 Sign-in is Google OAuth via Firebase Auth. If sign-in already works on your deployed site,
 your production domain is already authorized and there is nothing to do here — none of these

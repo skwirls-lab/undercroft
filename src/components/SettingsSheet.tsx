@@ -7,7 +7,10 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useDeckStore } from '@/store/deckStore';
 import { useAuth } from '@/lib/firebase/auth';
 import { sfxCastSpell } from '@/lib/audio';
-import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon, GraduationCap, Footprints } from 'lucide-react';
+import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon, GraduationCap, Footprints, Crown } from 'lucide-react';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { usePatron } from '@/components/patron/PatronSheet';
+import { PLAN_LABEL } from '@/lib/entitlements';
 import { TOURS, TOUR_NAMES } from '@/content/tours';
 import Link from 'next/link';
 import { Keystone } from '@/components/brand/Keystone';
@@ -59,6 +62,8 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
   const { sfxEnabled, sfxVolume, reduceMotion, apprenticeMode, showTours, toursDone, setSfxEnabled, setSfxVolume, setReduceMotion, setApprenticeMode, setShowTours, resetTours, requestTour } =
     useSettingsStore();
   const firstDeckId = useDeckStore((s) => s.decks[0]?.id ?? null);
+  const { plan, profile } = useEntitlements();
+  const { openPatron } = usePatron();
   const { user, signOut } = useAuth();
   const decks = useDeckStore((s) => s.decks);
 
@@ -191,6 +196,23 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
                 ? 'No decks saved yet.'
                 : `${decks.length} deck${decks.length === 1 ? '' : 's'} synced to your account.`}
             </p>
+            <button
+              type="button"
+              onClick={() => { onOpenChange(false); openPatron(null); }}
+              className="flex w-full items-center gap-3 rounded-lg border border-border/40 px-4 py-3 text-left transition-colors hover:border-gold/40"
+              data-dev-plan-row
+            >
+              <Crown className="h-4 w-4 shrink-0 text-gold" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{PLAN_LABEL[plan]} plan</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {plan === 'patron'
+                    ? (profile.planSource === 'admin' ? 'Granted by the keeper.' : profile.subscriptionStatus === 'canceling' ? 'Ends at the period\u2019s close.' : 'Renews monthly. Tap to manage.')
+                    : 'Two decks, ten Archivist requests a month, random opponents. Tap to see Patron.'}
+                </span>
+              </span>
+              <span className="shrink-0 text-xs font-medium text-gold">{plan === 'patron' ? 'Manage' : 'Upgrade'}</span>
+            </button>
             <Button
               variant="ghost"
               onClick={() => {

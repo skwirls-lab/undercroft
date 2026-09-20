@@ -258,9 +258,12 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   },
 
   updateDeck: (id, updates) => {
+    // A derived field (the stored deck-check verdict) is not an edit: writing it must not make
+    // a deck "recently touched", or opening a read-only deck would reorder the free vault.
+    const derivedOnly = Object.keys(updates).every((k) => k === 'legality');
     set((state) => ({
       decks: state.decks.map((d) =>
-        d.id === id ? { ...d, ...updates, updatedAt: Date.now() } : d
+        d.id === id ? { ...d, ...updates, ...(derivedOnly ? {} : { updatedAt: Date.now() }) } : d
       ),
     }));
     const { syncedUserId } = get();
