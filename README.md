@@ -86,6 +86,13 @@ default), a specific house deck, or any vault deck with a commander — includin
 are about to play, if a mirror match is the test. `src/lib/opponentDecks.ts` resolves the
 choices into `start_game` payloads; the server names each AI seat after its deck.
 
+## In a game
+
+Every seat plaque and the board header carry an (i). It opens the **seat inspector**: life,
+poison against 10, library and hand counts, the mana pool, commander damage taken from every
+opposing commander against the 21 that ends a game, and the graveyard, exile and command zone
+laid out as cards with a reader. Tabs across the top switch seats without closing.
+
 ## Plans and paywalls
 
 Nothing is paid yet, but the seam is in: `src/lib/entitlements.ts` is the single price list
