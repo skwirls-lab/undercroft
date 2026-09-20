@@ -100,13 +100,21 @@ poison against 10, library and hand counts, the mana pool, commander damage take
 opposing commander against the 21 that ends a game, and the graveyard, exile and command zone
 laid out as cards with a reader. Tabs across the top switch seats without closing.
 
+## Administration
+
+Settings has an Administration section for the admin allowlist: the Archivist's master
+switch, model and allowances (`config/app`), a notice banner, Patron grants by email, and
+this month's usage. Server-side code lives in `src/lib/server/` (Admin SDK, bearer-token
+auth, config cache, usage metering) and is reached through route handlers under
+`src/app/api/`. `SECURITY_SETUP.md` has the environment variables and the rules.
+
 ## Plans and paywalls
 
 Nothing is paid yet, but the seam is in: `src/lib/entitlements.ts` is the single price list
 (`FEATURES`, `LIMITS`) and `useEntitlements()` is what a screen asks before showing a gated
 control. Deck editing, shelves, custom opponent decks, the deck cap and the four-player pod all
-go through it. `ENFORCE_ENTITLEMENTS` is the launch switch: while it is `false` every gate
-answers yes. A player's plan is read from `users/{uid}.plan`, which the Firestore rules forbid
+go through it. The launch switch is the `NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1` environment variable: while it
+is unset every gate answers yes. A player's plan is read from `users/{uid}.plan`, which the Firestore rules forbid
 the client from writing — only a billing webhook with admin credentials may set it.
 
 ## Project Structure
@@ -141,7 +149,10 @@ npm run check:protocol    # every server prompt has a renderer and matching resp
 npm run test:parser       # decklist parser
 npm run test:events       # game-log synthesiser
 npm run test:sync         # Scryfall → Firestore sync helpers
-npm run test:deck         # deck grouping/stats, opponent seat resolution, entitlement gates
+npm run test:deck         # deck grouping/stats, opponent seat resolution
+npm run test:entitlements # the price list under both launch-switch positions, plan resolution
+npm run test:metering     # Archivist allowance arithmetic
+npm run test:rules        # firestore.rules against the emulator (needs Java)
 npx next build
 ```
 

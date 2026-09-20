@@ -1,3 +1,5 @@
+import { isDevMock, DEV_MOCK_USER } from '@/lib/devMock';
+
 /**
  * Admin allowlist.
  *
@@ -20,6 +22,7 @@ const ADMIN_UIDS: string[] = (process.env.NEXT_PUBLIC_ADMIN_UIDS ?? '')
   .filter((uid) => uid.length > 0);
 
 export function isAdminUid(uid: string | null | undefined): boolean {
+  if (isDevMock() && uid === DEV_MOCK_USER.uid) return true;
   if (!uid) return false;
   return ADMIN_UIDS.includes(uid);
 }

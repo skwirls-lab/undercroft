@@ -137,7 +137,49 @@ never appears, not an outage.
 Your pinned version is in `FORGE_VERSION` (currently `forge-2.0.12`; upstream is at
 `forge-2.0.14`), so the first run will propose an upgrade.
 
-## 3. Sign-in and account separation
+## 3. The server side: FIREBASE_SERVICE_ACCOUNT on Vercel
+
+Route handlers (`/api/me` today; the Archivist and billing next) run on Vercel with the
+Firebase Admin SDK. They need the same service-account JSON the card-sync Action uses:
+
+1. Vercel → Project → Settings → Environment Variables.
+2. Add `FIREBASE_SERVICE_ACCOUNT` with the whole JSON file as the value (Production and
+   Preview). Redeploy.
+3. Open the app, sign in, and load `/api/me` in a tab while signed in — it needs the bearer
+   token the app attaches, so the easiest check is the usage meter in Settings once the
+   Archivist ships. Until then, a missing variable shows up as a clear error in the Vercel
+   function logs on the first request, naming the variable.
+
+Admin writes (plan grants, usage counters, monthly stats) go through this SDK and bypass
+the security rules; that is why the client never has to be allowed to write them.
+
+## 4. The rules, again: config, stats, admin grants
+
+`firestore.rules` gained four things. Paste the file again (section 1) — with your UID in
+the allowlist — before using the Administration section of Settings:
+
+| Path | Read | Write |
+|---|---|---|
+| `/config/{id}` | any signed-in user | admins only |
+| `/stats/{id}`, `/archivistLog/{id}` | admins only | nobody from a browser (server only) |
+| `/users/{uid}` | owner, or any admin | owner, except the protected fields; admin may change exactly `plan, planSource, patronUntil, planNote` |
+| `/users` (listing) | admins only (email lookup) | — |
+
+Protected profile fields a player can never write: `plan, planSource, patronUntil,
+planNote, usage, stripeCustomerId, stripeSubscriptionId, subscriptionStatus`.
+
+`npm run test:rules` exercises all of this against the Firestore emulator; CI runs it on
+every pull request.
+
+## 5. Administration (Settings → Administration)
+
+Visible only to UIDs in `NEXT_PUBLIC_ADMIN_UIDS`, and only effective for UIDs in the rules
+allowlist. From there you can switch the Archivist off app-wide, change its model id and the
+monthly allowances, post a notice banner, grant or revoke Patron by email (with an optional
+expiry — a grant made here is never undone by billing), and see this month's usage with an
+estimated cost once you enter the model's per-token rates.
+
+## 6. Sign-in and account separation
 
 Sign-in is Google OAuth via Firebase Auth. If sign-in already works on your deployed site,
 your production domain is already authorized and there is nothing to do here — none of these

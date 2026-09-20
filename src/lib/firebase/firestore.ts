@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from './config';
 import type { Deck, DeckEntry, Shelf } from '@/store/deckStore';
-import { parsePlan, type Plan } from '@/lib/entitlements';
+import { parsePlanProfile, type PlanProfile } from '@/lib/plan';
 
 // ─── User Profile ─────────────────────────────────────
 
@@ -197,14 +197,14 @@ export async function deleteDeckFromFirestore(
  */
 export interface VaultProfile {
   shelves: Shelf[];
-  plan: Plan;
+  plan: PlanProfile;
 }
 
 const SHELF_ACCENTS = new Set(['gold', 'W', 'U', 'B', 'R', 'G']);
 
 export async function loadVaultProfile(uid: string): Promise<VaultProfile> {
   const db = getFirebaseDb();
-  if (!db) return { shelves: [], plan: 'free' };
+  if (!db) return { shelves: [], plan: parsePlanProfile(null) };
 
   const snap = await getDoc(doc(db, 'users', uid));
   const data = snap.exists() ? snap.data() : {};
@@ -218,7 +218,7 @@ export async function loadVaultProfile(uid: string): Promise<VaultProfile> {
           createdAt: typeof s.createdAt === 'number' ? s.createdAt : Date.now(),
         }))
     : [];
-  return { shelves, plan: parsePlan(data.plan) };
+  return { shelves, plan: parsePlanProfile(data as Record<string, unknown>) };
 }
 
 export async function saveShelves(uid: string, shelves: Shelf[]): Promise<void> {

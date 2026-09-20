@@ -51,5 +51,27 @@ jobs:
       - name: Deck model tests
         run: npm run test:deck
 
+      - name: Entitlement and metering tests
+        run: npm run test:entitlements && npm run test:metering
+
       - name: Build
         run: npx next build
+
+  # The security rules, against the Firestore emulator. Separate job: it needs Java and a
+  # jar download, neither of which the quick checks should wait on.
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Firestore rules tests
+        run: npx --yes firebase-tools@14 emulators:exec --only firestore --project demo-undercroft "node scripts/test-rules.mjs"

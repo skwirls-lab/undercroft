@@ -1,39 +1,41 @@
 /**
- * Plans and feature gates.
+ * Plans and feature gates — the price list.
  *
- * Nothing is paywalled yet, and no payment provider is wired up. What exists is the seam:
- * every feature that might one day sit behind a subscription asks `can()` or `limit()`
- * here instead of assuming it is allowed, so turning enforcement on later is a change to
- * this file and a Stripe webhook, not a hunt through every screen.
+ * Every feature that sits (or will sit) behind the Patron tier asks `can()` or `limit()`
+ * here instead of assuming it is allowed, so the whole paywall is one table and one switch.
  *
- * How it is meant to grow:
- *   - A user's plan lives on their Firestore profile (`users/{uid}.plan`). Today nothing
- *     writes it, so everyone reads as `free`. When billing exists, a server-side webhook
- *     (never the client — Firestore rules must forbid the client writing `plan`) sets it to
- *     `patron` on payment and back to `free` on cancellation.
- *   - `ENFORCE_ENTITLEMENTS` is the launch switch. While it is false every gate answers yes
- *     and every limit is unbounded, whatever the plan says. Flip it when there is something
- *     to buy.
- *   - `FEATURES` is the single price list. To move a feature between tiers, edit one row.
+ *   - A player's plan comes from their profile document (`users/{uid}.plan`, resolved by
+ *     lib/plan.ts so an expired admin grant reads as free). The client never writes it: the
+ *     billing webhook and the admin panel do, and firestore.rules enforces that.
+ *   - `ENFORCE_ENTITLEMENTS` is the launch switch, read from the environment so flipping it is
+ *     a Vercel setting plus a redeploy, not a code change. While it is off every gate answers
+ *     yes and every limit is unbounded, whatever the plan says.
+ *   - The Archivist's monthly allowance is the one limit that is NOT unbounded when the switch
+ *     is off: the server meters it regardless, because it costs real money. Its numbers live
+ *     in the app config (admin-editable), not here.
  *
  * Keep gating decisions out of the game itself: the Forge session does not know or care what
- * plan a player is on, and a free player's game should never behave differently mid-match.
+ * plan a player is on, and a free player's game never behaves differently mid-match.
  */
 
-export type Plan = 'free' | 'patron';
+import type { Plan } from '@/lib/plan';
+export { parsePlan, type Plan } from '@/lib/plan';
 
-/** Launch switch. False means everything is unlocked for everyone. */
-export const ENFORCE_ENTITLEMENTS = false;
+/** Launch switch. Off means everything is unlocked for everyone. */
+export const ENFORCE_ENTITLEMENTS: boolean = process.env.NEXT_PUBLIC_ENFORCE_ENTITLEMENTS === '1';
 
 export type Feature =
-  | 'deck.edit'          // change cards, commander and name after import
   | 'vault.shelves'      // organise decks into shelves
-  | 'ai.customDecks'     // hand a vault deck to an AI seat
-  | 'game.fourPlayer';   // three AI opponents (a full pod)
+  | 'opponents.choose'   // pick what each AI seat plays (house deck or vault deck)
+  | 'game.fourPlayer'    // three AI opponents (a full pod)
+  | 'archivist.deck'     // deck advice, swaps, strategy, rules questions
+  | 'archivist.match'    // the in-match assistant
+  | 'archivist.recap'    // post-game recap
+  | 'archivist.ideas';   // commander ideas in New Deck
 
 export type Limit =
-  | 'vault.maxDecks'     // how many decks the vault holds
-  | 'vault.maxShelves';
+  | 'vault.maxDecks'     // how many decks the vault holds (playable + editable)
+  | 'game.maxAI';        // AI opponents per game
 
 interface FeatureRule {
   /** Plans that include the feature. */
@@ -44,15 +46,18 @@ interface FeatureRule {
 
 /** The price list. One row per feature; the launch switch decides whether it applies. */
 export const FEATURES: Record<Feature, FeatureRule> = {
-  'deck.edit':       { plans: ['patron'],         label: 'Deck editing' },
-  'vault.shelves':   { plans: ['patron'],         label: 'Shelves' },
-  'ai.customDecks':  { plans: ['patron'],         label: 'Custom opponent decks' },
-  'game.fourPlayer': { plans: ['free', 'patron'], label: 'Four-player pods' },
+  'vault.shelves':    { plans: ['patron'],         label: 'Shelves' },
+  'opponents.choose': { plans: ['patron'],         label: 'Choose opponent decks' },
+  'game.fourPlayer':  { plans: ['patron'],         label: 'Four-player pods' },
+  'archivist.deck':   { plans: ['free', 'patron'], label: 'Deck advice from the Archivist' },
+  'archivist.match':  { plans: ['patron'],         label: 'The Archivist at the table' },
+  'archivist.recap':  { plans: ['patron'],         label: 'Post-game recap' },
+  'archivist.ideas':  { plans: ['patron'],         label: 'Commander ideas' },
 };
 
 export const LIMITS: Record<Limit, Record<Plan, number>> = {
-  'vault.maxDecks':   { free: 3, patron: Infinity },
-  'vault.maxShelves': { free: 0, patron: Infinity },
+  'vault.maxDecks': { free: 2, patron: Infinity },
+  'game.maxAI':     { free: 2, patron: 3 },
 };
 
 export const PLAN_LABEL: Record<Plan, string> = {
@@ -60,19 +65,21 @@ export const PLAN_LABEL: Record<Plan, string> = {
   patron: 'Patron',
 };
 
+export const PATRON_PRICE_LABEL = '$4.99 / month';
+
 /** Is `feature` available on `plan`? Always yes until enforcement is switched on. */
-export function can(plan: Plan, feature: Feature): boolean {
-  if (!ENFORCE_ENTITLEMENTS) return true;
+export function can(plan: Plan, feature: Feature, enforce: boolean = ENFORCE_ENTITLEMENTS): boolean {
+  if (!enforce) return true;
   return FEATURES[feature].plans.includes(plan);
 }
 
 /** Numeric ceiling for `limit` on `plan`. Unbounded until enforcement is switched on. */
-export function limit(plan: Plan, key: Limit): number {
-  if (!ENFORCE_ENTITLEMENTS) return Infinity;
+export function limit(plan: Plan, key: Limit, enforce: boolean = ENFORCE_ENTITLEMENTS): number {
+  if (!enforce) return key === 'game.maxAI' ? 3 : Infinity;
   return LIMITS[key][plan];
 }
 
-/** Coerce whatever the profile document holds into a plan, defaulting to free. */
-export function parsePlan(value: unknown): Plan {
-  return value === 'patron' ? 'patron' : 'free';
+/** Features that are Patron-only, for the upsell sheet. */
+export function patronOnlyFeatures(): Feature[] {
+  return (Object.keys(FEATURES) as Feature[]).filter((f) => !FEATURES[f].plans.includes('free'));
 }

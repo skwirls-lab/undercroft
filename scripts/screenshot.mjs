@@ -33,6 +33,7 @@ const SCREENS = [
   { name: 'setup-opponent', path: '/game?deck=mock-atraxa', click: '[data-dev-seat="0"]' },
   { name: 'setup-warning', path: '/game?deck=mock-atraxa', click: '[data-dev-start]' },
   { name: 'settings', path: '/', click: 'button[aria-label="Settings"]:visible' },
+  { name: 'settings-admin', path: '/', click: 'button[aria-label="Settings"]:visible', scrollTo: '[data-dev-admin]' },
   { name: 'board', path: '/dev/board' },
   { name: 'board-me', path: '/dev/board?open=me' },
   { name: 'board-opp', path: '/dev/board?open=ai-2' },
@@ -75,6 +76,10 @@ for (const vp of VIEWPORTS) {
       if (screen.click) {
         await page.locator(screen.click).first().click();
         await page.waitForTimeout(600);
+      }
+      if (screen.scrollTo) {
+        await page.locator(screen.scrollTo).first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(400);
       }
       if (screen.type) {
         await page.locator(screen.type[0]).first().fill(screen.type[1]);

@@ -9,6 +9,9 @@ import { useAuth } from '@/lib/firebase/auth';
 import { sfxCastSpell } from '@/lib/audio';
 import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon } from 'lucide-react';
 import { Keystone } from '@/components/brand/Keystone';
+import { SectionLabel, ToggleRow } from '@/components/settings/controls';
+import { AdminPanel } from '@/components/admin/AdminPanel';
+import { isAdminUid } from '@/lib/admin';
 
 /**
  * Settings as an overlay rather than a route.
@@ -158,6 +161,8 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
             </Button>
           </section>
 
+          {isAdminUid(user?.uid) && <AdminPanel />}
+
           <p className="border-t border-border/30 pt-5 text-xs leading-relaxed text-muted-foreground/60">
             Powered by the Forge rules engine. Card data from Scryfall. Undercroft is not
             affiliated with Wizards of the Coast.
@@ -165,54 +170,5 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="eyebrow">
-      {children}
-    </h3>
-  );
-}
-
-function ToggleRow({
-  label,
-  hint,
-  checked,
-  onChange,
-  icon,
-}: {
-  label: string;
-  hint: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  icon: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className="flex w-full items-center gap-3 rounded-lg border border-border/40 px-4 py-3 text-left transition-colors hover:border-border"
-    >
-      <span className="shrink-0 text-gold">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{hint}</span>
-      </span>
-      <span
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-          checked ? 'bg-gold' : 'bg-muted'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
-            checked ? 'translate-x-[22px]' : 'translate-x-0.5'
-          }`}
-        />
-      </span>
-    </button>
   );
 }
