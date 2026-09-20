@@ -56,6 +56,7 @@ export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, co
   return (
     <button
       data-dev-open={player.id}
+      data-tour={player.isAI ? 'board-plaque' : undefined}
       onClick={onOpen}
       className={cn(
         'group relative flex h-full min-h-0 w-full flex-1 overflow-hidden rounded-xl border text-left transition-[border-color,box-shadow,transform] duration-300 active:scale-[0.99]',
@@ -83,6 +84,7 @@ export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, co
           aria-label={`Details for ${player.name}`}
           title="Details: commander damage, graveyard, exile"
           data-dev-inspect={player.id}
+          data-tour="board-inspect"
           onClick={(e) => { e.stopPropagation(); onInspect(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onInspect(); } }}
           className="absolute right-[clamp(8px,1.5vmin,14px)] top-[clamp(8px,1.5vmin,14px)] z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-foreground/70 ring-1 ring-white/10 backdrop-blur-sm transition-colors hover:bg-gold hover:text-gold-foreground"
@@ -117,6 +119,7 @@ export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, co
               aria-label={`Details for ${player.name}`}
               title="Details: commander damage, graveyard, exile"
               data-dev-inspect={player.id}
+              data-tour="board-inspect"
               onClick={(e) => { e.stopPropagation(); onInspect(); }}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onInspect(); } }}
               className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/45 text-foreground/70 ring-1 ring-white/10 transition-colors hover:bg-gold hover:text-gold-foreground"

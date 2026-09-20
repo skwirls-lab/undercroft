@@ -67,6 +67,7 @@ export function ApprenticeStrip({ youId, className }: { youId: string; className
       className={cn('flex shrink-0 items-center gap-2 border-b border-border/30 px-2', tone === 'note' ? 'bg-gold/[0.07]' : tone === 'prompt' ? 'bg-card/60' : 'bg-background/40', className)}
       style={{ minHeight: 'clamp(22px,3.4vh,1000px)', padding: 'clamp(2px,0.4vmin,1000px) clamp(8px,1.5vmin,1000px)' }}
       data-dev-apprentice
+      data-tour="board-apprentice"
       data-apprentice-tone={tone}
       role="status"
     >

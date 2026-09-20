@@ -12,6 +12,8 @@ import { FORGE_SERVER_URL, prewarmForgeServer } from '@/lib/forgeConfig';
 import { AI_DECKS } from '@/lib/aiDecks';
 import { SURPRISE, describeChoice, resolveOpponents, vaultDeckPlayableByAI, vaultDeckToForge, type OpponentChoice } from '@/lib/opponentDecks';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { useTour } from '@/hooks/useTour';
+import { TourOverlay } from '@/components/tour/Tour';
 import { useCardRecords } from '@/hooks/useCardRecords';
 import { frontFace, assessDeck } from '@/lib/deckCards';
 import { LegalityBadge } from '@/components/decks/DeckCheck';
@@ -49,6 +51,7 @@ function GameSetupContent() {
   const { decks, isSyncing } = useDeckStore();
   const { connect, startGame, connectionStatus } = useForgeGameStore();
   const { can } = useEntitlements();
+  const tour = useTour('setup', { ready: !isSyncing });
 
   // `?deck=` arrives from a deck's Play button. It preselects; the player can still change it.
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(() => searchParams.get('deck'));
@@ -161,8 +164,9 @@ function GameSetupContent() {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-5 pb-10 sm:px-10">
+        {tour.active && <TourOverlay tour={tour.tour} onDone={tour.finish} />}
         {/* Deck Selection */}
-        <Alcove className="px-5 pb-5 pt-12 sm:px-6">
+        <Alcove className="px-5 pb-5 pt-12 sm:px-6" data-tour="setup-deck">
           <Eyebrow className="mx-1 mb-4">Your deck</Eyebrow>
           {isSyncing && decks.length === 0 ? (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
@@ -217,7 +221,7 @@ function GameSetupContent() {
         <Alcove className="px-5 pb-5 pt-12 sm:px-6">
           <Eyebrow className="mx-1 mb-4">Opponents</Eyebrow>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded-xl border border-border/50 bg-background/40 p-1" role="radiogroup" aria-label="Number of AI opponents">
+            <div className="flex rounded-xl border border-border/50 bg-background/40 p-1" role="radiogroup" aria-label="Number of AI opponents" data-tour="setup-pod">
               {[1, 2, 3].map((count) => {
                 const locked = count === 3 && !canFourPlayer;
                 return (
@@ -260,6 +264,7 @@ function GameSetupContent() {
                   disabled={!canCustomOpponents}
                   title={canCustomOpponents ? undefined : 'Choosing opponent decks is a Patron feature'}
                   data-dev-seat={i}
+                  data-tour={i === 0 ? 'setup-seat' : undefined}
                   className="group flex items-center gap-3 rounded-xl border border-border/50 p-3 text-left transition-all hover:border-gold/40 hover:bg-card/60 disabled:cursor-not-allowed disabled:hover:border-border/50 disabled:hover:bg-transparent"
                 >
                   <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/40 text-muted-foreground ring-1 ring-border/60">
@@ -287,6 +292,7 @@ function GameSetupContent() {
           size="lg"
           disabled={!canStart || starting || checking}
           data-dev-start
+          data-tour="setup-start"
           className="h-14 w-full gap-2.5 rounded-xl bg-gold text-base font-bold text-gold-foreground shadow-[0_0_32px_var(--gold-glow)] hover:bg-gold/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
           onClick={() => handleStartGame()}
         >

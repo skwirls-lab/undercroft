@@ -18,6 +18,7 @@
     "test:metering": "tsx scripts/test-metering.ts",
     "test:archivist": "tsx scripts/test-archivist.ts",
     "test:lessons": "tsx scripts/test-lessons.ts",
+    "test:tours": "node scripts/test-tours.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-undercroft \"node scripts/test-rules.mjs\""
   },
   "dependencies": {

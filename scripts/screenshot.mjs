@@ -39,6 +39,7 @@ const SCREENS = [
   { name: 'settings', path: '/', click: 'button[aria-label="Settings"]:visible' },
   { name: 'settings-admin', path: '/', click: 'button[aria-label="Settings"]:visible', scrollTo: '[data-dev-admin]' },
   { name: 'settings-archivist', path: '/', click: 'button[aria-label="Settings"]:visible', scrollTo: '[data-dev-archivist-settings]' },
+  { name: 'settings-tours', path: '/', click: 'button[aria-label="Settings"]:visible', scrollTo: '[data-dev-tours]' },
   { name: 'learn', path: '/learn' },
   { name: 'learn-turn', path: '/learn/the-turn' },
   { name: 'learn-stack', path: '/learn/the-stack', scrollTo: '#stack' },
