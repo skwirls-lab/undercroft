@@ -15,6 +15,7 @@ import { identityOf } from '@/lib/deckRules';
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 import { ManaSymbol } from '@/components/game/ManaSymbol';
 import { cn } from '@/lib/utils';
+import { CommanderIdeas } from '@/components/archivist/CommanderIdeas';
 
 interface NewDeckDialogProps {
   open: boolean;
@@ -124,6 +125,7 @@ function NewDeckForm({ shelfId, onDone }: { shelfId: string | null; onDone: () =
           {active && !searching && results.length === 0 && (
             <p className="rounded-lg border border-dashed border-border/60 px-3 py-4 text-center text-sm text-muted-foreground">No legendary creature matches “{query.trim()}”.</p>
           )}
+          {!active && <CommanderIdeas onPick={pick} />}
         </div>
       )}
 

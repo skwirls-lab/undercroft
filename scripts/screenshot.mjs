@@ -29,12 +29,20 @@ const SCREENS = [
   { name: 'deck-detail-check', path: '/decks/mock-atraxa', click: '[data-dev-check]' },
   { name: 'deck-detail-menu', path: '/decks/mock-atraxa', click: 'button[aria-label="More actions"]' },
   { name: 'new-deck', path: '/decks', click: '[data-dev-new-deck]', type: ['[data-dev-cmdr-search]', 'kre'] },
+  { name: 'new-deck-ideas', path: '/decks', click: '[data-dev-new-deck]', clickThen: ['[data-dev-ideas] button', '[data-dev-ideas-wish]', 'tokens and green', 'button[aria-label="Ask for ideas"]'], wait: 2500 },
+  { name: 'archivist-deck', path: '/decks/mock-atraxa?archivist=improve', wait: 4500 },
+  { name: 'archivist-swaps', path: '/decks/mock-atraxa?archivist=swaps', wait: 2500 },
+  { name: 'archivist-strategy', path: '/decks/mock-atraxa?archivist=strategy', wait: 6000 },
   { name: 'setup', path: '/game?deck=mock-atraxa' },
   { name: 'setup-opponent', path: '/game?deck=mock-atraxa', click: '[data-dev-seat="0"]' },
   { name: 'setup-warning', path: '/game?deck=mock-atraxa', click: '[data-dev-start]' },
   { name: 'settings', path: '/', click: 'button[aria-label="Settings"]:visible' },
   { name: 'settings-admin', path: '/', click: 'button[aria-label="Settings"]:visible', scrollTo: '[data-dev-admin]' },
+  { name: 'settings-archivist', path: '/', click: 'button[aria-label="Settings"]:visible', scrollTo: '[data-dev-archivist-settings]' },
   { name: 'board', path: '/dev/board' },
+  { name: 'board-archivist', path: '/dev/board?archivist=1' },
+  { name: 'board-archivist-advice', path: '/dev/board?archivist=advice', wait: 4500 },
+  { name: 'board-archivist-free', path: '/dev/board?archivist=1&plan=free' },
   { name: 'board-me', path: '/dev/board?open=me' },
   { name: 'board-opp', path: '/dev/board?open=ai-2' },
   { name: 'inspect-me', path: '/dev/board?inspect=me' },
@@ -85,6 +93,14 @@ for (const vp of VIEWPORTS) {
         await page.locator(screen.type[0]).first().fill(screen.type[1]);
         await page.waitForTimeout(900);
       }
+      // A short scripted sequence: click, fill, click.
+      if (screen.clickThen) {
+        const [open, field, text, submit] = screen.clickThen;
+        await page.locator(open).first().click();
+        await page.locator(field).first().fill(text);
+        await page.locator(submit).first().click();
+      }
+      if (screen.wait) await page.waitForTimeout(screen.wait);
       const file = join(outDir, `${screen.name}-${vp.tag}.png`);
       await page.screenshot({ path: file });
 
@@ -100,7 +116,11 @@ for (const vp of VIEWPORTS) {
         return { docScroll, scrollers };
       });
       const tag = `${screen.name}@${vp.tag}`;
-      if (screen.name.startsWith('board') && (scroll.docScroll > 2 || scroll.scrollers.length)) {
+      if (screen.name.startsWith('board') && !screen.name.startsWith('board-archivist') && (scroll.docScroll > 2 || scroll.scrollers.length)) {
+        problems.push(`${tag}: document +${scroll.docScroll}px; inner scrollers: ${scroll.scrollers.join(', ') || 'none'}`);
+      }
+      // With the Archivist docked the board still must not scroll; the panel's own conversation may.
+      if (screen.name.startsWith('board-archivist') && (scroll.docScroll > 2 || scroll.scrollers.some((s) => !s.includes('archivist')))) {
         problems.push(`${tag}: document +${scroll.docScroll}px; inner scrollers: ${scroll.scrollers.join(', ') || 'none'}`);
       }
       console.log(`ok   ${tag}${scroll.scrollers.length ? '  [scrollers: ' + scroll.scrollers.length + ']' : ''}`);

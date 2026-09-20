@@ -26,6 +26,8 @@ export function useEntitlements() {
       plan,
       profile,
       can: (feature: Feature) => can(plan, feature),
+      /** The same question with the launch switch ignored: what the server will enforce today. */
+      canStrict: (feature: Feature) => can(plan, feature, true),
       limit: (key: Limit) => limit(plan, key),
       archivist: {
         enabled: config.archivistEnabled,

@@ -20,10 +20,15 @@ import type { CardInstance, GameAction } from '@/lib/gameTypes';
 import { PhaseTracker } from '@/components/game/PhaseTracker';
 import { Keystone } from '@/components/brand/Keystone';
 import { useFitToRow } from '@/hooks/useFitToRow';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { MatchArchivist, type MatchAsk } from '@/components/archivist/MatchArchivist';
 import {
   Loader2,
   Flag,
   RotateCcw,
+  BookOpen,
   Hand as HandIcon,
   ArrowRight,
   FastForward,
@@ -127,6 +132,24 @@ export function ForgeGamePage() {
   // 28px header. Confirm before either.
   const [pendingExit, setPendingExit] = useState<'concede' | 'new-game' | null>(null);
 
+  // The Archivist: a book in the header opens a panel beside the board (a bottom sheet on a
+  // phone). The Settings switch hides the book entirely; the plan decides whether the panel
+  // answers. Nothing is sent until the player asks.
+  const archivistInMatch = useSettingsStore((s) => s.archivistInMatch);
+  const { canStrict } = useEntitlements();
+  const archivistAvailable = archivistInMatch && (canStrict('archivist.match') || canStrict('archivist.recap'));
+  const narrowForPanel = useMediaQuery('(max-width: 900px)');
+  const [archivistOpen, setArchivistOpen] = useState(false);
+  const [archivistAsk, setArchivistAsk] = useState<MatchAsk | null>(null);
+  const openArchivist = useCallback((ask: MatchAsk | null = null) => { setArchivistAsk(ask); setArchivistOpen(true); }, []);
+  useEffect(() => {
+    // Harness and deep links: ?archivist=advice|recap opens the panel and asks.
+    if (process.env.NODE_ENV === 'production') return;
+    const v = new URLSearchParams(window.location.search).get('archivist');
+    if (v === 'advice' || v === 'recap') openArchivist(v);
+    else if (v === '1') openArchivist(null);
+  }, [openArchivist]);
+
   // Action bar state
   const hasPriorityForActions = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
   const isMyTurn = gameState?.turn.activePlayerId === HUMAN_PLAYER_ID;
@@ -195,7 +218,8 @@ export function ForgeGamePage() {
   // Game in progress — unified layout for all screen sizes
   return (
     <CardPreviewProvider>
-      <div className="flex h-[100dvh] flex-col overflow-hidden">
+      <div className="flex h-[100dvh] overflow-hidden">
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         {/* ─── HEADER: nav | phase tracker | nav buttons ─── */}
         <header className="flex items-center border-b border-border/30 shrink-0" style={{ gap: 'clamp(4px,1vmin,1000px)', padding: 'clamp(2px,0.5vmin,1000px) clamp(6px,1.5vmin,1000px)', minHeight: 'clamp(32px,5vh,1000px)' }}>
           <Link href="/" className="flex shrink-0 items-center px-1" title="Home" aria-label="Home">
@@ -211,6 +235,11 @@ export function ForgeGamePage() {
             </div>
           )}
           <div className="flex items-center shrink-0" style={{ gap: 'clamp(2px,0.5vmin,1000px)' }}>
+            {archivistAvailable && (
+              <Button variant="ghost" size="sm" onClick={() => (archivistOpen ? setArchivistOpen(false) : openArchivist(null))} className={cn('p-0', archivistOpen ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Ask the Archivist" aria-label="Ask the Archivist" aria-pressed={archivistOpen} data-dev-archivist>
+                <BookOpen style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setPendingExit('concede')} className="p-0 text-red-400" style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Concede" aria-label="Concede">
               <Flag style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
             </Button>
@@ -251,6 +280,11 @@ export function ForgeGamePage() {
                   </Button>
                 )}
                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { disconnect(); router.push('/game'); }}>New Game</Button>
+                {archivistAvailable && (
+                  <Button size="sm" variant="outline" className="h-7 gap-1 border-gold/40 text-xs text-gold hover:bg-gold/10 hover:text-gold" onClick={() => openArchivist('recap')} data-dev-archivist-recap>
+                    <BookOpen className="h-3 w-3" /> Ask the Archivist what happened
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -326,6 +360,16 @@ export function ForgeGamePage() {
           commanderCount={commandZoneCards.length}
           onOpenBoard={() => setExpandedPlayerId(HUMAN_PLAYER_ID)}
         />
+      </div>
+
+      {archivistOpen && archivistAvailable && (
+        <MatchArchivist
+          youId={HUMAN_PLAYER_ID}
+          mode={narrowForPanel ? 'sheet' : 'docked'}
+          initialAsk={archivistAsk}
+          onClose={() => { setArchivistOpen(false); setArchivistAsk(null); }}
+        />
+      )}
       </div>
 
       {pendingExit && (

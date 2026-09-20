@@ -100,6 +100,34 @@ poison against 10, library and hand counts, the mana pool, commander damage take
 opposing commander against the 21 that ends a game, and the graveyard, exile and command zone
 laid out as cards with a reader. Tabs across the top switch seats without closing.
 
+## The Archivist
+
+The Archivist is the resident helper: a keeper of records who has read every card. It is
+asked, never volunteers, and every request counts against a monthly allowance shown in
+Settings.
+
+- **Deck page → Ask the Archivist.** Improve the deck (pick a goal: curve, ramp, draw,
+  removal, synergy, budget), suggest swaps, explain how to pilot it, or ask a free question.
+  Swaps come back as tiles with **Apply**; every suggested card is looked up and checked
+  against the commander's colours first, so a name the model invented never reaches a deck.
+- **New deck → "Not sure? Ask the Archivist for commander ideas."** Five commanders for a
+  wish like "tokens and green", each resolved through the commander search before it is shown.
+- **In a game → the book in the header.** Docked beside the board on a desktop, a bottom
+  sheet on a phone. "What should I do this turn?" or a free question; the conversation lasts
+  one turn. The Archivist sees your hand, every battlefield, the stack and the legal actions,
+  never an opponent's hand. After the game: "Ask the Archivist what happened."
+- **Settings → The Archivist.** The in-match switch and this month's meter.
+
+One route, `POST /api/archivist` (`src/app/api/archivist/route.ts`): verify the player,
+check the app switch and the plan, reserve one request, build the prompt
+(`src/lib/archivist/prompts.ts`), call OpenRouter, stream the answer back, record the tokens.
+The client (`src/lib/archivist/client.ts`, `useArchivist()`) streams into the panels and maps
+the server's codes to one typed error. When the admin switch is off every entry point says
+"The Archivist is resting" and nothing is sent. `ARCHIVIST_STUB=1` answers from a canned
+script so the whole path can be exercised without a key; the dev harness does the same in
+mock mode (`/decks/mock-atraxa?archivist=improve|swaps|strategy`,
+`/dev/board?archivist=advice|recap`).
+
 ## Administration
 
 Settings has an Administration section for the admin allowlist: the Archivist's master
@@ -152,6 +180,7 @@ npm run test:sync         # Scryfall → Firestore sync helpers
 npm run test:deck         # deck grouping/stats, opponent seat resolution
 npm run test:entitlements # the price list under both launch-switch positions, plan resolution
 npm run test:metering     # Archivist allowance arithmetic
+npm run test:archivist    # prompt builders, context serialisation, swap/idea parsing
 npm run test:rules        # firestore.rules against the emulator (needs Java)
 npx next build
 ```

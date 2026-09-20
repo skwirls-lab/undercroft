@@ -103,6 +103,10 @@ export const MOCK_CARDS: ScryfallCardRecord[] = [
   rec('Island', '', 'Basic Land — Island', '({T}: Add {U}.)', [], { color_identity: ['U'] }),
   rec('Swamp', '', 'Basic Land — Swamp', '({T}: Add {B}.)', [], { color_identity: ['B'] }),
   rec('Mountain', '', 'Basic Land — Mountain', '({T}: Add {R}.)', [], { color_identity: ['R'] }),
+  // Not in any mock deck: what the Archivist's swap suggestions resolve to.
+  rec('Three Visits', '{1}{G}', 'Sorcery', 'Search your library for a Forest card, put it onto the battlefield, then shuffle.', ['G']),
+  rec('Esper Sentinel', '{W}', 'Artifact Creature — Human Soldier', "Whenever an opponent casts their first noncreature spell each turn, draw a card unless that player pays {X}, where X is Esper Sentinel's power.", ['W'], { power: '1', toughness: '1' }),
+  rec('Fellwar Stone', '{2}', 'Artifact', '{T}: Add one mana of any color that a land an opponent controls could produce.', []),
 ];
 
 const byName = new Map(MOCK_CARDS.map((c) => [c.name, c]));

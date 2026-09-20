@@ -9,10 +9,13 @@ interface SettingsStore {
   sfxVolume: number;
   /** Skip entrance/transition animations. Mirrors prefers-reduced-motion when the OS sets it. */
   reduceMotion: boolean;
+  /** Show the Archivist's book in the game header. Off hides every in-match entry point. */
+  archivistInMatch: boolean;
 
   setSfxEnabled: (enabled: boolean) => void;
   setSfxVolume: (volume: number) => void;
   setReduceMotion: (reduce: boolean) => void;
+  setArchivistInMatch: (on: boolean) => void;
 
   /**
    * Reset the preferences that belong to a person rather than to this device.
@@ -26,6 +29,7 @@ const DEFAULTS = {
   sfxEnabled: true,
   sfxVolume: 0.7,
   reduceMotion: false,
+  archivistInMatch: true,
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -43,6 +47,7 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ sfxVolume: volume });
       },
       setReduceMotion: (reduce) => set({ reduceMotion: reduce }),
+      setArchivistInMatch: (on) => set({ archivistInMatch: on }),
 
       clearUserSettings: () => {
         setSfxEnabled(DEFAULTS.sfxEnabled);
@@ -57,6 +62,7 @@ export const useSettingsStore = create<SettingsStore>()(
         sfxEnabled: state.sfxEnabled,
         sfxVolume: state.sfxVolume,
         reduceMotion: state.reduceMotion,
+        archivistInMatch: state.archivistInMatch,
       }),
       // Persisted values must be pushed into the audio module after rehydration, or the
       // in-memory gates stay at their defaults and ignore the user's choices.

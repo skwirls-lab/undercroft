@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Swords, Pencil, Check, MoreHorizontal, FileText, RefreshCw, Trash2, Crown,
-  Loader2, Library, Lock, Plus,
+  Loader2, Library, Lock, Plus, BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,9 @@ import { CardSearchPanel } from './CardSearchPanel';
 import { DeckCheckBadge, DeckCheckDialog } from './DeckCheck';
 import { checkDeck, canBeCommander, fitsIdentity, summarizeCheck, sameLegality } from '@/lib/deckRules';
 import { AccentDot, ShelfDialog } from './Shelves';
+import { DeckArchivistSheet, type DeckTask } from '@/components/archivist/DeckArchivistSheet';
+import { deckContext } from '@/lib/archivist/context';
+import { loadCardRecords } from '@/lib/deckCards';
 import { rise, riseStagger, settle } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
@@ -62,6 +65,12 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const [textOpen, setTextOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
+  // `?archivist=improve|swaps|strategy` opens the consultation and asks at once (deep links, harness).
+  const [archivistOpen, setArchivistOpen] = useState(() => !!searchParams.get('archivist'));
+  const archivistTask = ((): DeckTask | null => {
+    const v = searchParams.get('archivist');
+    return v === 'improve' || v === 'swaps' || v === 'strategy' ? v : null;
+  })();
 
   const names = useMemo(() => (deck ? deck.cards.map((c) => c.cardName) : []), [deck]);
   const { records, loading: recordsLoading } = useCardRecords(names);
@@ -138,6 +147,39 @@ export function DeckDetail({ deckId }: { deckId: string }) {
       console.error('[DeckDetail] verify after add failed:', err);
     }
   }, [deck, records, commit, patchVerified]);
+
+  /** One accepted swap from the Archivist: the cut and the add land in a single write. */
+  const swapCard = useCallback(async (remove: string, rec: ScryfallCardRecord) => {
+    if (!deck) return;
+    const cmd = deck.commanderName ? records.get(deck.commanderName) : null;
+    if (cmd && !fitsIdentity(rec, cmd.color_identity ?? [])) { toast.error(`${rec.name} is outside ${deck.commanderName}'s colour identity.`); return; }
+    if (remove === deck.commanderName) { toast.error('The commander stays.'); return; }
+    primeCardRecord(rec);
+    const without = deck.cards.filter((e) => e.cardName !== remove);
+    const next = without.some((e) => e.cardName === rec.name)
+      ? without
+      : [...without, { cardName: rec.name, quantity: 1, resolved: true, scryfallId: rec.id, oracleId: rec.oracle_id } satisfies DeckEntry];
+    commit(next);
+    toast.success(`${remove} out, ${rec.name} in.`);
+    try {
+      const report = await verifyEntries(next, new Set([rec.name]));
+      patchVerified(report.cards, new Set([rec.name]));
+      if (report.forgeUnresolvable.includes(rec.name)) toast.warning(`${rec.name} is not in the Forge engine yet — it will be skipped in games.`);
+    } catch (err) {
+      console.error('[DeckDetail] verify after swap failed:', err);
+    }
+  }, [deck, records, commit, patchVerified]);
+
+  /** A card name from the Archivist: the reader for a deck card, a lookup for any other. */
+  const openNamed = useCallback((name: string) => {
+    if (!deck) return;
+    if (deck.cards.some((e) => e.cardName === name)) { setPreviewRecord(null); setOpenCard(name); return; }
+    void loadCardRecords([name]).then((m) => {
+      const rec = m.get(name);
+      if (rec) setPreviewRecord(rec);
+      else toast(`No card called “${name}” in the records.`);
+    });
+  }, [deck]);
 
   const makeCommander = useCallback((name: string) => {
     if (!deck) return;
@@ -276,6 +318,9 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                     <Button onClick={finishEditing} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Check /> Done</Button>
                   ) : (
                     <>
+                      <Button variant="outline" onClick={() => setArchivistOpen(true)} className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold" data-dev-archivist>
+                        <BookOpen /> <span className="hidden sm:inline">Ask the</span> Archivist
+                      </Button>
                       <Link href={`/game?deck=${encodeURIComponent(deck.id)}`}>
                         <Button className="gap-1.5 bg-gold text-gold-foreground shadow-[0_0_24px_var(--gold-glow)] hover:bg-gold/90"><Swords /> Play</Button>
                       </Link>
@@ -392,6 +437,17 @@ export function DeckDetail({ deckId }: { deckId: string }) {
           )}
         </motion.div>
       </div>
+
+      <DeckArchivistSheet
+        open={archivistOpen}
+        onOpenChange={setArchivistOpen}
+        context={deckContext(deck, records, check)}
+        deckNames={new Set(deck.cards.map((c) => c.cardName))}
+        onSwap={swapCard}
+        onOpenCard={openNamed}
+        initialTask={archivistTask}
+        ready={!recordsLoading}
+      />
 
       {/* Reader — a deck card with edit controls, or a search result read-only */}
       <CardLightbox

@@ -11,6 +11,7 @@ import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon } from 'lucide-rea
 import { Keystone } from '@/components/brand/Keystone';
 import { SectionLabel, ToggleRow } from '@/components/settings/controls';
 import { AdminPanel } from '@/components/admin/AdminPanel';
+import { ArchivistSettings } from '@/components/archivist/ArchivistSettings';
 import { isAdminUid } from '@/lib/admin';
 
 /**
@@ -122,6 +123,8 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
               icon={<Sparkles className="h-4 w-4" />}
             />
           </section>
+
+          <ArchivistSettings />
 
           <section className="flex flex-col gap-3">
             <SectionLabel>Account</SectionLabel>
