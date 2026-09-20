@@ -14,6 +14,7 @@ import { SURPRISE, describeChoice, resolveOpponents, vaultDeckPlayableByAI, vaul
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useTour } from '@/hooks/useTour';
 import { TourOverlay } from '@/components/tour/Tour';
+import { usePatron } from '@/components/patron/PatronSheet';
 import { useCardRecords } from '@/hooks/useCardRecords';
 import { frontFace, assessDeck } from '@/lib/deckCards';
 import { LegalityBadge } from '@/components/decks/DeckCheck';
@@ -50,7 +51,8 @@ function GameSetupContent() {
   const searchParams = useSearchParams();
   const { decks, isSyncing } = useDeckStore();
   const { connect, startGame, connectionStatus } = useForgeGameStore();
-  const { can } = useEntitlements();
+  const { can, isReadOnly } = useEntitlements();
+  const { openPatron } = usePatron();
   const tour = useTour('setup', { ready: !isSyncing });
 
   // `?deck=` arrives from a deck's Play button. It preselects; the player can still change it.
@@ -65,7 +67,7 @@ function GameSetupContent() {
   const [warnings, setWarnings] = useState<Array<{ deck: Deck; seat: string; legality: DeckLegality }> | null>(null);
   const [checking, setChecking] = useState(false);
 
-  const selectedDeck = decks.find((d) => d.id === selectedDeckId);
+  const selectedDeck = decks.find((d) => d.id === selectedDeckId && !isReadOnly(d.id));
   // While decks are still loading from Firestore we must not treat "none" as "none exist".
   const canStart = !!selectedDeck || (decks.length === 0 && !isSyncing);
   const canCustomOpponents = can('opponents.choose');
@@ -185,12 +187,14 @@ function GameSetupContent() {
               {decks.map((deck) => {
                 const selected = selectedDeckId === deck.id;
                 const art = artFor(deck);
+                const locked = isReadOnly(deck.id);
                 return (
                   <button
                     key={deck.id}
                     role="radio"
                     aria-checked={selected}
-                    onClick={() => setSelectedDeckId(deck.id)}
+                    onClick={() => (locked ? openPatron('deck.readOnly') : setSelectedDeckId(deck.id))}
+                    title={locked ? 'Beyond the free vault\u2019s two decks' : undefined}
                     className={cn(
                       'relative flex items-center gap-3 overflow-hidden rounded-xl border p-3 text-left transition-all',
                       selected
@@ -207,7 +211,7 @@ function GameSetupContent() {
                       <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
                         <span className="truncate">{deck.commanderName || 'No commander'} &middot; {deck.cards.reduce((sum, c) => sum + c.quantity, 0)} cards</span>
                         <span className="text-border">&middot;</span>
-                        <LegalityBadge legality={deck.legality} className="text-xs" />
+                        {locked ? <span className="flex shrink-0 items-center gap-1 text-xs text-amber-300"><Lock className="h-3 w-3" /> Read-only</span> : <LegalityBadge legality={deck.legality} className="text-xs" />}
                       </p>
                     </div>
                   </button>
@@ -229,9 +233,8 @@ function GameSetupContent() {
                     key={count}
                     role="radio"
                     aria-checked={aiCount === count}
-                    disabled={locked}
                     title={locked ? 'Four-player pods are a Patron feature' : undefined}
-                    onClick={() => setAiCount(count)}
+                    onClick={() => (locked ? openPatron('game.fourPlayer') : setAiCount(count))}
                     className={cn(
                       'flex h-11 w-14 items-center justify-center rounded-lg font-display text-xl font-bold transition-all',
                       aiCount === count ? 'bg-gold text-gold-foreground shadow-[0_0_20px_var(--gold-glow)]' : 'text-muted-foreground hover:text-foreground',
@@ -260,8 +263,7 @@ function GameSetupContent() {
                 <button
                   key={i}
                   type="button"
-                  onClick={() => canCustomOpponents && setPickerSeat(i)}
-                  disabled={!canCustomOpponents}
+                  onClick={() => (canCustomOpponents ? setPickerSeat(i) : openPatron('opponents.choose'))}
                   title={canCustomOpponents ? undefined : 'Choosing opponent decks is a Patron feature'}
                   data-dev-seat={i}
                   data-tour={i === 0 ? 'setup-seat' : undefined}

@@ -34,6 +34,7 @@ import { deckContext } from '@/lib/archivist/context';
 import { loadCardRecords } from '@/lib/deckCards';
 import { useTour } from '@/hooks/useTour';
 import { TourOverlay } from '@/components/tour/Tour';
+import { usePatron } from '@/components/patron/PatronSheet';
 import { rise, riseStagger, settle } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
@@ -50,9 +51,12 @@ export function DeckDetail({ deckId }: { deckId: string }) {
   const isSyncing = useDeckStore((s) => s.isSyncing);
   const shelves = useDeckStore((s) => s.shelves);
   const { updateDeck, removeDeck, moveDeckToShelf, addShelf } = useDeckStore();
-  const { can } = useEntitlements();
-  // Building and editing are free on every plan; the vault size is what a free player hits.
-  const canEdit = true;
+  const { can, isReadOnly } = useEntitlements();
+  const { openPatron } = usePatron();
+  // Building and editing are free on every plan; the vault size is what a free player hits:
+  // a deck beyond the cap stays readable and is otherwise locked.
+  const readOnly = isReadOnly(deckId);
+  const canEdit = !readOnly;
 
   // `?edit=1` (from "New deck") opens straight into edit mode with the search box ready.
   const [editing, setEditing] = useState(() => searchParams.get('edit') === '1');
@@ -273,6 +277,14 @@ export function DeckDetail({ deckId }: { deckId: string }) {
           <ArrowLeft className="h-4 w-4" /> The vault{shelf ? <><span className="text-border">/</span><AccentDot accent={shelf.accent} />{shelf.name}</> : null}
         </Link>
 
+        {readOnly && (
+          <button type="button" onClick={() => openPatron('deck.readOnly')} className="mb-4 flex w-full items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-left text-sm" data-dev-readonly>
+            <Lock className="h-4 w-4 shrink-0 text-amber-300" />
+            <span className="min-w-0 flex-1"><span className="font-medium text-amber-200">Read-only.</span> The free vault holds two decks; this one is beyond them. It is safe here, and Patrons can edit and play everything.</span>
+            <span className="shrink-0 text-xs font-medium text-gold">Become a Patron</span>
+          </button>
+        )}
+
         {/* Header alcove with commander art */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={settle}>
           <Alcove lit className="relative">
@@ -325,14 +337,17 @@ export function DeckDetail({ deckId }: { deckId: string }) {
                       <Button variant="outline" onClick={() => setArchivistOpen(true)} className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold" data-dev-archivist data-tour="deck-archivist">
                         <BookOpen /> <span className="hidden sm:inline">Ask the</span> Archivist
                       </Button>
-                      <Link href={`/game?deck=${encodeURIComponent(deck.id)}`} data-tour="deck-play">
-                        <Button className="gap-1.5 bg-gold text-gold-foreground shadow-[0_0_24px_var(--gold-glow)] hover:bg-gold/90"><Swords /> Play</Button>
-                      </Link>
+                      {readOnly ? (
+                        <Button onClick={() => openPatron('deck.readOnly')} className="gap-1.5 bg-muted text-muted-foreground hover:bg-muted" data-tour="deck-play"><Lock /> Play</Button>
+                      ) : (
+                        <Link href={`/game?deck=${encodeURIComponent(deck.id)}`} data-tour="deck-play">
+                          <Button className="gap-1.5 bg-gold text-gold-foreground shadow-[0_0_24px_var(--gold-glow)] hover:bg-gold/90"><Swords /> Play</Button>
+                        </Link>
+                      )}
                       <Button
                         variant="outline"
-                        onClick={() => canEdit && startEditing()}
-                        disabled={!canEdit}
-                        title={canEdit ? undefined : 'Deck editing is a Patron feature'}
+                        onClick={() => (canEdit ? startEditing() : openPatron('deck.readOnly'))}
+                        title={canEdit ? undefined : 'Beyond the free vault\u2019s two decks'}
                         className="gap-1.5 border-border/60 text-foreground"
                         data-tour="deck-edit"
                       >

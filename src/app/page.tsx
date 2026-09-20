@@ -4,6 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/firebase/auth';
+import { usePatron } from '@/components/patron/PatronSheet';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { useDeckStore } from '@/store/deckStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -249,6 +251,8 @@ function Stat({ label, sub }: { label: string; sub: string }) {
 function Dashboard() {
   const { user } = useAuth();
   const { decks } = useDeckStore();
+  const { plan } = useEntitlements();
+  const { openPatron } = usePatron();
   const recent = [...decks].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4);
   const firstName = user?.displayName ? user.displayName.split(' ')[0] : null;
 
@@ -263,10 +267,17 @@ function Dashboard() {
           <motion.h1 variants={rise} className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
             Welcome back{firstName ? <>, <span className="text-gold">{firstName}</span></> : null}
           </motion.h1>
-          <motion.p variants={rise} className="text-sm text-muted-foreground">
-            {decks.length === 0
-              ? 'Your vault is empty. Import a deck to begin.'
-              : `${decks.length} deck${decks.length === 1 ? '' : 's'} in the vault.`}
+          <motion.p variants={rise} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              {decks.length === 0
+                ? 'Your vault is empty. Import a deck to begin.'
+                : `${decks.length} deck${decks.length === 1 ? '' : 's'} in the vault.`}
+            </span>
+            {plan === 'patron' ? (
+              <button type="button" onClick={() => openPatron(null)} className="plaque flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold text-gold" data-dev-patron-plaque><Crown className="h-3 w-3" /> Patron</button>
+            ) : (
+              <button type="button" onClick={() => openPatron(null)} className="flex items-center gap-1 text-xs text-gold/80 hover:text-gold hover:underline" data-dev-patron-invite><Crown className="h-3 w-3" /> Become a Patron</button>
+            )}
           </motion.p>
         </motion.div>
 

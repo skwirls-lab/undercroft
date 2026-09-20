@@ -17,6 +17,7 @@ import { useCardRecords } from '@/hooks/useCardRecords';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useTour } from '@/hooks/useTour';
 import { TourOverlay } from '@/components/tour/Tour';
+import { usePatron } from '@/components/patron/PatronSheet';
 import { verifyEntries, assessDeck, frontFace, type VerifyReport } from '@/lib/deckCards';
 import { LegalityBadge } from '@/components/decks/DeckCheck';
 import {
@@ -41,7 +42,8 @@ function DecksContent() {
     isSyncing, syncedUserId, syncFailed, loadFromFirestore,
   } = useDeckStore();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
-  const { can, limit } = useEntitlements();
+  const { can, limit, isReadOnly } = useEntitlements();
+  const { openPatron } = usePatron();
 
   const [filter, setFilter] = useState<Filter>('all');
   const [shelfDialog, setShelfDialog] = useState<{ open: boolean; shelf: Shelf | null }>({ open: false, shelf: null });
@@ -116,8 +118,7 @@ function DecksContent() {
         <div className="flex shrink-0 items-center gap-2">
           <Button
             size="sm"
-            disabled={atDeckLimit}
-            onClick={() => setNewDeckOpen(true)}
+            onClick={() => (atDeckLimit ? openPatron('vault.maxDecks') : setNewDeckOpen(true))}
             title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined}
             data-dev-new-deck
             data-tour="vault-new"
@@ -126,11 +127,11 @@ function DecksContent() {
             {atDeckLimit ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             New Deck
           </Button>
-        <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>
+        <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else if (atDeckLimit) openPatron('vault.maxDecks'); else setImportOpen(true); }}>
           <DialogTrigger
             render={
-              <Button size="sm" variant="outline" disabled={atDeckLimit} title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 border-border/60 text-foreground" data-tour="vault-import">
-                <Upload className="h-4 w-4" />
+              <Button size="sm" variant="outline" title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 border-border/60 text-foreground" data-tour="vault-import">
+                {atDeckLimit ? <Lock className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
                 Import
               </Button>
             }
@@ -230,10 +231,9 @@ function DecksContent() {
               )}
               <button
                 type="button"
-                onClick={() => canShelve && setShelfDialog({ open: true, shelf: null })}
-                disabled={!canShelve}
+                onClick={() => (canShelve ? setShelfDialog({ open: true, shelf: null }) : openPatron('vault.shelves'))}
                 title={canShelve ? undefined : 'Shelves are a Patron feature'}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-border/60 px-3.5 text-sm text-muted-foreground transition-colors hover:border-gold/50 hover:text-gold disabled:opacity-50 disabled:hover:border-border/60 disabled:hover:text-muted-foreground"
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-border/60 px-3.5 text-sm text-muted-foreground transition-colors hover:border-gold/50 hover:text-gold"
               >
                 {canShelve ? <Plus className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />} New shelf
               </button>
@@ -260,6 +260,8 @@ function DecksContent() {
                         shelf={shelves.find((s) => s.id === deck.shelfId) ?? null}
                         shelves={shelves}
                         canShelve={canShelve}
+                        readOnly={isReadOnly(deck.id)}
+                        onReadOnly={() => openPatron('deck.readOnly')}
                         onMove={(id) => moveDeckToShelf(deck.id, id)}
                         onNewShelf={() => setShelfDialog({ open: true, shelf: null })}
                         onDelete={() => removeDeck(deck.id)}
@@ -294,12 +296,15 @@ interface DeckCardProps {
   shelf: Shelf | null;
   shelves: Shelf[];
   canShelve: boolean;
+  /** Beyond the free vault's cap: readable, not editable or playable. */
+  readOnly?: boolean;
+  onReadOnly?: () => void;
   onMove: (shelfId: string | null) => void;
   onNewShelf: () => void;
   onDelete: () => void;
 }
 
-function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, onDelete }: DeckCardProps) {
+function DeckCard({ deck, art, shelf, shelves, canShelve, readOnly, onReadOnly, onMove, onNewShelf, onDelete }: DeckCardProps) {
   const totalCards = deck.cards.reduce((sum, c) => sum + c.quantity, 0);
 
   // The arch cap clips the top corners, so nothing interactive lives up there. The link covers
@@ -327,7 +332,11 @@ function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, on
       <div className="mx-5 flex items-center gap-2 border-t border-border/30 py-2.5 text-xs text-muted-foreground">
         <span className="shrink-0">{totalCards} cards</span>
         <span className="text-border">·</span>
-        <span data-tour="vault-badge" className="flex shrink-0 items-center"><LegalityBadge legality={deck.legality} /></span>
+        {readOnly ? (
+          <button type="button" onClick={onReadOnly} data-tour="vault-badge" className="flex shrink-0 items-center gap-1 text-amber-300 hover:underline" title="Beyond the free vault's two decks: readable, not playable"><Lock className="h-3.5 w-3.5" /> Read-only</button>
+        ) : (
+          <span data-tour="vault-badge" className="flex shrink-0 items-center"><LegalityBadge legality={deck.legality} /></span>
+        )}
         {shelf && <span className="ml-auto flex min-w-0 items-center gap-1.5 truncate"><AccentDot accent={shelf.accent} /><span className="truncate">{shelf.name}</span></span>}
 
         <DropdownMenu>

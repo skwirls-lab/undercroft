@@ -160,7 +160,10 @@ export async function updateDeckInFirestore(
   if (!db) return;
 
   const deckRef = doc(db, 'users', uid, 'decks', deckId);
-  const data: DocumentData = { updatedAt: Date.now() };
+  // The stored deck-check verdict is derived, not an edit: it must not move the deck to the
+  // top of the vault's recency order (which decides the free tier's read-only decks).
+  const derivedOnly = Object.keys(updates).every((k) => k === 'legality');
+  const data: DocumentData = derivedOnly ? {} : { updatedAt: Date.now() };
 
   if (updates.name !== undefined) data.name = updates.name;
   if (updates.commanderName !== undefined) data.commanderName = updates.commanderName;
