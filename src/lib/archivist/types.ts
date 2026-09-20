@@ -110,4 +110,4 @@ export interface CommanderIdea {
   why: string;
 }
 
-export type ArchivistErrorCode = 'unauthenticated' | 'disabled' | 'patron' | 'quota' | 'bad-request' | 'upstream' | 'server' | 'network';
+export type ArchivistErrorCode = 'unauthenticated' | 'expired' | 'server-config' | 'disabled' | 'patron' | 'quota' | 'bad-request' | 'upstream' | 'server' | 'network';

@@ -145,10 +145,17 @@ Firebase Admin SDK. They need the same service-account JSON the card-sync Action
 1. Vercel → Project → Settings → Environment Variables.
 2. Add `FIREBASE_SERVICE_ACCOUNT` with the whole JSON file as the value (Production and
    Preview). Redeploy.
-3. Open the app, sign in, and load `/api/me` in a tab while signed in — it needs the bearer
-   token the app attaches, so the easiest check is the usage meter in Settings once the
-   Archivist ships. Until then, a missing variable shows up as a clear error in the Vercel
-   function logs on the first request, naming the variable.
+3. Open `https://<your domain>/api/health` in a browser. It says whether the Admin SDK
+   started, which project the service account is for, and whether the Archivist and Stripe
+   variables are set — booleans and ids only, never a secret. Every `problems` entry names
+   the fix. Two things it catches that otherwise look like a player's sign-in failing
+   (a 401 from every API call):
+   - the JSON did not survive the paste (the private key's `\n` newlines doubled up, or a
+     line was lost): the value is read tolerantly, and base64 of the file works too;
+   - the service account belongs to a different Firebase project than the app signs users
+     into: the two project ids on the page must match.
+   A real sign-in problem is reported as a 401 with a reason in the Vercel function logs
+   (`[auth] verifyIdToken failed (auth/...)`); a setup problem is a 500 with `server-config`.
 
 Admin writes (plan grants, usage counters, monthly stats) go through this SDK and bypass
 the security rules; that is why the client never has to be allowed to write them.
@@ -264,6 +271,8 @@ Client-side account separation was hardened alongside this:
 Everything the app needs before it is advertised, in order. Each item names where it is
 explained above.
 
+0. **`/api/health` reads ok** on the deployed site (§3). Do this first after every change to
+   the environment variables; it names anything missing.
 1. **Firestore rules** pasted with your UID in the allowlist (§1, §4). `npm run test:rules`
    is green in CI; the deployed copy must match the file in this repo.
 2. **Vercel environment variables**, Production and Preview:

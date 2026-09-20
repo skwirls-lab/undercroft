@@ -20,6 +20,7 @@
     "test:lessons": "tsx scripts/test-lessons.ts",
     "test:tours": "node scripts/test-tours.mjs",
     "test:billing": "tsx scripts/test-billing.ts",
+    "test:service-account": "tsx scripts/test-service-account.ts",
     "test:rules": "firebase emulators:exec --only firestore --project demo-undercroft \"node scripts/test-rules.mjs\""
   },
   "dependencies": {

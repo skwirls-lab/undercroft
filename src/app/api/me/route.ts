@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser, AuthError, jsonError } from '@/lib/server/auth';
+import { requireUser, errorResponse, jsonError } from '@/lib/server/auth';
 import { adminDb } from '@/lib/server/firebaseAdmin';
 import { getAppConfig } from '@/lib/server/appConfig';
 import { allowanceFor } from '@/lib/metering';
@@ -29,7 +29,8 @@ export async function GET(request: Request) {
       archivistEnabled: config.archivistEnabled,
     });
   } catch (err) {
-    if (err instanceof AuthError) return jsonError(err.status, 'unauthenticated', err.message);
+    const res = errorResponse(err);
+    if (res) return res;
     console.error('[api/me]', err);
     return jsonError(500, 'server', 'Something went wrong on the server.');
   }

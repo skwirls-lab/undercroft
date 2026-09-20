@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser, AuthError, jsonError } from '@/lib/server/auth';
+import { requireUser, errorResponse, jsonError } from '@/lib/server/auth';
 import { getStripe, stripePriceId, siteUrl } from '@/lib/server/stripe';
 import { customerIdFor } from '@/lib/server/billingStore';
 
@@ -15,7 +15,8 @@ export async function POST(request: Request) {
   try {
     ({ uid, email } = await requireUser(request));
   } catch (err) {
-    if (err instanceof AuthError) return jsonError(err.status, 'unauthenticated', err.message);
+    const res = errorResponse(err);
+    if (res) return res;
     throw err;
   }
   const stripe = getStripe();
