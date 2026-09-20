@@ -103,6 +103,40 @@ async function enrichAndUpdateImages(adapted: GameState) {
   }
 }
 
+/**
+ * Art for cards the client knows only by name — prompt options from the library, mostly.
+ * Shares the session cache with the state enrichment above, so a card seen on the
+ * battlefield later costs nothing to show in a tutor prompt, and vice versa.
+ */
+export async function prefetchImageUris(names: string[]): Promise<Map<string, CardData['imageUris'] | undefined>> {
+  const wanted = [...new Set(names.filter((n) => n && n !== '???'))];
+  const missing = wanted.filter((n) => !imageUrisCache.has(n));
+  if (missing.length > 0) {
+    try {
+      const { resolveCardNames } = await import('@/lib/firebase/cards');
+      const resolved = await resolveCardNames(missing);
+      for (const [name, card] of resolved) {
+        imageUrisCache.set(
+          name,
+          card?.image_uris
+            ? {
+                artCrop: card.image_uris.art_crop || undefined,
+                normal: card.image_uris.normal || undefined,
+                small: card.image_uris.small || undefined,
+                large: card.image_uris.large || undefined,
+              }
+            : null
+        );
+      }
+    } catch (err) {
+      console.error('[ForgeGameStore] Failed to fetch prompt card images:', err);
+    }
+  }
+  const out = new Map<string, CardData['imageUris'] | undefined>();
+  for (const n of wanted) out.set(n, imageUrisCache.get(n) ?? undefined);
+  return out;
+}
+
 /** One card's competing legal plays, awaiting a local pick. */
 export interface PendingAbilitySelection {
   cardInstanceId: string;

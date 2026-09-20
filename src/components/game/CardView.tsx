@@ -73,6 +73,8 @@ interface CardViewProps {
   interactive?: boolean;
   combatRole?: CombatRole;
   className?: string;
+  /** Set the global floating preview on click. Off inside prompts, which have their own reading pane. */
+  preview?: boolean;
 }
 
 /** Frame colour by the card's colour identity — the one place colour is decorative. */
@@ -304,6 +306,7 @@ export function CardView({
   interactive = true,
   combatRole = 'none',
   className,
+  preview = true,
 }: CardViewProps) {
   const { setPreviewCard } = useCardPreview();
 
@@ -319,7 +322,7 @@ export function CardView({
         combatRole === 'blocking' && 'rounded-lg shadow-[0_0_12px_rgba(59,130,246,0.4)] ring-2 ring-blue-500/80 ring-offset-1 ring-offset-background',
         className
       )}
-      onClick={() => { setPreviewCard(card); onClick?.(card); }}
+      onClick={() => { if (preview) setPreviewCard(card); onClick?.(card); }}
       onDoubleClick={() => onDoubleClick?.(card)}
     >
       {mode === 'pip' && <PipView card={card} />}

@@ -162,7 +162,7 @@ function PopulateCardsPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {!loading && !done && !error && (
-            <Button onClick={handlePopulate} size="lg" className="w-full">
+            <Button onClick={handlePopulate} size="lg" className="w-full text-foreground">
               <Database className="mr-2 h-5 w-5" />
               Start Population
             </Button>

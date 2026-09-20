@@ -339,7 +339,7 @@ export function GameBoard({
             {hasPriority ? (isMyTurn ? 'Your Turn' : 'Priority') : `${gameState.players.find((p) => p.id === gameState.priority.playerWithPriority)?.name}'s turn`}
           </span>
           <div className="ml-auto flex items-center gap-1.5">
-            <Button size="sm" onClick={handlePassPriority} disabled={!hasPriority || gameState.isGameOver} className="h-7 gap-1 px-3 text-xs"><ArrowRight className="h-3 w-3" />Pass</Button>
+            <Button size="sm" onClick={handlePassPriority} disabled={!hasPriority || gameState.isGameOver} className="h-7 gap-1 px-3 text-xs text-foreground"><ArrowRight className="h-3 w-3" />Pass</Button>
             <Button size="sm" variant={autoPassUntilNextTurn ? 'default' : 'outline'} onClick={() => setAutoPass(!autoPassUntilNextTurn)} className={cn('h-7 px-2 text-xs', autoPassUntilNextTurn && 'bg-amber-600 text-white')}><FastForward className="h-3 w-3" /></Button>
           </div>
         </div>
