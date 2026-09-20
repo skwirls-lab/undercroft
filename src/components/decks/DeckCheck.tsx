@@ -2,7 +2,8 @@
 
 import { CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { DeckCheck as DeckCheckResult } from '@/lib/deckRules';
+import { HelpCircle } from 'lucide-react';
+import type { DeckCheck as DeckCheckResult, DeckLegality } from '@/lib/deckRules';
 import { cn } from '@/lib/utils';
 
 /**
@@ -10,6 +11,24 @@ import { cn } from '@/lib/utils';
  * full list with the cards each issue concerns. Card names open the reader so a problem can
  * be fixed from where it is reported.
  */
+
+/**
+ * The stored verdict, for lists: "Ready" means resolved AND legal, "N issues" otherwise, and
+ * "Unchecked" for a deck that predates the check — open it once and it will be judged.
+ */
+export function LegalityBadge({ legality, className }: { legality: DeckLegality | null | undefined; className?: string }) {
+  if (!legality) {
+    return <span className={cn('flex shrink-0 items-center gap-1 text-muted-foreground', className)} title="Open the deck to check it against the Commander rules"><HelpCircle className="h-3.5 w-3.5" />Unchecked</span>;
+  }
+  if (legality.legal) {
+    return <span className={cn('flex shrink-0 items-center gap-1 text-emerald-300', className)} title="100 cards, legal commander, singleton, in colour, all playable"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>;
+  }
+  return (
+    <span className={cn('flex shrink-0 items-center gap-1 text-amber-300', className)} title={legality.summary.join('\n')}>
+      <AlertCircle className="h-3.5 w-3.5" />{legality.issues} issue{legality.issues === 1 ? '' : 's'}
+    </span>
+  );
+}
 
 export function DeckCheckBadge({ check, verifying, onClick, className }: { check: DeckCheckResult; verifying?: boolean; onClick: () => void; className?: string }) {
   const n = check.issues.length;

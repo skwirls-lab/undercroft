@@ -78,6 +78,13 @@ be added. The **deck check** (`src/lib/deckRules.ts`) reports 100 cards, one com
 singleton rule with its exceptions (basics, "any number", "up to seven"), colour identity,
 unknown names and cards the engine lacks; it is one badge in the header and a dialog on tap.
 
+**Ready means legal.** The badge on a deck in the vault and on the setup screen is the stored
+verdict of the deck check, refreshed whenever the deck page recomputes it, so "Ready" means
+every name resolved *and* the deck passes the Commander rules. A deck that predates the check
+reads "Unchecked" until it is opened. Pressing Start re-judges your deck and any vault deck
+handed to an AI, live; a failing deck gets a warning naming its issues with a link to fix it,
+and a "Play anyway" — it is a simulator, so the game is never refused.
+
 **Shelves** are the vault's folders: one level, a name and an accent colour, filed on the
 player's profile document. A deck sits on at most one shelf.
 

@@ -83,6 +83,28 @@ export interface DeckCheck {
   identity: Color[] | null;
 }
 
+/**
+ * The part of a check worth keeping on the deck document: enough for the vault and the setup
+ * screen to say "legal" or "3 issues" without loading a hundred card records per deck. The
+ * deck page recomputes the full check live and refreshes this whenever it changes.
+ */
+export interface DeckLegality {
+  legal: boolean;
+  issues: number;
+  /** One line per issue, in the player's terms. */
+  summary: string[];
+  checkedAt: number;
+}
+
+export function summarizeCheck(check: DeckCheck): DeckLegality {
+  return { legal: check.legal, issues: check.issues.length, summary: check.issues.map((i) => i.message), checkedAt: Date.now() };
+}
+
+/** Same verdict, ignoring the timestamp. */
+export function sameLegality(a: DeckLegality | null | undefined, b: DeckLegality): boolean {
+  return !!a && a.legal === b.legal && a.issues === b.issues && a.summary.join('\n') === b.summary.join('\n');
+}
+
 export function checkDeck(
   deck: { cards: DeckEntry[]; commanderName: string },
   records: Map<string, ScryfallCardRecord | null>

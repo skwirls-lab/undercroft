@@ -10,6 +10,7 @@
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 import type { DeckEntry } from '@/store/deckStore';
 import { isDevMock } from '@/lib/devMock';
+import { checkDeck, summarizeCheck, type DeckLegality } from '@/lib/deckRules';
 
 // ─── Lookup ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,15 @@ export async function loadCardRecords(names: string[]): Promise<Map<string, Scry
   const out = new Map<string, ScryfallCardRecord | null>();
   for (const n of wanted) out.set(n, recordCache.get(n) ?? null);
   return out;
+}
+
+/**
+ * Judge a deck against the Commander rules, loading whatever records are not cached yet.
+ * The verdict is what the vault and the setup screen show, and what Start warns about.
+ */
+export async function assessDeck(deck: { cards: DeckEntry[]; commanderName: string }): Promise<DeckLegality> {
+  const records = await loadCardRecords(deck.cards.map((c) => c.cardName));
+  return summarizeCheck(checkDeck(deck, records));
 }
 
 /** Put a record straight into the cache — a search result that was just added to a deck. */

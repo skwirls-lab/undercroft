@@ -13,8 +13,10 @@ import { AI_DECKS } from '@/lib/aiDecks';
 import { SURPRISE, describeChoice, resolveOpponents, vaultDeckPlayableByAI, vaultDeckToForge, type OpponentChoice } from '@/lib/opponentDecks';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useCardRecords } from '@/hooks/useCardRecords';
-import { frontFace } from '@/lib/deckCards';
-import { Swords, Bot, Loader2, AlertCircle, WifiOff, Crown, Check, Dices, Library, Lock, ChevronRight } from 'lucide-react';
+import { frontFace, assessDeck } from '@/lib/deckCards';
+import { LegalityBadge } from '@/components/decks/DeckCheck';
+import type { DeckLegality } from '@/lib/deckRules';
+import { Swords, Bot, Loader2, WifiOff, Crown, Check, Dices, Library, Lock, ChevronRight, ShieldAlert, Pencil } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Alcove, Eyebrow } from '@/components/brand/Alcove';
 import { Keystone } from '@/components/brand/Keystone';
@@ -56,6 +58,9 @@ function GameSetupContent() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [connectPhase, setConnectPhase] = useState('Connecting...');
+  /** Decks that failed the rules check at Start, awaiting "play anyway" or "fix". */
+  const [warnings, setWarnings] = useState<Array<{ deck: Deck; seat: string; legality: DeckLegality }> | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
   // While decks are still loading from Firestore we must not treat "none" as "none exist".
@@ -71,7 +76,46 @@ function GameSetupContent() {
   // this screen so the container is usually warm by the time they press Start.
   useEffect(() => { prewarmForgeServer(); }, []);
 
-  const handleStartGame = useCallback(async () => {
+  /**
+   * Judge every deck about to be dealt — yours and any vault deck handed to an AI — against
+   * the Commander rules, live, so an old deck that predates the check still gets one. A
+   * failing deck does not stop the game (it is a simulator), but it does get a warning with
+   * the issues named and a way to go fix them.
+   */
+  const preflight = useCallback(async (): Promise<boolean> => {
+    const toCheck: Array<{ deck: Deck; seat: string }> = [];
+    if (selectedDeck) toCheck.push({ deck: selectedDeck, seat: 'Your deck' });
+    opponents.slice(0, aiCount).forEach((c, i) => {
+      if (c.kind === 'vault') {
+        const d = decks.find((x) => x.id === c.deckId);
+        if (d) toCheck.push({ deck: d, seat: `Opponent ${i + 1}` });
+      }
+    });
+    if (toCheck.length === 0) return true;
+    setChecking(true);
+    try {
+      const results = await Promise.all(toCheck.map(async ({ deck, seat }) => ({ deck, seat, legality: await assessDeck(deck) })));
+      const { updateDeck } = useDeckStore.getState();
+      for (const r of results) {
+        if (!r.deck.legality || r.deck.legality.legal !== r.legality.legal || r.deck.legality.issues !== r.legality.issues) {
+          updateDeck(r.deck.id, { legality: r.legality });
+        }
+      }
+      const failing = results.filter((r) => !r.legality.legal);
+      if (failing.length > 0) { setWarnings(failing); return false; }
+      return true;
+    } catch (err) {
+      // If the check itself fails, do not stand between the player and the game.
+      console.error('[setup] deck check failed:', err);
+      return true;
+    } finally {
+      setChecking(false);
+    }
+  }, [selectedDeck, opponents, aiCount, decks]);
+
+  const handleStartGame = useCallback(async (skipCheck = false) => {
+    if (!skipCheck && !(await preflight())) return;
+    setWarnings(null);
     setStarting(true);
     setStartError(null);
     setConnectPhase('Connecting...');
@@ -107,7 +151,7 @@ function GameSetupContent() {
       clearTimeout(slow);
       clearTimeout(slower);
     }
-  }, [aiCount, connect, connectionStatus, decks, opponents, router, selectedDeck, startGame]);
+  }, [aiCount, connect, connectionStatus, decks, opponents, router, selectedDeck, startGame, preflight]);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -135,8 +179,6 @@ function GameSetupContent() {
           ) : (
             <div className="grid gap-2" role="radiogroup" aria-label="Your deck">
               {decks.map((deck) => {
-                const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
-                const fullyResolved = hasResolution && deck.unresolvedCount === 0;
                 const selected = selectedDeckId === deck.id;
                 const art = artFor(deck);
                 return (
@@ -158,16 +200,12 @@ function GameSetupContent() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">{deck.name}</p>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {deck.commanderName || 'No commander'} &middot; {deck.totalCards || deck.cards.reduce((sum, c) => sum + c.quantity, 0)} cards
-                        {hasResolution && (
-                          <span className={fullyResolved ? 'text-green-400' : 'text-amber-400'}>
-                            {' '}&middot; {fullyResolved ? 'Ready' : `${deck.unresolvedCount} unresolved`}
-                          </span>
-                        )}
+                      <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+                        <span className="truncate">{deck.commanderName || 'No commander'} &middot; {deck.cards.reduce((sum, c) => sum + c.quantity, 0)} cards</span>
+                        <span className="text-border">&middot;</span>
+                        <LegalityBadge legality={deck.legality} className="text-xs" />
                       </p>
                     </div>
-                    {hasResolution && !fullyResolved && <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />}
                   </button>
                 );
               })}
@@ -247,12 +285,15 @@ function GameSetupContent() {
         {/* Start Game */}
         <Button
           size="lg"
-          disabled={!canStart || starting}
+          disabled={!canStart || starting || checking}
+          data-dev-start
           className="h-14 w-full gap-2.5 rounded-xl bg-gold text-base font-bold text-gold-foreground shadow-[0_0_32px_var(--gold-glow)] hover:bg-gold/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
-          onClick={handleStartGame}
+          onClick={() => handleStartGame()}
         >
           {starting ? (
             <><Keystone size={28} loading /> {connectPhase}</>
+          ) : checking ? (
+            <><Keystone size={28} loading /> Checking decks…</>
           ) : (
             <><Swords className="h-5 w-5" /> Start Game</>
           )}
@@ -269,7 +310,7 @@ function GameSetupContent() {
             <WifiOff className="h-4 w-4 shrink-0" />
             <span className="min-w-0">{startError}</span>
             <div className="ml-auto flex shrink-0 gap-1">
-              <Button variant="ghost" size="sm" className="text-xs" onClick={handleStartGame}>Retry</Button>
+              <Button variant="ghost" size="sm" className="text-xs" onClick={() => handleStartGame(true)}>Retry</Button>
               <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setStartError(null); setStarting(false); }}>Dismiss</Button>
             </div>
           </div>
@@ -279,6 +320,35 @@ function GameSetupContent() {
           <p className="text-center text-xs text-muted-foreground">No deck selected — a demo deck will be used.</p>
         )}
       </main>
+
+      {/* Rules warning — the deck is not Commander legal; play anyway, or go fix it */}
+      <Dialog open={warnings !== null} onOpenChange={(open) => { if (!open) setWarnings(null); }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md" data-dev-warning>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display text-xl"><ShieldAlert className="h-5 w-5 text-amber-400" /> Not Commander legal</DialogTitle>
+            <DialogDescription>
+              You can still play — this is a simulator — but the game will not be a fair test of the deck.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            {(warnings ?? []).map((w) => (
+              <div key={w.deck.id} className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm"><span className="text-muted-foreground">{w.seat}:</span> <span className="font-semibold">{w.deck.name}</span></p>
+                  <Link href={`/decks/${encodeURIComponent(w.deck.id)}?edit=1`} className="flex shrink-0 items-center gap-1 text-xs font-medium text-gold hover:underline"><Pencil className="h-3 w-3" /> Fix</Link>
+                </div>
+                <ul className="mt-1.5 flex flex-col gap-1 pl-4 text-sm text-foreground/90">
+                  {w.legality.summary.map((line, i) => <li key={i} className="list-disc">{line}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setWarnings(null)} className="text-foreground">Go back</Button>
+            <Button onClick={() => handleStartGame(true)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Swords className="h-4 w-4" /> Play anyway</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <OpponentPicker
         seat={pickerSeat}

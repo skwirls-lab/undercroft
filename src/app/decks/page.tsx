@@ -15,7 +15,8 @@ import { useDeckStore, type Deck, type Shelf, type ShelfAccent } from '@/store/d
 import { useAuth } from '@/lib/firebase/auth';
 import { useCardRecords } from '@/hooks/useCardRecords';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { verifyEntries, frontFace, type VerifyReport } from '@/lib/deckCards';
+import { verifyEntries, assessDeck, frontFace, type VerifyReport } from '@/lib/deckCards';
+import { LegalityBadge } from '@/components/decks/DeckCheck';
 import {
   Plus, Trash2, Upload, Loader2, CheckCircle2, AlertCircle, Cloud, CloudOff, LogIn, Crown, MoreHorizontal, Library, Pencil, Lock,
 } from 'lucide-react';
@@ -78,7 +79,9 @@ function DecksContent() {
       if (currentShelf) moveDeckToShelf(deck.id, currentShelf.id);
       setImportStep('Resolving cards…');
       const report = await verifyEntries(deck.cards);
-      updateDeck(deck.id, { cards: report.cards, resolvedCount: report.resolved, unresolvedCount: report.unresolved.length });
+      setImportStep('Checking Commander rules…');
+      const legality = await assessDeck({ cards: report.cards, commanderName: deck.commanderName });
+      updateDeck(deck.id, { cards: report.cards, resolvedCount: report.resolved, unresolvedCount: report.unresolved.length, legality });
       setImportResult(report);
     } finally {
       setImporting(false);
@@ -292,10 +295,7 @@ interface DeckCardProps {
 }
 
 function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, onDelete }: DeckCardProps) {
-  const totalCards = deck.totalCards || deck.cards.reduce((sum, c) => sum + c.quantity, 0);
-  const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
-  const notInForge = deck.cards.filter((c) => c.resolved && c.forgeResolved === false).length;
-  const fullyResolved = hasResolution && deck.unresolvedCount === 0 && notInForge === 0;
+  const totalCards = deck.cards.reduce((sum, c) => sum + c.quantity, 0);
 
   // The arch cap clips the top corners, so nothing interactive lives up there. The link covers
   // the art and title; the footer row holds the status and the menu, side by side.
@@ -321,16 +321,8 @@ function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, on
 
       <div className="mx-5 flex items-center gap-2 border-t border-border/30 py-2.5 text-xs text-muted-foreground">
         <span className="shrink-0">{totalCards} cards</span>
-        {hasResolution && (
-          <>
-            <span className="text-border">·</span>
-            {fullyResolved ? (
-              <span className="flex shrink-0 items-center gap-1 text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
-            ) : (
-              <span className="flex shrink-0 items-center gap-1 text-amber-300"><AlertCircle className="h-3.5 w-3.5" />{deck.unresolvedCount > 0 ? `${deck.unresolvedCount} unresolved` : `${notInForge} not in Forge`}</span>
-            )}
-          </>
-        )}
+        <span className="text-border">·</span>
+        <LegalityBadge legality={deck.legality} />
         {shelf && <span className="ml-auto flex min-w-0 items-center gap-1.5 truncate"><AccentDot accent={shelf.accent} /><span className="truncate">{shelf.name}</span></span>}
 
         <DropdownMenu>
