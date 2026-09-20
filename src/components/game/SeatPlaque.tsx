@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { CommanderDamage } from './CommanderDamage';
 import type { PlayerState } from '@/lib/gameTypes';
-import { Heart, BookOpen, Skull, Ban, Crown, Swords, Sparkles, TreePine, ChevronRight, Droplets } from 'lucide-react';
+import { Heart, BookOpen, Skull, Ban, Crown, Swords, Sparkles, TreePine, ChevronRight, Droplets, Info } from 'lucide-react';
 
 /**
  * One seat at the table: a stone plaque with the player's name, life, zone counts and
@@ -36,9 +36,11 @@ interface SeatPlaqueProps {
   hasPriority: boolean;
   compact?: boolean;
   onOpen: () => void;
+  /** Open the seat inspector (stats, commander damage, graveyard and exile). */
+  onInspect?: () => void;
 }
 
-export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, compact, onOpen }: SeatPlaqueProps) {
+export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, compact, onOpen, onInspect }: SeatPlaqueProps) {
   // Direction of the last life change, read in render against the previous value and
   // committed after. The pulse itself is a one-shot CSS animation on an element keyed by
   // life, so it restarts on every change and ends on its own — no timers, no state.
@@ -74,6 +76,20 @@ export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, co
       {pulse && <span key={player.life} className={cn('pointer-events-none absolute inset-0 rounded-xl', pulse === 'loss' ? 'pulse-loss' : 'pulse-gain')} />}
       {/* Active-turn marker: a thin light along the top edge, deliberately not gold */}
       {isActiveTurn && <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/50 to-transparent" />}
+      {onInspect && !compact && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`Details for ${player.name}`}
+          title="Details: commander damage, graveyard, exile"
+          data-dev-inspect={player.id}
+          onClick={(e) => { e.stopPropagation(); onInspect(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onInspect(); } }}
+          className="absolute right-[clamp(8px,1.5vmin,14px)] top-[clamp(8px,1.5vmin,14px)] z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-foreground/70 ring-1 ring-white/10 backdrop-blur-sm transition-colors hover:bg-gold hover:text-gold-foreground"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </span>
+      )}
 
       {compact ? (
         <>
@@ -94,6 +110,20 @@ export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, co
             </div>
             <CommanderDamage damage={player.commanderDamageReceived} compact className="mt-1" />
           </div>
+          {onInspect && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={`Details for ${player.name}`}
+              title="Details: commander damage, graveyard, exile"
+              data-dev-inspect={player.id}
+              onClick={(e) => { e.stopPropagation(); onInspect(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onInspect(); } }}
+              className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/45 text-foreground/70 ring-1 ring-white/10 transition-colors hover:bg-gold hover:text-gold-foreground"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </span>
+          )}
           <div className={cn('relative flex items-center gap-1 font-display text-2xl font-bold tabular-nums', lifeTone)}>
             <Heart className="h-4 w-4 text-red-400" />
             {player.life}
@@ -102,7 +132,7 @@ export function SeatPlaque({ player, stats, isYou, isActiveTurn, hasPriority, co
         </>
       ) : (
         <>
-          <div className="relative flex items-start justify-between gap-2">
+          <div className={cn('relative flex items-start justify-between gap-2', onInspect && 'pr-9')}>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="truncate font-display font-bold" style={{ fontSize: 'clamp(15px,3vmin,22px)' }}>{player.name}</span>

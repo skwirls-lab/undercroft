@@ -145,8 +145,17 @@ export function buildMockGame(): ForgeGameState {
       handCard('Rhystic Study', '{2}{U}', 'Enchantment'),
       handCard('Island', '', 'Basic Land — Island'),
     ],
-    graveyard: [handCard('Path to Exile', '{W}', 'Instant'), handCard('Sakura-Tribe Elder', '{1}{G}', 'Creature — Snake Shaman')],
-    exile: [],
+    graveyard: [
+      handCard('Path to Exile', '{W}', 'Instant', 'Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle.'),
+      handCard('Sakura-Tribe Elder', '{1}{G}', 'Creature — Snake Shaman', 'Sacrifice Sakura-Tribe Elder: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.'),
+      handCard('Toxic Deluge', '{2}{B}', 'Sorcery', 'As an additional cost to cast this spell, pay X life.\nAll creatures get -X/-X until end of turn.'),
+      handCard('Eternal Witness', '{1}{G}{G}', 'Creature — Human Shaman', 'When Eternal Witness enters, you may return target card from your graveyard to your hand.'),
+      handCard('Plains', '', 'Basic Land — Plains'),
+    ],
+    exile: [
+      handCard('Swords to Plowshares', '{W}', 'Instant', 'Exile target creature. Its controller gains life equal to its power.'),
+      handCard('Mystic Remora', '{U}', 'Enchantment', 'Cumulative upkeep {4}\nWhenever an opponent casts a noncreature spell, you may draw a card unless that player pays {4}.'),
+    ],
     librarySize: 61,
   };
 
@@ -160,10 +169,10 @@ export function buildMockGame(): ForgeGameState {
     isActivePlayer: false,
     hasPriority: false,
     manaPool,
-    commanderDamage: { "Atraxa, Praetors' Voice": 12 },
+    commanderDamage: { "Atraxa, Praetors' Voice": 12, 'The Ur-Dragon': 5 },
     command: [],
     battlefield: [
-      creature('Krenko, Mob Boss', '{2}{R}{R}', 3, 3, { types: 'Goblin Warrior' }),
+      { ...creature('Krenko, Mob Boss', '{2}{R}{R}', 3, 3, { types: 'Goblin Warrior' }), typeLine: 'Legendary Creature — Goblin Warrior' },
       ...Array.from({ length: 7 }, () => creature('Goblin', '', 1, 1, { types: 'Goblin', isToken: true })),
       creature('Goblin Chieftain', '{1}{R}{R}', 2, 2, { types: 'Goblin', keywords: ['Haste'] }),
       other('Skullclamp', '{1}', 'Artifact — Equipment'),

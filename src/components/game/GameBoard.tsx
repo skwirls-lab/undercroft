@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { SeatPlaque, type SeatStats } from './SeatPlaque';
+import { SeatInspector } from './SeatInspector';
 import { BoardView } from './BoardView';
 import { Hand } from './Hand';
 import { CardView } from './CardView';
@@ -84,6 +85,9 @@ export function GameBoard({
 
   // Targeting mode state
   const [targeting, setTargeting] = useState<TargetingState | null>(null);
+
+  // Seat inspector — which player's details are open, if any
+  const [inspectPlayerId, setInspectPlayerId] = useState<string | null>(null);
 
   // Expanded board — which player's field is being viewed
   const [expandedPlayerIdInternal, setExpandedPlayerIdInternal] = useState<string | null>(null);
@@ -285,6 +289,7 @@ export function GameBoard({
               hasPriority={gameState.priority.playerWithPriority === opp.id}
               compact={narrow}
               onOpen={() => setExpandedPlayerId(opp.id)}
+              onInspect={() => setInspectPlayerId(opp.id)}
             />
           ))}
         </div>
@@ -299,6 +304,7 @@ export function GameBoard({
               isActiveTurn={isMyTurn}
               hasPriority={hasPriority && !gameState.isGameOver}
               onOpen={() => setExpandedPlayerId(currentPlayerId)}
+              onInspect={() => setInspectPlayerId(currentPlayerId)}
             />
           </div>
         )}
@@ -392,6 +398,7 @@ export function GameBoard({
             viewedPlayerId={expandedPlayerId}
             onViewPlayer={setExpandedPlayerId}
             onClose={() => setExpandedPlayerId(null)}
+            onInspect={setInspectPlayerId}
             currentPlayerId={currentPlayerId}
             hasPriority={hasPriority}
             legalActions={filteredLegalActions}
@@ -414,6 +421,17 @@ export function GameBoard({
           />
         )}
       </AnimatePresence>
+
+      {/* Seat inspector */}
+      {inspectPlayerId && (
+        <SeatInspector
+          gameState={gameState}
+          playerId={inspectPlayerId}
+          currentPlayerId={currentPlayerId}
+          onSelectPlayer={setInspectPlayerId}
+          onClose={() => setInspectPlayerId(null)}
+        />
+      )}
 
       {/* Game over overlay */}
       <AnimatePresence>

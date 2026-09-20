@@ -15,6 +15,7 @@ import type { ForgeChoiceRequest } from '@/lib/forgeClient';
  *
  * Query params:
  *   ?open=me | ai-2 | ai-3 | ai-4   open the expanded board for that player on load
+ *   ?inspect=me | ai-2 | ai-3 | ai-4   open the seat inspector for that player on load
  *   ?choice=tutor | discard | confirm | modes | scry | targets
  *                                   seed a server prompt so the choice overlay renders
  */
@@ -119,12 +120,16 @@ export function DevBoard() {
   // Let the page mount, then open a board if asked.
   useEffect(() => {
     if (!ready) return;
-    const open = new URLSearchParams(window.location.search).get('open');
-    if (!open) return;
-    const target = open === 'me' ? 'player-human' : open;
+    const params = new URLSearchParams(window.location.search);
+    const open = params.get('open');
+    const inspect = params.get('inspect');
+    if (!open && !inspect) return;
+    const attr = open ? 'data-dev-open' : 'data-dev-inspect';
+    const raw = open ?? inspect!;
+    const target = raw === 'me' ? 'player-human' : raw;
     // The page owns this state; nudge it through the same event the stat boxes use.
     const t = setTimeout(() => {
-      const btn = document.querySelector<HTMLButtonElement>(`[data-dev-open="${target}"]`);
+      const btn = document.querySelector<HTMLElement>(`[${attr}="${target}"]`);
       btn?.click();
     }, 150);
     return () => clearTimeout(t);

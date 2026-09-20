@@ -12,7 +12,7 @@ import { useFitToRow } from '@/hooks/useFitToRow';
 import { getCardsInZone, getZoneCardCount } from '@/lib/ZoneManager';
 import { cardArrive } from '@/lib/motion';
 import type { CardInstance, GameState, GameAction, CombatState, ManaColor } from '@/lib/gameTypes';
-import { Heart, Crown, Sword, Gem, Library, X, ChevronLeft, ChevronRight, Skull, Ban, BookOpen, Hand as HandIcon, Droplets } from 'lucide-react';
+import { Heart, Crown, Sword, Gem, Library, X, ChevronLeft, ChevronRight, Skull, Ban, BookOpen, Hand as HandIcon, Droplets, Info } from 'lucide-react';
 
 /**
  * The expanded board for one player: what you open when you tap a seat.
@@ -44,6 +44,8 @@ export interface BoardViewProps {
   viewedPlayerId: string;
   onViewPlayer: (id: string) => void;
   onClose: () => void;
+  /** Open the seat inspector for the viewed player. */
+  onInspect?: (id: string) => void;
   currentPlayerId: string;
   hasPriority: boolean;
   /** Legal actions for the current player; the board only lights affordances on your own seat. */
@@ -81,7 +83,7 @@ function combatRole(cardId: string, combat?: CombatState | null): CombatRole {
 
 export function BoardView(props: BoardViewProps) {
   const {
-    gameState, viewedPlayerId, onViewPlayer, onClose, currentPlayerId, hasPriority, legalActions, combat,
+    gameState, viewedPlayerId, onViewPlayer, onClose, onInspect, currentPlayerId, hasPriority, legalActions, combat,
     targeting, onSelectTarget, onCancelTargeting,
     onTapLand, onUntapLand, onCastCommander, onEquipClick, onActivateAbility,
     pendingManaChoice, onManaColorPicked, onCancelManaChoice,
@@ -280,6 +282,18 @@ export function BoardView(props: BoardViewProps) {
           {viewed.poisonCounters > 0 && <span className="flex items-center gap-0.5 text-green-400"><Droplets className="h-3.5 w-3.5" />{viewed.poisonCounters}</span>}
         </div>
         <div className="ml-auto flex items-center gap-3">
+          {onInspect && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onInspect(viewed.id); }}
+              aria-label={`Details for ${viewed.name}`}
+              title="Details: commander damage, graveyard, exile"
+              data-dev-inspect-board={viewed.id}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-foreground/70 ring-1 ring-white/10 transition-colors hover:bg-gold hover:text-gold-foreground"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          )}
           <ManaPoolDisplay manaPool={viewed.manaPool} compact />
           <span className={cn('flex items-center gap-1 font-display text-2xl font-bold tabular-nums', viewed.life <= 10 ? 'text-red-300' : viewed.life <= 20 ? 'text-amber-200' : 'text-foreground')}>
             <Heart className="h-4 w-4 text-red-400" />{viewed.life}
