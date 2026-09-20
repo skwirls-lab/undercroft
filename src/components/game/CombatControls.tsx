@@ -207,7 +207,7 @@ function AttackerSelector({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={handleConfirm} disabled={selectedAttackers.size === 0} className="gap-1 bg-red-600 hover:bg-red-700">
+        <Button size="sm" onClick={handleConfirm} disabled={selectedAttackers.size === 0} className="gap-1 bg-red-600 hover:bg-red-700 text-foreground">
           <Swords className="h-3.5 w-3.5" />
           Attack ({selectedAttackers.size})
         </Button>
@@ -375,7 +375,7 @@ function BlockerSelector({
       )}
 
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={handleConfirm} className="gap-1 bg-blue-600 hover:bg-blue-700">
+        <Button size="sm" onClick={handleConfirm} className="gap-1 bg-blue-600 hover:bg-blue-700 text-foreground">
           <Shield className="h-3.5 w-3.5" />
           Confirm Blocks ({blockerAssignments.size})
         </Button>

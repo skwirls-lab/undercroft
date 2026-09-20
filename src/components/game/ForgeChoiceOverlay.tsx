@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { CardView } from './CardView';
+import { ManaCostDisplay, OracleText } from './ManaSymbol';
 import { getCardsInZone } from '@/lib/ZoneManager';
-import type { CardInstance } from '@/lib/gameTypes';
+import { prefetchImageUris } from '@/store/forgeGameStore';
+import type { CardInstance, CardData, ManaColor } from '@/lib/gameTypes';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
 import type { PendingAbilitySelection } from '@/store/forgeGameStore';
 import type { GameAction } from '@/lib/gameTypes';
@@ -41,6 +43,88 @@ interface CardOption {
   owner?: string;
   controller?: string;
   life?: number;
+  // Sent by the server since the prompt-readability fix; older servers omit them.
+  manaCost?: string;
+  oracleText?: string;
+  /** Colour letters, e.g. "WU". */
+  colors?: string;
+}
+
+/**
+ * Turn a prompt option into a CardInstance so it renders as a real card.
+ *
+ * A card the client already holds (hand, battlefield, graveyard) is used as-is — it has the
+ * richer data. Anything else, which is every library card, is built from what the server put
+ * in the option. Either way the result carries art if the session has any for that name.
+ */
+function optionToInstance(opt: CardOption, known: CardInstance | undefined, imageUris: CardData['imageUris'] | undefined): CardInstance {
+  if (known) {
+    return imageUris && !known.cardData.imageUris ? { ...known, cardData: { ...known.cardData, imageUris } } : known;
+  }
+  const colors = (opt.colors ?? '').split('').filter((c) => 'WUBRG'.includes(c)) as ManaColor[];
+  return {
+    instanceId: `opt-${opt.id}`,
+    cardData: {
+      scryfallId: '',
+      oracleId: '',
+      name: opt.name,
+      manaCost: opt.manaCost ?? '',
+      cmc: 0,
+      typeLine: opt.type ?? '',
+      oracleText: opt.oracleText ?? '',
+      colors,
+      colorIdentity: colors,
+      keywords: [],
+      power: opt.power != null ? String(opt.power) : undefined,
+      toughness: opt.toughness != null ? String(opt.toughness) : undefined,
+      layout: 'normal',
+      legalities: {},
+      imageUris,
+    },
+    ownerId: '',
+    controllerId: '',
+    zone: 'library',
+    tapped: false,
+    flipped: false,
+    faceDown: false,
+    counters: {},
+    attachments: [],
+    attachmentNames: [],
+    damage: 0,
+    summoningSick: false,
+    abilities: [],
+  };
+}
+
+/** The readable part: everything on the card that is not the picture. */
+function CardDetail({ card, zone }: { card: CardInstance | null; zone?: string }) {
+  if (!card) {
+    return (
+      <div className="flex h-full min-h-[96px] items-center justify-center rounded-lg border border-dashed border-border/40 px-4 text-center text-xs text-muted-foreground/60">
+        Tap a card to read it
+      </div>
+    );
+  }
+  const d = card.cardData;
+  return (
+    <div className="flex h-full flex-col gap-1.5 rounded-lg border border-gold/25 bg-gold/[0.04] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-display text-base font-bold leading-tight text-foreground">{d.name}</span>
+        {d.manaCost && <ManaCostDisplay manaCost={d.manaCost} size="sm" className="mt-0.5 shrink-0" />}
+      </div>
+      {d.typeLine && <span className="text-[11px] italic text-muted-foreground">{d.typeLine}{zone ? ` · ${zone.toLowerCase()}` : ''}</span>}
+      {d.oracleText ? (
+        <div className="scroll-thin max-h-[30vh] overflow-y-auto text-[12px] leading-relaxed text-foreground/85">
+          <OracleText text={d.oracleText} />
+        </div>
+      ) : (
+        <span className="text-[11px] text-muted-foreground/60">No rules text available for this card.</span>
+      )}
+      {d.power !== undefined && (
+        <span className="mt-auto self-end font-display text-sm font-bold text-foreground">{d.power}/{d.toughness}</span>
+      )}
+    </div>
+  );
 }
 
 // ============================================================
@@ -169,7 +253,7 @@ function ChoicePanel({ choice, onRespond }: {
           <Button
                 key={play.index}
                 onClick={() => onRespond(choice.requestId, { abilityIndex: play.index })}
-                className="rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10"
+                className="rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10 text-foreground"
                 style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
               >
                 <span className="font-medium text-foreground">{play.cardName || 'Ability'}</span>
@@ -215,7 +299,7 @@ function ChoicePanel({ choice, onRespond }: {
       <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold text-foreground" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>{prompt || 'Confirm?'}</h3>
         <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-          <Button onClick={() => onRespond(choice.requestId, { confirmed: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Yes</Button>
+          <Button onClick={() => onRespond(choice.requestId, { confirmed: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10 text-foreground" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Yes</Button>
           <Button variant="outline" onClick={() => onRespond(choice.requestId, { confirmed: false })} className="rounded-lg border bg-card/60 font-medium hover:border-border/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>No</Button>
         </div>
       </div>
@@ -357,7 +441,7 @@ function ChoicePanel({ choice, onRespond }: {
           <Button
               key={a.index}
               onClick={() => onRespond(choice.requestId, abilityResponse(a.index))}
-              className="rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10"
+              className="rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10 text-foreground"
               style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
             >
               <span className="font-medium">{a.cardName || 'Ability'}</span>
@@ -385,7 +469,7 @@ function ChoicePanel({ choice, onRespond }: {
       <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Play trigger?'}</h3>
         <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-          <Button onClick={() => onRespond(choice.requestId, { play: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Yes</Button>
+          <Button onClick={() => onRespond(choice.requestId, { play: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10 text-foreground" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Yes</Button>
           <Button variant="outline" onClick={() => onRespond(choice.requestId, { play: false })} className="rounded-lg border bg-card/60 font-medium hover:border-border/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>No</Button>
         </div>
       </div>
@@ -397,7 +481,7 @@ function ChoicePanel({ choice, onRespond }: {
       <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Put on top of library?'}</h3>
         <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-          <Button onClick={() => onRespond(choice.requestId, { onTop: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Top</Button>
+          <Button onClick={() => onRespond(choice.requestId, { onTop: true })} className="rounded-lg border bg-card/60 font-medium hover:border-gold/40 hover:bg-gold/10 text-foreground" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Top</Button>
           <Button variant="outline" onClick={() => onRespond(choice.requestId, { onTop: false })} className="rounded-lg border bg-card/60 font-medium hover:border-border/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>Bottom</Button>
         </div>
       </div>
@@ -771,7 +855,7 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
             <Button
               key={src.id}
               onClick={() => tapLand(src.id)}
-              className="rounded-lg border border-border/40 bg-card/80 text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300"
+              className="rounded-lg border border-border/40 bg-card/80 text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300 text-foreground"
               style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
             >
               <div className="font-medium">{src.name}</div>
@@ -811,7 +895,7 @@ function AbilitySelectionPanel({ selection, onPick, onCancel }: {
           <Button
             key={`${action.payload.forgeAbilityIndex ?? i}`}
             onClick={() => onPick(action)}
-            className="rounded-lg border border-border/40 bg-card/60 text-left hover:border-gold/40 hover:bg-gold/10"
+            className="rounded-lg border border-border/40 bg-card/60 text-left hover:border-gold/40 hover:bg-gold/10 text-foreground"
             style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)', maxWidth: 'clamp(200px,32vmin,1000px)' }}
           >
             <span className="block truncate">
@@ -869,7 +953,7 @@ function OrderCardsPanel({ prompt, cards, requestId, onRespond }: {
               <Button
                 key={id}
                 onClick={() => toggle(id)}
-                className="rounded-lg border border-gold/50 bg-gold/15 hover:bg-gold/25"
+                className="rounded-lg border border-gold/50 bg-gold/15 hover:bg-gold/25 text-foreground"
                 style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
               >
                 {i + 1}. {label(c)}
@@ -885,7 +969,7 @@ function OrderCardsPanel({ prompt, cards, requestId, onRespond }: {
             <Button
               key={c.id}
               onClick={() => toggle(c.id)}
-              className="rounded-lg border border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10"
+              className="rounded-lg border border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10 text-foreground"
               style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
             >
               {label(c)}
@@ -897,7 +981,7 @@ function OrderCardsPanel({ prompt, cards, requestId, onRespond }: {
       <Button
         disabled={remaining.length > 0}
         onClick={() => onRespond(requestId, { orderedIds: order })}
-        className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25 disabled:opacity-40"
+        className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25 disabled:opacity-40 text-foreground"
         style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
       >
         {remaining.length > 0 ? `Place ${remaining.length} more` : 'Confirm order'}
@@ -964,7 +1048,7 @@ function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
               <Button
                 key={b.id}
                 onClick={() => (assignedTo !== undefined ? clearBlocker(b.id) : setActiveBlocker(activeBlocker === b.id ? null : b.id))}
-                className={`rounded-lg border bg-card/60 hover:bg-red-500/10 ${activeBlocker === b.id ? 'border-gold/60' : assignedTo !== undefined ? 'border-green-500/50' : 'border-border/40'}`}
+                className={`rounded-lg border bg-card/60 hover:bg-red-500/10 ${activeBlocker === b.id ? 'border-gold/60' : assignedTo !== undefined ? 'border-green-500/50' : 'border-border/40'} text-foreground`}
                 style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
               >
                 {label(b)}{attacker ? ` → ${attacker.name}` : ''}
@@ -982,7 +1066,7 @@ function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
               key={a.id}
               disabled={activeBlocker == null}
               onClick={() => assign(a.id)}
-              className="rounded-lg border border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10 disabled:opacity-40"
+              className="rounded-lg border border-border/40 bg-card/60 hover:border-gold/40 hover:bg-gold/10 disabled:opacity-40 text-foreground"
               style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
             >
               {label(a)}
@@ -994,7 +1078,7 @@ function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
       <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
         <Button
           onClick={submit}
-          className="rounded-lg border border-red-500/40 bg-red-500/15 font-medium hover:bg-red-500/25"
+          className="rounded-lg border border-red-500/40 bg-red-500/15 font-medium hover:bg-red-500/25 text-foreground"
           style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
         >
           Confirm blocks ({Object.keys(blocks).length})
@@ -1053,7 +1137,7 @@ function AnnounceNumberPanel({ prompt, description, min, max, requestId, onRespo
         </Button>
         <Button
           onClick={() => onRespond(requestId, { value })}
-          className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25"
+          className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25 text-foreground"
           style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)', marginLeft: 'clamp(4px,0.8vmin,1000px)' }}
         >
           Confirm
@@ -1091,7 +1175,7 @@ function BinaryChoicePanel({ prompt, kind, requestId, onRespond }: {
       <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
         <Button
           onClick={() => onRespond(requestId, { result: true })}
-          className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25"
+          className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25 text-foreground"
           style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
         >
           {yes}
@@ -1136,7 +1220,7 @@ function ColorChoicePanel({ prompt, colors, requestId, onRespond }: {
           <Button
             key={c.mask}
             onClick={() => onRespond(requestId, { mask: c.mask })}
-            className={`rounded-lg border border-border/40 font-bold ${COLOR_SWATCH[c.symbol] ?? 'bg-card/60'}`}
+            className={`rounded-lg border border-border/40 font-bold ${COLOR_SWATCH[c.symbol] ?? 'bg-card/60'} text-foreground`}
             style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
           >
             {c.symbol} · {c.name}
@@ -1194,7 +1278,7 @@ function AssignDamagePanel({ prompt, attackerName, totalDamage, blockers, reques
       <Button
         disabled={remaining !== 0}
         onClick={() => onRespond(requestId, { assignments: Object.fromEntries(blockers.map((b) => [String(b.id), assigned[b.id] ?? 0])) })}
-        className="rounded-lg border border-red-500/40 bg-red-500/15 font-medium hover:bg-red-500/25 disabled:opacity-40"
+        className="rounded-lg border border-red-500/40 bg-red-500/15 font-medium hover:bg-red-500/25 disabled:opacity-40 text-foreground"
         style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
       >
         {remaining === 0 ? 'Confirm damage' : `Assign ${remaining} more`}
@@ -1220,129 +1304,124 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
   canCancel?: boolean;
 }) {
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
-  const [previewId, setPreviewId] = React.useState<number | null>(null);
+  // The card whose text is showing. In single-select it is also the pick.
+  const [focusedId, setFocusedId] = React.useState<number | null>(null);
+  const [images, setImages] = React.useState<Map<string, CardData['imageUris'] | undefined>>(new Map());
   const isSingle = max === 1;
 
   // Keys that the server expects as arrays even for single selection
   const arrayKeys = new Set(['selectedIds', 'entityIds', 'targetIds', 'attackerCardIds', 'bottomIds']);
 
-  // Resolve card options to CardInstance objects for art display
   const gameState = useGameStore((s) => s.gameState);
-  const resolvedCards = useMemo(() => {
-    if (!gameState) return new Map<number, CardInstance>();
+  const cards = useMemo(() => {
     const map = new Map<number, CardInstance>();
     for (const opt of options) {
       if (opt.type === 'player') continue;
-      const instanceId = `forge-${opt.id}`;
-      const instance = gameState.cardInstances.get(instanceId);
-      if (instance) map.set(opt.id, instance);
+      const known = gameState?.cardInstances.get(`forge-${opt.id}`);
+      map.set(opt.id, optionToInstance(opt, known, images.get(opt.name)));
     }
     return map;
-  }, [gameState, options]);
+  }, [gameState, options, images]);
+
+  // Art for options the client only knows by name (library cards). Best effort; the slab
+  // is the fallback and it already says what the card is.
+  React.useEffect(() => {
+    const names = options.filter((o) => o.type !== 'player' && !gameState?.cardInstances.get(`forge-${o.id}`)?.cardData.imageUris).map((o) => o.name);
+    if (names.length === 0) return;
+    let cancelled = false;
+    prefetchImageUris(names).then((m) => { if (!cancelled) setImages(m); });
+    return () => { cancelled = true; };
+  }, [options, gameState]);
 
   const toggle = (id: number) => {
-    if (isSingle) {
-      // Single-select: highlight first, don't auto-respond
-      setPreviewId(previewId === id ? null : id);
-      return;
-    }
+    setFocusedId(id);
+    if (isSingle) return;
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else if (next.size < max) { next.add(id); }
+      if (next.has(id)) next.delete(id);
+      else if (next.size < max) next.add(id);
       return next;
     });
   };
 
-  const confirmSingle = () => {
-    if (previewId == null) return;
-    if (formatResponse) {
-      onRespond(requestId, formatResponse([previewId]));
-    } else {
-      const value = arrayKeys.has(responseKey) ? [previewId] : previewId;
-      onRespond(requestId, { [responseKey]: value });
-    }
-  };
-
-  const confirm = () => {
-    const ids = Array.from(selected);
-    if (formatResponse) {
-      onRespond(requestId, formatResponse(ids));
-    } else {
-      onRespond(requestId, { [responseKey]: ids });
-    }
-  };
-
-  const skipOrCancel = () => {
-    if (formatResponse) {
-      onRespond(requestId, formatResponse([]));
-    } else {
-      onRespond(requestId, { [responseKey]: arrayKeys.has(responseKey) ? [] : null });
-    }
+  const respond = (ids: number[]) => {
+    if (formatResponse) onRespond(requestId, formatResponse(ids));
+    else if (isSingle && ids.length === 1 && !arrayKeys.has(responseKey)) onRespond(requestId, { [responseKey]: ids[0] });
+    else onRespond(requestId, { [responseKey]: arrayKeys.has(responseKey) || !isSingle ? ids : (ids[0] ?? null) });
   };
 
   const canSkip = min === 0;
   const hasOptions = options.length > 0;
-  const previewCard = previewId != null ? resolvedCards.get(previewId) : null;
-  const previewOpt = previewId != null ? options.find(o => o.id === previewId) : null;
+  const focusedOpt = focusedId != null ? options.find((o) => o.id === focusedId) : null;
+  const focusedCard = focusedId != null ? cards.get(focusedId) ?? null : null;
+  const pickCount = isSingle ? (focusedId != null ? 1 : 0) : selected.size;
 
   return (
-    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
-      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt}</h3>
-      {!isSingle && hasOptions && (
-        <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>Select {min === max ? min : `${min}-${max}`} · {selected.size} selected</p>
-      )}
+    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(12px,2vmin,20px)' }}>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="font-display text-base font-bold sm:text-lg">{prompt}</h3>
+        {hasOptions && (
+          <p className="text-xs text-muted-foreground">
+            {isSingle ? 'Choose one' : `Select ${min === max ? min : `${min}–${max}`}`}
+            {' · '}<span className="tabular-nums text-foreground">{pickCount}</span> selected
+          </p>
+        )}
+      </div>
+
       {hasOptions ? (
-        <div className="flex flex-wrap items-end" style={{ gap: 'clamp(6px,1.2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-          {options.map((opt) => {
-            const resolved = resolvedCards.get(opt.id);
-            const isActive = isSingle ? previewId === opt.id : selected.has(opt.id);
-            return (
-              <div
-                key={opt.id}
-                onClick={() => toggle(opt.id)}
-                className={`relative rounded-lg cursor-pointer transition-all duration-150 ${
-                  isActive
-                    ? 'ring-2 ring-gold/60 scale-105 z-10 shadow-[0_0_12px_var(--gold-glow)]'
-                    : 'hover:ring-1 hover:ring-border/60'
-                }`}
-              >
-                {resolved ? (
-                  <CardView card={resolved} mode="art" interactive={false} />
-                ) : (
-                  <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-card/60" style={{ width: 'clamp(80px,12vmin,200px)', height: 'clamp(110px,17vmin,280px)', padding: 'clamp(4px,0.6vmin,1000px)' }}>
-                    <span className="font-semibold text-center leading-tight" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>{opt.name}</span>
-                    {opt.power !== undefined && <span className="text-muted-foreground" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>{opt.power}/{opt.toughness}</span>}
-                    {opt.type === 'player' && <span className="text-muted-foreground" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>Life: {opt.life}</span>}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row">
+          {/* The cards */}
+          <div className="scroll-thin flex min-w-0 flex-1 flex-wrap content-start gap-2 overflow-y-auto" style={{ maxHeight: '48vh' }}>
+            {options.map((opt) => {
+              const card = cards.get(opt.id);
+              const isPicked = isSingle ? focusedId === opt.id : selected.has(opt.id);
+              const isFocused = focusedId === opt.id;
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => toggle(opt.id)}
+                  className={`relative shrink-0 cursor-pointer rounded-lg transition-all duration-150 ${
+                    isPicked ? 'affordance-selected z-10' : isFocused ? 'ring-1 ring-gold/40' : 'hover:ring-1 hover:ring-border/60'
+                  }`}
+                >
+                  {card ? (
+                    <CardView card={card} mode="art" interactive={false} preview={false} />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-card/60 p-2" style={{ width: 'clamp(72px,10vmin,140px)', height: 'clamp(100px,14vmin,196px)' }}>
+                      <span className="text-center text-sm font-semibold leading-tight">{opt.name}</span>
+                      {opt.type === 'player' && <span className="mt-1 text-xs text-muted-foreground">Life {opt.life}</span>}
+                    </div>
+                  )}
+                  {isPicked && !isSingle && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-gold-foreground shadow">
+                      {[...selected].indexOf(opt.id) + 1}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* What the focused card says */}
+          <div className="w-full shrink-0 sm:w-[260px]">
+            <CardDetail card={focusedCard} zone={focusedOpt?.zone} />
+          </div>
         </div>
       ) : (
-        <p className="text-amber-400" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>No valid options available.</p>
+        <p className="mb-3 text-sm text-amber-400">No valid options available.</p>
       )}
-      {/* Preview info for selected card */}
-      {isSingle && previewCard && previewOpt && (
-        <div className="rounded-lg border border-gold/30 bg-gold/5 flex items-center" style={{ padding: 'clamp(6px,1vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)', gap: 'clamp(6px,1vmin,1000px)' }}>
-          <span className="font-semibold text-gold" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>{previewOpt.name}</span>
-          {previewCard.cardData.typeLine && <span className="text-muted-foreground" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)' }}>— {previewCard.cardData.typeLine}</span>}
-          {previewCard.cardData.oracleText && <span className="text-foreground/70 hidden sm:inline" style={{ fontSize: 'clamp(9px,1.4vmin,1000px)' }}>| {previewCard.cardData.oracleText.slice(0, 80)}{previewCard.cardData.oracleText.length > 80 ? '...' : ''}</span>}
-        </div>
-      )}
-      <div className="flex" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
-        {isSingle && (
-          <Button disabled={previewId == null} onClick={confirmSingle} className="rounded-lg border bg-gold font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
-            Select{previewOpt ? `: ${previewOpt.name}` : ''}
+
+      <div className="flex flex-wrap gap-2">
+        {isSingle ? (
+          <Button disabled={focusedId == null} onClick={() => focusedId != null && respond([focusedId])} className="h-9 rounded-lg bg-gold px-4 font-semibold text-gold-foreground hover:bg-gold/90 disabled:opacity-50">
+            Select{focusedOpt ? `: ${focusedOpt.name}` : ''}
           </Button>
-        )}
-        {!isSingle && (
-          <Button disabled={selected.size < min} onClick={confirm} className="rounded-lg border bg-gold font-medium hover:bg-gold/90 disabled:opacity-50 disabled:hover:bg-gold" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
+        ) : (
+          <Button disabled={selected.size < min} onClick={() => respond([...selected])} className="h-9 rounded-lg bg-gold px-4 font-semibold text-gold-foreground hover:bg-gold/90 disabled:opacity-50">
             Confirm ({selected.size})
           </Button>
         )}
         {(canSkip || canCancel || !hasOptions) && (
-          <Button variant="outline" onClick={skipOrCancel} className="rounded-lg border bg-card/60 font-medium hover:border-border/40" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
+          <Button variant="outline" onClick={() => respond([])} className="h-9 rounded-lg px-4 font-medium text-foreground">
             {canSkip ? 'Skip' : 'Cancel'}
           </Button>
         )}

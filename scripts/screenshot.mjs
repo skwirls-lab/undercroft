@@ -26,6 +26,12 @@ const SCREENS = [
   { name: 'board', path: '/dev/board' },
   { name: 'board-me', path: '/dev/board?open=me' },
   { name: 'board-opp', path: '/dev/board?open=ai-2' },
+  { name: 'prompt-tutor', path: '/dev/board?choice=tutor' },
+  { name: 'prompt-tutor-read', path: '/dev/board?choice=tutor', click: '.prompt-panel [data-card-preview-safe]:nth-of-type(1)' },
+  { name: 'prompt-discard', path: '/dev/board?choice=discard' },
+  { name: 'prompt-confirm', path: '/dev/board?choice=confirm' },
+  { name: 'prompt-modes', path: '/dev/board?choice=modes' },
+  { name: 'prompt-targets', path: '/dev/board?choice=targets' },
 ];
 
 const VIEWPORTS = [
