@@ -35,6 +35,7 @@ check('deck-check issues are carried', dc.issues.length >= 1 && dc.issues.some((
 check('shortType strips supertypes', shortType('Legendary Creature — Phyrexian Angel Horror') === 'Creature' && shortType('Basic Land — Forest') === 'Land' && shortType('Artifact Creature — Golem') === 'Artifact Creature');
 const deckText = describeDeck(dc);
 check('description names the commander text and the list', deckText.includes('proliferate') && deckText.includes('1 Sol Ring'));
+check('every card carries its printed text', dc.cards.filter((c) => c.text).length >= dc.cards.length - 1 && deckText.includes('Add {C}{C}'));
 
 // ─── Match context ───────────────────────────────────────────────────────────
 console.log('match context');
@@ -76,13 +77,17 @@ const msgs = buildMessages({ task: 'deck.improve', deck: dc, goal: 'more-ramp' }
 check('system prompt first, ask last', msgs[0].role === 'system' && msgs[0].content === SYSTEM_PROMPT && msgs[msgs.length - 1].role === 'user');
 check('goal text is included', msgs[1].content.includes('mana acceleration'));
 check('card text is declared data, not instructions', SYSTEM_PROMPT.includes('not instructions'));
+check('the Archivist is told to admit an unknown card rather than guess', /do not know it for certain, say so/.test(SYSTEM_PROMPT) && /deck's name is a name, not a card/.test(SYSTEM_PROMPT));
+const question = buildMessages({ task: 'rules.question', question: 'hi', deck: dc });
+check('a deck question carries the whole deck with card text', question.length === 3 && question[1].content.includes('printed text') && question[1].content.includes('1 Sol Ring') && question[2].content === 'The player asks: hi');
+check('a deck question without a deck carries only the ask', buildMessages({ task: 'rules.question', question: 'What is the stack?' }).length === 2);
 const advice = buildMessages({ task: 'match.advice', match: mc, question: '' }, [{ role: 'user', content: 'earlier q' }, { role: 'assistant', content: 'earlier a' }]);
 check('history sits between context and the ask', advice.length === 5 && advice[2].content === 'earlier q' && advice[3].role === 'assistant');
 check('an empty question becomes the default ask', advice[4].content.startsWith('What should I do this turn?'));
 check('swaps and ideas are the JSON tasks', isJsonTask('deck.swaps') && isJsonTask('commander.ideas') && !isJsonTask('deck.improve'));
 check('features map to the price list', taskFeature('match.advice') === 'archivist.match' && taskFeature('game.recap') === 'archivist.recap' && taskFeature('commander.ideas') === 'archivist.ideas' && taskFeature('rules.question') === 'archivist.deck');
 
-const huge: DeckContext = { ...dc, cards: Array.from({ length: 3000 }, (_, i) => ({ name: `Filler Card Number ${i}`, qty: 1, type: 'Creature', mv: 3, cost: '{2}{G}' })) };
+const huge: DeckContext = { ...dc, cards: Array.from({ length: 3000 }, (_, i) => ({ name: `Filler Card Number ${i}`, qty: 1, type: 'Creature', mv: 3, cost: '{2}{G}', text: 'Flying' })) };
 const trimmed = buildMessages({ task: 'deck.strategy', deck: huge });
 const total = trimmed.reduce((s, m) => s + m.content.length, 0);
 check('an oversized prompt is cut to budget', total <= PROMPT_BUDGET_CHARS + 50, `total ${total}`);

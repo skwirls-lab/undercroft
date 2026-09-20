@@ -34,6 +34,7 @@ export function deckContext(
         type: shortType(face?.typeLine ?? ''),
         mv: rec ? Math.round(rec.cmc ?? 0) : 0,
         cost: face?.manaCost ?? '',
+        text: face ? face.oracleText.replace(/\s+/g, ' ').slice(0, 220) : '',
       };
     })
     .sort((a, b) => a.type.localeCompare(b.type) || a.mv - b.mv || a.name.localeCompare(b.name));
@@ -100,7 +101,7 @@ export function matchContext(state: GameState, legalActions: GameAction[], youId
       commanderDamage,
       commander: commanderZone,
       hand: zone(you.id, 'hand').map((c) => ({ name: c.cardData.name, cost: c.cardData.manaCost, type: shortType(c.cardData.typeLine), oracle: c.cardData.oracleText })),
-      battlefield: yourBf.map((c) => ({ name: c.cardData.name, type: shortType(c.cardData.typeLine), tapped: c.tapped, pt: pt(c) })),
+      battlefield: yourBf.map((c) => ({ name: c.cardData.name, type: shortType(c.cardData.typeLine), tapped: c.tapped, pt: pt(c), text: /land/i.test(c.cardData.typeLine) ? undefined : c.cardData.oracleText.replace(/\s+/g, ' ').slice(0, 140) })),
       graveyard: zone(you.id, 'graveyard').map((c) => c.cardData.name),
       libraryCount: state.zones.get(`${you.id}:library`)?.cards.length ?? 0,
       manaAvailable: yourBf.filter((c) => !c.tapped && /land/i.test(c.cardData.typeLine)).length + Object.values(you.manaPool).reduce((s, n) => s + n, 0),

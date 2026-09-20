@@ -111,7 +111,7 @@ export async function POST(request: Request) {
     model: config.archivistModel,
     messages,
     max_tokens: json ? 900 : 700,
-    temperature: json ? 0.4 : 0.7,
+    temperature: json ? 0.3 : 0.5,
     stream: true,
     stream_options: { include_usage: true },
     ...(json ? { response_format: { type: 'json_object' } } : {}),
