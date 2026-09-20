@@ -180,13 +180,13 @@ export interface ForgeGameStoreState {
     commander?: string;
     playerName?: string;
     aiCount?: number;
-    aiDecks?: Array<{ deckList: string[]; commander?: string }>;
+    aiDecks?: Array<{ deckList: string[]; commander?: string; name?: string }>;
   } | null;
 
   // Actions
   connect: (serverUrl: string) => Promise<void>;
   disconnect: () => void;
-  startGame: (deckList: string[], commander?: string, playerName?: string, aiCount?: number, aiDecks?: Array<{ deckList: string[]; commander?: string }>) => void;
+  startGame: (deckList: string[], commander?: string, playerName?: string, aiCount?: number, aiDecks?: Array<{ deckList: string[]; commander?: string; name?: string }>) => void;
   respondToChoice: (requestId: string, payload: Record<string, unknown>) => void;
   concede: () => void;
   setPendingAbilitySelection: (selection: PendingAbilitySelection | null) => void;

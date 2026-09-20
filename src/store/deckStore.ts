@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import {
   loadDecks,
+  loadVaultProfile,
   saveDeck,
+  saveShelves,
   updateDeckInFirestore,
   deleteDeckFromFirestore,
 } from '@/lib/firebase/firestore';
+import type { Plan } from '@/lib/entitlements';
 
 export interface DeckEntry {
   cardName: string;
@@ -15,6 +18,22 @@ export interface DeckEntry {
   forgeName?: string;       // Forge-compatible name if different from cardName (e.g., reprint → original)
   forgeResolved?: boolean;  // Whether the card (or its equivalent) exists in Forge's database
 }
+
+/**
+ * A shelf in the vault. Decks are filed on at most one shelf; a deck with no shelf sits in
+ * the open. Shelves are the app's folders — one level, no nesting, because nobody needs a
+ * tree to hold a dozen Commander decks and the word "folder" does not belong in a crypt.
+ */
+export interface Shelf {
+  id: string;
+  name: string;
+  /** Accent for the shelf's label: one of the five colours, or gold for neutral. */
+  accent: ShelfAccent;
+  createdAt: number;
+}
+
+export type ShelfAccent = 'W' | 'U' | 'B' | 'R' | 'G' | 'gold';
+export const SHELF_ACCENTS: readonly ShelfAccent[] = ['gold', 'W', 'U', 'B', 'R', 'G'];
 
 export interface Deck {
   id: string;
@@ -27,10 +46,15 @@ export interface Deck {
   totalCards: number;
   createdAt: number;
   updatedAt: number;
+  /** Shelf the deck is filed on, or null/undefined for none. */
+  shelfId?: string | null;
 }
 
 interface DeckStore {
   decks: Deck[];
+  shelves: Shelf[];
+  /** Subscription plan from the profile document. Read-only here; see lib/entitlements. */
+  plan: Plan;
   activeDeckId: string | null;
   syncedUserId: string | null;
   isSyncing: boolean;
@@ -43,10 +67,29 @@ interface DeckStore {
   setActiveDeck: (id: string | null) => void;
   importDeckFromText: (text: string, name: string) => Deck;
 
+  // Shelves
+  addShelf: (name: string, accent?: ShelfAccent) => Shelf;
+  renameShelf: (id: string, name: string, accent?: ShelfAccent) => void;
+  /** Removes the shelf; its decks are left in the open, not deleted. */
+  removeShelf: (id: string) => void;
+  moveDeckToShelf: (deckId: string, shelfId: string | null) => void;
+
   // Firestore sync
   loadFromFirestore: (uid: string) => Promise<void>;
   syncDeckToFirestore: (deck: Deck) => Promise<void>;
   clearSync: () => void;
+}
+
+/** Sum of quantities — the number the deck legality rules care about. */
+export function countCards(cards: DeckEntry[]): number {
+  return cards.reduce((sum, c) => sum + c.quantity, 0);
+}
+
+/** Recompute the derived counts after the card list changes. */
+export function deckTotals(cards: DeckEntry[]): Pick<Deck, 'totalCards' | 'resolvedCount' | 'unresolvedCount'> {
+  const resolvedCount = cards.filter((c) => c.resolved).length;
+  const unresolvedCount = new Set(cards.filter((c) => c.resolved === false).map((c) => c.cardName)).size;
+  return { totalCards: countCards(cards), resolvedCount, unresolvedCount };
 }
 
 /**
@@ -162,8 +205,12 @@ function cleanCardName(input: string): string {
     .trim();
 }
 
+const newId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
 export const useDeckStore = create<DeckStore>((set, get) => ({
   decks: [],
+  shelves: [],
+  plan: 'free',
   activeDeckId: null,
   syncedUserId: null,
   syncFailed: false,
@@ -206,22 +253,54 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   importDeckFromText: (text, name) => {
     const { cards, commanderName } = parseDecklist(text);
 
-    const totalCards = cards.reduce((s, c) => s + c.quantity, 0);
     const deck: Deck = {
-      id: `deck_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: newId('deck'),
       name,
       commanderName,
       cards,
       format: 'commander',
       resolvedCount: 0,
       unresolvedCount: 0,
-      totalCards,
+      totalCards: countCards(cards),
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      shelfId: null,
     };
 
     get().addDeck(deck);
     return deck;
+  },
+
+  // ─── Shelves ────────────────────────────────────────
+
+  addShelf: (name, accent = 'gold') => {
+    const shelf: Shelf = { id: newId('shelf'), name: name.trim() || 'Untitled shelf', accent, createdAt: Date.now() };
+    const shelves = [...get().shelves, shelf];
+    set({ shelves });
+    persistShelves(get().syncedUserId, shelves);
+    return shelf;
+  },
+
+  renameShelf: (id, name, accent) => {
+    const shelves = get().shelves.map((s) =>
+      s.id === id ? { ...s, name: name.trim() || s.name, accent: accent ?? s.accent } : s
+    );
+    set({ shelves });
+    persistShelves(get().syncedUserId, shelves);
+  },
+
+  removeShelf: (id) => {
+    const shelves = get().shelves.filter((s) => s.id !== id);
+    set({ shelves });
+    persistShelves(get().syncedUserId, shelves);
+    // Decks on the shelf go back to the open. Each is its own document, so each is its own write.
+    for (const deck of get().decks) {
+      if (deck.shelfId === id) get().moveDeckToShelf(deck.id, null);
+    }
+  },
+
+  moveDeckToShelf: (deckId, shelfId) => {
+    get().updateDeck(deckId, { shelfId });
   },
 
   // ─── Firestore Sync ─────────────────────────────────
@@ -232,22 +311,22 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     // so clearSync does not run) could leave the previous user's decks on screen.
     const { syncedUserId: previousUid } = get();
     if (previousUid && previousUid !== uid) {
-      set({ decks: [], activeDeckId: null });
+      set({ decks: [], shelves: [], plan: 'free', activeDeckId: null });
     }
 
     set({ isSyncing: true, syncedUserId: uid, syncFailed: false });
     try {
-      const decks = await loadDecks(uid);
+      const [decks, profile] = await Promise.all([loadDecks(uid), loadVaultProfile(uid)]);
       // A fast A -> B switch can let A's request resolve after B's. Applying it would show B
       // another user's decks, and any later edit would write them into B's account.
       if (get().syncedUserId !== uid) return;
-      set({ decks, isSyncing: false, syncFailed: false });
+      set({ decks, shelves: profile.shelves, plan: profile.plan, isSyncing: false, syncFailed: false });
     } catch (error) {
       console.error('Failed to load decks from Firestore:', error);
       if (get().syncedUserId !== uid) return;
       // Never fall back to stale data on failure — an empty list is wrong but safe, whereas
       // the previous account's decks are wrong AND get written to this account on any edit.
-      set({ decks: [], activeDeckId: null, isSyncing: false, syncFailed: true });
+      set({ decks: [], shelves: [], activeDeckId: null, isSyncing: false, syncFailed: true });
     }
   },
 
@@ -262,6 +341,11 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
   },
 
   clearSync: () => {
-    set({ syncedUserId: null, decks: [], activeDeckId: null, syncFailed: false });
+    set({ syncedUserId: null, decks: [], shelves: [], plan: 'free', activeDeckId: null, syncFailed: false });
   },
 }));
+
+function persistShelves(uid: string | null, shelves: Shelf[]) {
+  if (!uid) return;
+  saveShelves(uid, shelves).catch(console.error);
+}

@@ -49,7 +49,7 @@ npm run screenshot            # writes to ./screenshots
 | Framework | Next.js 16 (App Router), React 19, TypeScript |
 | UI | Tailwind v4, shadcn/ui, Framer Motion, Lucide icons |
 | Auth | Firebase Authentication (Google OAuth) |
-| Data | Cloud Firestore — `users/{uid}/decks` per player, a shared `cards` collection of Scryfall data |
+| Data | Cloud Firestore — `users/{uid}/decks` per player (shelves and plan on `users/{uid}`), a shared `cards` collection of Scryfall data |
 | Rules engine | Forge, headless, on a Java WebSocket bridge (separate repo) |
 | AI opponents | Forge's own AI |
 | Hosting | Vercel (frontend), Railway (game server) |
@@ -58,6 +58,33 @@ The client keeps no rules logic. It renders state snapshots the server pushes an
 decisions the server asks for (`src/lib/forgeClient.ts` → `src/store/forgeGameStore.ts` →
 `src/lib/forgeStateAdapter.ts` → the game components).
 
+## The vault
+
+Decks live in **the vault** (`/decks`). Each deck has its own page (`/decks/{id}`) that shows
+every card as itself — scans from the shared card collection, grouped by type, with a reader
+for rules text — plus colour identity, a mana curve and the deck's verification status.
+Editing is a mode on that page: quantities, removals, an add-card search, renaming, choosing
+the commander, or replacing the whole list as text. Every edit saves as it happens and
+re-verifies the changed cards against the card database and the Forge engine, the same
+pipeline import uses (`src/lib/deckCards.ts`).
+
+**Shelves** are the vault's folders: one level, a name and an accent colour, filed on the
+player's profile document. A deck sits on at most one shelf.
+
+**Opponent decks.** On the game setup screen each AI seat can play a random house deck (the
+default), a specific house deck, or any vault deck with a commander — including the one you
+are about to play, if a mirror match is the test. `src/lib/opponentDecks.ts` resolves the
+choices into `start_game` payloads; the server names each AI seat after its deck.
+
+## Plans and paywalls
+
+Nothing is paid yet, but the seam is in: `src/lib/entitlements.ts` is the single price list
+(`FEATURES`, `LIMITS`) and `useEntitlements()` is what a screen asks before showing a gated
+control. Deck editing, shelves, custom opponent decks, the deck cap and the four-player pod all
+go through it. `ENFORCE_ENTITLEMENTS` is the launch switch: while it is `false` every gate
+answers yes. A player's plan is read from `users/{uid}.plan`, which the Firestore rules forbid
+the client from writing — only a billing webhook with admin credentials may set it.
+
 ## Project Structure
 
 ```
@@ -65,10 +92,11 @@ src/
 ├── app/               # Routes: landing/dashboard, decks, game setup, game board, admin, dev
 ├── components/
 │   ├── brand/         # Keystone, Arch, Alcove — the Undercroft visual identity
+│   ├── decks/         # Deck page, card tiles, reader, add-card search, shelves
 │   ├── game/          # Board, seats, cards, hand, prompts
 │   └── ui/            # shadcn primitives
-├── hooks/             # useFitToRow (size cards to their row), useMediaQuery, Firestore sync
-├── lib/               # Forge client + adapter, game-log synthesiser, motion presets, Firebase
+├── hooks/             # useFitToRow, useCardRecords, useEntitlements, useMediaQuery, Firestore sync
+├── lib/               # Forge client + adapter, deck cards + verification, opponent decks, entitlements
 ├── store/             # Zustand: decks, settings, game state
 └── dev/               # Mock game and mock decks for the development harness
 scripts/               # Tests, protocol check, card sync, screenshot sweep
@@ -83,6 +111,7 @@ npm run check:protocol    # every server prompt has a renderer and matching resp
 npm run test:parser       # decklist parser
 npm run test:events       # game-log synthesiser
 npm run test:sync         # Scryfall → Firestore sync helpers
+npm run test:deck         # deck grouping/stats, opponent seat resolution, entitlement gates
 npx next build
 ```
 

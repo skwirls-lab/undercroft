@@ -306,7 +306,7 @@ function Dashboard() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {recent.map((deck) => (
                 <motion.div key={deck.id} variants={rise}>
-                  <Link href="/game" className="group block">
+                  <Link href={`/decks/${encodeURIComponent(deck.id)}`} className="group block">
                     <Alcove flat className="flex items-center gap-3 p-3 transition-colors group-hover:border-gold/30">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-gold">
                         <Crown className="h-5 w-5" />

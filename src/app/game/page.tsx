@@ -1,23 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { useDeckStore } from '@/store/deckStore';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useDeckStore, type Deck } from '@/store/deckStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { FORGE_SERVER_URL, prewarmForgeServer } from '@/lib/forgeConfig';
-import { pickRandomAIDeck, aiDeckToForgeFormat } from '@/lib/aiDecks';
-import { Swords, Bot, Loader2, AlertCircle, WifiOff } from 'lucide-react';
+import { AI_DECKS } from '@/lib/aiDecks';
+import { SURPRISE, describeChoice, resolveOpponents, vaultDeckPlayableByAI, vaultDeckToForge, type OpponentChoice } from '@/lib/opponentDecks';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { useCardRecords } from '@/hooks/useCardRecords';
+import { frontFace } from '@/lib/deckCards';
+import { Swords, Bot, Loader2, AlertCircle, WifiOff, Crown, Check, Dices, Library, Lock, ChevronRight } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Alcove, Eyebrow } from '@/components/brand/Alcove';
 import { Keystone } from '@/components/brand/Keystone';
+import { ManaSymbol } from '@/components/game/ManaSymbol';
 import { cn } from '@/lib/utils';
-import { Crown, Check } from 'lucide-react';
-
-/**
- * Forge game client for WebSocket communication.
- */
 
 /**
  * Build a simple Goblin demo deck string list - Krenko + lands + goblins
@@ -29,44 +31,41 @@ function buildGoblinDemo(): string[] {
   return [...base, ...Array(38).fill('1 Mountain')];
 }
 
-/**
- * Convert a user deck from the store into the "N CardName" format.
- */
-function buildForgeDeck(deck: ReturnType<typeof useDeckStore.getState>['decks'][0]) {
-  const deckList: string[] = [];
-  let commander: string | undefined;
-
-  if (deck.commanderName) {
-    commander = deck.commanderName;
-  }
-
-  for (const entry of deck.cards) {
-    // Skip the commander line if it's also in the main list
-    if (commander && entry.cardName === commander) continue;
-    // Use forgeName if the card needed a substitution (e.g., reprint → original)
-    const name = entry.forgeName || entry.cardName;
-    deckList.push(`${entry.quantity} ${name}`);
-  }
-
-  return { deckList, commander };
-}
-
 export default function GameSetupPage() {
-  return <AuthGuard><GameSetupContent /></AuthGuard>;
+  return (
+    <AuthGuard>
+      <Suspense fallback={null}>
+        <GameSetupContent />
+      </Suspense>
+    </AuthGuard>
+  );
 }
 
 function GameSetupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { decks, isSyncing } = useDeckStore();
   const { connect, startGame, connectionStatus } = useForgeGameStore();
-  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const { can } = useEntitlements();
+
+  // `?deck=` arrives from a deck's Play button. It preselects; the player can still change it.
+  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(() => searchParams.get('deck'));
   const [aiCount, setAiCount] = useState(1);
+  const [opponents, setOpponents] = useState<OpponentChoice[]>([SURPRISE, SURPRISE, SURPRISE]);
+  const [pickerSeat, setPickerSeat] = useState<number | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [connectPhase, setConnectPhase] = useState('Connecting...');
+
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
   // While decks are still loading from Firestore we must not treat "none" as "none exist".
-  const canStart = selectedDeckId !== null || (decks.length === 0 && !isSyncing);
+  const canStart = !!selectedDeck || (decks.length === 0 && !isSyncing);
+  const canCustomOpponents = can('ai.customDecks');
+  const canFourPlayer = can('game.fourPlayer');
+
+  const commanderNames = useMemo(() => decks.map((d) => d.commanderName).filter(Boolean), [decks]);
+  const { records } = useCardRecords(commanderNames);
+  const artFor = (deck: Deck) => (deck.commanderName && records.get(deck.commanderName) ? frontFace(records.get(deck.commanderName)!).art : undefined);
 
   // The Forge server sleeps when idle on Railway. Nudge it awake as soon as the player reaches
   // this screen so the container is usually warm by the time they press Start.
@@ -87,31 +86,19 @@ function GameSetupContent() {
         await connect(FORGE_SERVER_URL);
       }
 
-      const usedNames: string[] = [];
-      const aiDecks = Array.from({ length: aiCount }, () => {
-        const picked = pickRandomAIDeck(usedNames);
-        usedNames.push(picked.name);
-        return aiDeckToForgeFormat(picked);
-      });
+      const aiDecks = resolveOpponents(opponents.slice(0, aiCount), decks);
 
-      let allDecks: Array<{ deckList: string[]; commander?: string }>;
+      let playerDeck: { deckList: string[]; commander?: string };
       if (selectedDeck) {
-        allDecks = [buildForgeDeck(selectedDeck), ...aiDecks];
+        playerDeck = vaultDeckToForge(selectedDeck);
       } else if (decks.length === 0) {
-        allDecks = [{ deckList: buildGoblinDemo(), commander: 'Krenko, Mob Boss' }, ...aiDecks];
+        playerDeck = { deckList: buildGoblinDemo(), commander: 'Krenko, Mob Boss' };
       } else {
         throw new Error('Please select a deck to continue.');
       }
 
       setConnectPhase('Dealing opening hands...');
-      const playerDeck = allDecks[0];
-      startGame(
-        playerDeck.deckList,
-        playerDeck.commander ?? undefined,
-        'Player',
-        aiCount,
-        allDecks.slice(1),
-      );
+      startGame(playerDeck.deckList, playerDeck.commander ?? undefined, 'Player', aiCount, aiDecks);
       setTimeout(() => router.push('/game/forge'), 500);
     } catch (e) {
       setStartError(e instanceof Error ? e.message : 'Failed to connect to game server.');
@@ -120,7 +107,7 @@ function GameSetupContent() {
       clearTimeout(slow);
       clearTimeout(slower);
     }
-  }, [aiCount, connect, connectionStatus, decks.length, router, selectedDeck, startGame]);
+  }, [aiCount, connect, connectionStatus, decks, opponents, router, selectedDeck, startGame]);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -151,6 +138,7 @@ function GameSetupContent() {
                 const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
                 const fullyResolved = hasResolution && deck.unresolvedCount === 0;
                 const selected = selectedDeckId === deck.id;
+                const art = artFor(deck);
                 return (
                   <button
                     key={deck.id}
@@ -158,14 +146,15 @@ function GameSetupContent() {
                     aria-checked={selected}
                     onClick={() => setSelectedDeckId(deck.id)}
                     className={cn(
-                      'flex items-center gap-3 rounded-xl border p-3 text-left transition-all',
+                      'relative flex items-center gap-3 overflow-hidden rounded-xl border p-3 text-left transition-all',
                       selected
                         ? 'border-gold/60 bg-gold/[0.07] shadow-[0_0_24px_var(--gold-glow-soft)]'
                         : 'border-border/50 hover:border-border hover:bg-card/60'
                     )}
                   >
-                    <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1', selected ? 'bg-gold text-gold-foreground ring-gold/60' : 'bg-gold/10 text-gold ring-gold/20')}>
-                      {selected ? <Check className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
+                    <div className={cn('relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ring-1', selected ? 'bg-gold text-gold-foreground ring-gold/60' : 'bg-gold/10 text-gold ring-gold/20')}>
+                      {art && !selected && <Image src={art} alt="" fill sizes="40px" className="object-cover opacity-80" unoptimized />}
+                      <span className="relative">{selected ? <Check className="h-5 w-5" /> : art ? null : <Crown className="h-5 w-5" />}</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">{deck.name}</p>
@@ -191,25 +180,67 @@ function GameSetupContent() {
           <Eyebrow className="mx-1 mb-4">Opponents</Eyebrow>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex rounded-xl border border-border/50 bg-background/40 p-1" role="radiogroup" aria-label="Number of AI opponents">
-              {[1, 2, 3].map((count) => (
-                <button
-                  key={count}
-                  role="radio"
-                  aria-checked={aiCount === count}
-                  onClick={() => setAiCount(count)}
-                  className={cn(
-                    'flex h-11 w-14 items-center justify-center rounded-lg font-display text-xl font-bold transition-all',
-                    aiCount === count ? 'bg-gold text-gold-foreground shadow-[0_0_20px_var(--gold-glow)]' : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {count}
-                </button>
-              ))}
+              {[1, 2, 3].map((count) => {
+                const locked = count === 3 && !canFourPlayer;
+                return (
+                  <button
+                    key={count}
+                    role="radio"
+                    aria-checked={aiCount === count}
+                    disabled={locked}
+                    title={locked ? 'Four-player pods are a Patron feature' : undefined}
+                    onClick={() => setAiCount(count)}
+                    className={cn(
+                      'flex h-11 w-14 items-center justify-center rounded-lg font-display text-xl font-bold transition-all',
+                      aiCount === count ? 'bg-gold text-gold-foreground shadow-[0_0_20px_var(--gold-glow)]' : 'text-muted-foreground hover:text-foreground',
+                      locked && 'opacity-40'
+                    )}
+                  >
+                    {locked ? <Lock className="h-4 w-4" /> : count}
+                  </button>
+                );
+              })}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Bot className="h-4 w-4 text-gold/70" />
               {aiCount === 1 ? 'Head to head' : aiCount === 2 ? 'Three-player pod' : 'Full four-player pod'}
             </div>
+          </div>
+
+          {/* One row per seat: what it plays, and a way to change it */}
+          <div className="mt-4 grid gap-2">
+            {Array.from({ length: aiCount }, (_, i) => {
+              const choice = opponents[i];
+              const desc = describeChoice(choice, decks);
+              const vaultDeck = choice.kind === 'vault' ? decks.find((d) => d.id === choice.deckId) : undefined;
+              const art = vaultDeck ? artFor(vaultDeck) : undefined;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => canCustomOpponents && setPickerSeat(i)}
+                  disabled={!canCustomOpponents}
+                  title={canCustomOpponents ? undefined : 'Choosing opponent decks is a Patron feature'}
+                  data-dev-seat={i}
+                  className="group flex items-center gap-3 rounded-xl border border-border/50 p-3 text-left transition-all hover:border-gold/40 hover:bg-card/60 disabled:cursor-not-allowed disabled:hover:border-border/50 disabled:hover:bg-transparent"
+                >
+                  <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/40 text-muted-foreground ring-1 ring-border/60">
+                    {art && <Image src={art} alt="" fill sizes="40px" className="object-cover opacity-80" unoptimized />}
+                    {!art && (choice.kind === 'surprise' ? <Dices className="h-5 w-5" /> : <Bot className="h-5 w-5" />)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Opponent {i + 1}</p>
+                    <p className="truncate font-semibold">{desc.title}</p>
+                    <p className="truncate text-sm text-muted-foreground">{desc.subtitle}</p>
+                  </div>
+                  {canCustomOpponents ? (
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-gold opacity-80 transition-opacity group-hover:opacity-100">Change <ChevronRight className="h-3.5 w-3.5" /></span>
+                  ) : (
+                    <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </Alcove>
 
@@ -248,6 +279,124 @@ function GameSetupContent() {
           <p className="text-center text-xs text-muted-foreground">No deck selected — a demo deck will be used.</p>
         )}
       </main>
+
+      <OpponentPicker
+        seat={pickerSeat}
+        current={pickerSeat !== null ? opponents[pickerSeat] : null}
+        vault={decks}
+        artFor={artFor}
+        onClose={() => setPickerSeat(null)}
+        onPick={(choice) => {
+          if (pickerSeat === null) return;
+          setOpponents((prev) => prev.map((c, i) => (i === pickerSeat ? choice : c)));
+          setPickerSeat(null);
+        }}
+      />
     </div>
+  );
+}
+
+// ─── Opponent picker ─────────────────────────────────────────────────────────
+
+interface OpponentPickerProps {
+  seat: number | null;
+  current: OpponentChoice | null;
+  vault: Deck[];
+  artFor: (deck: Deck) => string | undefined;
+  onClose: () => void;
+  onPick: (choice: OpponentChoice) => void;
+}
+
+/**
+ * What one AI seat plays. Three sections: leave it to chance, one of the house decks, or a
+ * deck from the vault — including the one you are about to play, if a mirror is the test.
+ */
+function OpponentPicker({ seat, current, vault, artFor, onClose, onPick }: OpponentPickerProps) {
+  const playable = vault.filter(vaultDeckPlayableByAI);
+  const unplayable = vault.length - playable.length;
+  const isCurrent = (c: OpponentChoice) =>
+    !!current && current.kind === c.kind &&
+    (c.kind === 'surprise' || (c.kind === 'house' && current.kind === 'house' && current.name === c.name) || (c.kind === 'vault' && current.kind === 'vault' && current.deckId === c.deckId));
+
+  return (
+    <Dialog open={seat !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" data-dev-picker>
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">Opponent {seat !== null ? seat + 1 : ''} plays…</DialogTitle>
+          <DialogDescription>Test your brew against a known matchup, or let the dice decide.</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex min-w-0 flex-col gap-5">
+          <PickRow
+            icon={<Dices className="h-5 w-5" />}
+            title="Surprise me"
+            subtitle="A random house deck, different from the other seats"
+            selected={isCurrent(SURPRISE)}
+            onClick={() => onPick(SURPRISE)}
+          />
+
+          <section className="flex flex-col gap-2">
+            <Eyebrow>House decks</Eyebrow>
+            {AI_DECKS.map((d) => (
+              <PickRow
+                key={d.name}
+                icon={<span className="flex items-center gap-0.5">{d.colors.split('').map((c) => <ManaSymbol key={c} symbol={c} size="sm" />)}</span>}
+                title={d.name}
+                subtitle={`${d.commander} — ${d.strategy}`}
+                selected={isCurrent({ kind: 'house', name: d.name })}
+                onClick={() => onPick({ kind: 'house', name: d.name })}
+              />
+            ))}
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <Eyebrow>Your vault</Eyebrow>
+            {playable.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border/60 px-4 py-5 text-center text-sm text-muted-foreground">
+                {vault.length === 0 ? 'No decks in the vault yet.' : 'A deck needs a commander before an AI can pilot it.'}
+              </p>
+            ) : (
+              playable.map((d) => (
+                <PickRow
+                  key={d.id}
+                  art={artFor(d)}
+                  icon={<Library className="h-5 w-5" />}
+                  title={d.name}
+                  subtitle={`${d.commanderName} · ${d.totalCards || d.cards.reduce((s, c) => s + c.quantity, 0)} cards${d.unresolvedCount > 0 ? ` · ${d.unresolvedCount} unresolved` : ''}`}
+                  selected={isCurrent({ kind: 'vault', deckId: d.id })}
+                  onClick={() => onPick({ kind: 'vault', deckId: d.id })}
+                />
+              ))
+            )}
+            {unplayable > 0 && playable.length > 0 && (
+              <p className="px-1 text-xs text-muted-foreground">{unplayable} deck{unplayable === 1 ? '' : 's'} hidden: no commander set.</p>
+            )}
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PickRow({ icon, art, title, subtitle, selected, onClick }: { icon: React.ReactNode; art?: string; title: string; subtitle: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        'flex w-full min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-all',
+        selected ? 'border-gold/60 bg-gold/[0.07] shadow-[0_0_20px_var(--gold-glow-soft)]' : 'border-border/50 hover:border-gold/40 hover:bg-card/60'
+      )}
+    >
+      <div className={cn('relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ring-1', selected ? 'bg-gold text-gold-foreground ring-gold/60' : 'bg-muted/40 text-muted-foreground ring-border/60')}>
+        {art && !selected && <Image src={art} alt="" fill sizes="40px" className="object-cover opacity-80" unoptimized />}
+        <span className="relative">{selected ? <Check className="h-5 w-5" /> : art ? null : icon}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-foreground">{title}</p>
+        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+      </div>
+    </button>
   );
 }

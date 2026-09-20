@@ -31,9 +31,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // User profiles — users can read/write their own profile
+    // User profiles — users can read/write their own profile. The profile also carries the
+    // vault's shelves (a small array) and, one day, `plan`: the subscription tier. `plan` is
+    // set only by a billing webhook with admin credentials, never by the app, so a client
+    // write that touches it is refused. Nothing enforces plans yet (see
+    // src/lib/entitlements.ts), but the rule is in place so flipping enforcement on cannot
+    // be undone from the browser console.
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && !('plan' in request.resource.data);
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan']);
+      allow delete: if isOwner(userId);
     }
 
     // User's decks — users can read/write their own decks

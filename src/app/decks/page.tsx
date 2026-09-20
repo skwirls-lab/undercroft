@@ -1,160 +1,88 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { useDeckStore, type DeckEntry } from '@/store/deckStore';
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useDeckStore, type Deck, type Shelf, type ShelfAccent } from '@/store/deckStore';
 import { useAuth } from '@/lib/firebase/auth';
+import { useCardRecords } from '@/hooks/useCardRecords';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { verifyEntries, frontFace, type VerifyReport } from '@/lib/deckCards';
 import {
-
-  Plus,
-  Trash2,
-  Upload,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Search,
-  Cloud,
-  CloudOff,
-  LogIn,
+  Plus, Trash2, Upload, Loader2, CheckCircle2, AlertCircle, Cloud, CloudOff, LogIn, Crown, MoreHorizontal, Library, Pencil, Lock,
 } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Alcove, Eyebrow } from '@/components/brand/Alcove';
-import { motion } from 'framer-motion';
+import { AccentDot, ShelfChip, ShelfDialog } from '@/components/decks/Shelves';
 import { rise, riseStagger } from '@/lib/motion';
-import { Crown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function DecksPage() {
   return <AuthGuard><DecksContent /></AuthGuard>;
 }
 
+type Filter = 'all' | 'open' | string;
+
 function DecksContent() {
-  const { decks, removeDeck, importDeckFromText, updateDeck, isSyncing, syncedUserId, syncFailed, loadFromFirestore } = useDeckStore();
+  const {
+    decks, shelves, removeDeck, importDeckFromText, updateDeck, moveDeckToShelf, addShelf, renameShelf, removeShelf,
+    isSyncing, syncedUserId, syncFailed, loadFromFirestore,
+  } = useDeckStore();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  const { can, limit } = useEntitlements();
+
+  const [filter, setFilter] = useState<Filter>('all');
+  const [shelfDialog, setShelfDialog] = useState<{ open: boolean; shelf: Shelf | null }>({ open: false, shelf: null });
+
+  // Import dialog
   const [importOpen, setImportOpen] = useState(false);
   const [deckName, setDeckName] = useState('');
   const [deckText, setDeckText] = useState('');
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{
-    resolved: number;
-    unresolved: string[];
-    forgeSubstituted: Array<{ original: string; forgeName: string }>;
-    forgeUnresolvable: string[];
-    total: number;
-  } | null>(null);
-  const [importStep, setImportStep] = useState<string>('');
+  const [importStep, setImportStep] = useState('');
+  const [importResult, setImportResult] = useState<VerifyReport | null>(null);
+
+  const maxDecks = limit('vault.maxDecks');
+  const atDeckLimit = decks.length >= maxDecks;
+  const canShelve = can('vault.shelves');
+
+  const commanderNames = useMemo(() => decks.map((d) => d.commanderName).filter(Boolean), [decks]);
+  const { records } = useCardRecords(commanderNames);
+
+  const currentShelf = shelves.find((s) => s.id === filter) ?? null;
+  const visible = useMemo(() => {
+    const sorted = [...decks].sort((a, b) => b.updatedAt - a.updatedAt);
+    if (filter === 'all') return sorted;
+    if (filter === 'open') return sorted.filter((d) => !d.shelfId);
+    return sorted.filter((d) => d.shelfId === filter);
+  }, [decks, filter]);
+  const openCount = decks.filter((d) => !d.shelfId).length;
 
   const handleImport = useCallback(async () => {
     if (!deckName.trim() || !deckText.trim()) return;
     setImporting(true);
     setImportResult(null);
-
     try {
-      // Step 1: Parse and create the deck
       setImportStep('Parsing decklist…');
       const deck = importDeckFromText(deckText, deckName);
-
-      // Step 2: Resolve card names against Firestore/Scryfall
-      setImportStep('Resolving cards in Scryfall…');
-      const { resolveCardNames } = await import('@/lib/firebase/cards');
-      const uniqueNames = [...new Set(deck.cards.map((c) => c.cardName))];
-      const resolved = await resolveCardNames(uniqueNames);
-
-      // Build initial card entries with Scryfall resolution
-      let updatedCards: DeckEntry[] = deck.cards.map((entry) => {
-        const card = resolved.get(entry.cardName);
-        return {
-          ...entry,
-          resolved: card !== null && card !== undefined,
-          scryfallId: card?.id,
-          oracleId: card?.oracle_id,
-        };
-      });
-
-      const resolvedCount = updatedCards.filter((c) => c.resolved).length;
-      const unresolvedNames = [...new Set(updatedCards.filter((c) => !c.resolved).map((c) => c.cardName))];
-
-      // Step 3: Check resolved cards against Forge
-      setImportStep('Verifying cards in Forge engine…');
-      const { resolveCardsForForge } = await import('@/lib/forgeCardCheck');
-      const cardsForForge = updatedCards
-        .filter((c) => c.resolved)
-        .map((c) => ({ cardName: c.cardName, oracleId: c.oracleId }));
-
-      const forgeResult = await resolveCardsForForge(cardsForForge);
-
-      // Update cards with Forge resolution status
-      const substitutedEntries: Array<{ original: string; forgeName: string }> = [];
-      updatedCards = updatedCards.map((entry) => {
-        if (!entry.resolved) {
-          return { ...entry, forgeResolved: false };
-        }
-        if (forgeResult.direct.includes(entry.cardName)) {
-          return { ...entry, forgeResolved: true };
-        }
-        const forgeName = forgeResult.substituted.get(entry.cardName);
-        if (forgeName) {
-          if (!substitutedEntries.find((s) => s.original === entry.cardName)) {
-            substitutedEntries.push({ original: entry.cardName, forgeName });
-          }
-          return { ...entry, forgeResolved: true, forgeName };
-        }
-        return { ...entry, forgeResolved: false };
-      });
-
-      updateDeck(deck.id, {
-        cards: updatedCards,
-        resolvedCount,
-        unresolvedCount: unresolvedNames.length,
-      });
-
-      setImportResult({
-        resolved: resolvedCount,
-        unresolved: unresolvedNames,
-        forgeSubstituted: substitutedEntries,
-        forgeUnresolvable: forgeResult.unresolvable,
-        total: updatedCards.length,
-      });
+      if (currentShelf) moveDeckToShelf(deck.id, currentShelf.id);
+      setImportStep('Resolving cards…');
+      const report = await verifyEntries(deck.cards);
+      updateDeck(deck.id, { cards: report.cards, resolvedCount: report.resolved, unresolvedCount: report.unresolved.length });
+      setImportResult(report);
     } finally {
       setImporting(false);
       setImportStep('');
     }
-  }, [deckName, deckText, importDeckFromText, updateDeck]);
-
-  const handleResolve = useCallback(async (deckId: string) => {
-    const deck = decks.find((d) => d.id === deckId);
-    if (!deck) return;
-
-    const { resolveCardNames } = await import('@/lib/firebase/cards');
-    const uniqueNames = [...new Set(deck.cards.map((c) => c.cardName))];
-    const resolved = await resolveCardNames(uniqueNames);
-
-    const updatedCards: DeckEntry[] = deck.cards.map((entry) => {
-      const card = resolved.get(entry.cardName);
-      return {
-        ...entry,
-        resolved: card !== null && card !== undefined,
-        scryfallId: card?.id,
-      };
-    });
-
-    const resolvedCount = updatedCards.filter((c) => c.resolved).length;
-    const unresolvedNames = [...new Set(updatedCards.filter((c) => !c.resolved).map((c) => c.cardName))];
-
-    updateDeck(deckId, {
-      cards: updatedCards,
-      resolvedCount,
-      unresolvedCount: unresolvedNames.length,
-    });
-  }, [decks, updateDeck]);
+  }, [deckName, deckText, importDeckFromText, updateDeck, moveDeckToShelf, currentShelf]);
 
   const closeAndReset = () => {
     setImportOpen(false);
@@ -163,9 +91,14 @@ function DecksContent() {
     setImportResult(null);
   };
 
+  const saveShelf = (name: string, accent: ShelfAccent) => {
+    if (shelfDialog.shelf) renameShelf(shelfDialog.shelf.id, name, accent);
+    else { const s = addShelf(name, accent); setFilter(s.id); }
+  };
+
   return (
     <div className="flex flex-1 flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-end justify-between gap-4 px-5 pb-4 pt-8 sm:px-10 sm:pt-12">
+      <header className="mx-auto flex w-full max-w-6xl items-end justify-between gap-4 px-5 pb-4 pt-8 sm:px-10 sm:pt-12">
         <div className="flex flex-col gap-1.5">
           <p className="eyebrow">The vault</p>
           <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">My Decks</h1>
@@ -174,8 +107,8 @@ function DecksContent() {
         <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>
           <DialogTrigger
             render={
-              <Button size="sm" className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90">
-                <Plus className="h-4 w-4" />
+              <Button size="sm" disabled={atDeckLimit} title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100">
+                {atDeckLimit ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                 Import Deck
               </Button>
             }
@@ -189,77 +122,12 @@ function DecksContent() {
             </DialogHeader>
             <div className="flex flex-col gap-4">
               {importResult ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    {importResult.unresolved.length === 0 ? (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <span className="text-green-400">All {importResult.resolved} cards resolved in Scryfall.</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-5 w-5 text-amber-500" />
-                        <span>
-                          {importResult.resolved} of {importResult.total} cards resolved in Scryfall.{' '}
-                          {importResult.unresolved.length} not found.
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  {importResult.forgeSubstituted.length === 0 && importResult.forgeUnresolvable.length === 0 ? (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      <span className="text-green-400">All cards verified in Forge engine.</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-sm">
-                      <AlertCircle className="h-5 w-5 text-amber-500" />
-                      <span>
-                        Forge engine:{' '}
-                        {importResult.forgeSubstituted.length > 0 && `${importResult.forgeSubstituted.length} substituted`}
-                        {importResult.forgeSubstituted.length > 0 && importResult.forgeUnresolvable.length > 0 && ', '}
-                        {importResult.forgeUnresolvable.length > 0 && `${importResult.forgeUnresolvable.length} unavailable`}
-                      </span>
-                    </div>
-                  )}
-
-                  {importResult.unresolved.length > 0 && (
-                    <div className="max-h-28 overflow-y-auto rounded border border-border/30 bg-card/50 p-2">
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Not found in Scryfall:</p>
-                      {importResult.unresolved.map((name) => (
-                        <p key={name} className="text-xs text-destructive">{name}</p>
-                      ))}
-                    </div>
-                  )}
-
-                  {importResult.forgeSubstituted.length > 0 && (
-                    <div className="max-h-28 overflow-y-auto rounded border border-blue-500/20 bg-blue-500/5 p-2">
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-blue-400/70">Forge substitutions (reprints → originals):</p>
-                      {importResult.forgeSubstituted.map((sub) => (
-                        <p key={sub.original} className="text-xs text-blue-300">
-                          {sub.original} → <span className="font-medium text-blue-400">{sub.forgeName}</span>
-                        </p>
-                      ))}
-                    </div>
-                  )}
-
-                  {importResult.forgeUnresolvable.length > 0 && (
-                    <div className="max-h-28 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 p-2">
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-red-400/70">Not found in Forge (won&apos;t work in-game):</p>
-                      {importResult.forgeUnresolvable.map((name) => (
-                        <p key={name} className="text-xs text-red-400">{name}</p>
-                      ))}
-                    </div>
-                  )}
-
-                  <Button onClick={closeAndReset} className="bg-gold text-gold-foreground hover:bg-gold/90">Done</Button>
-                </div>
+                <ImportReport report={importResult} onDone={closeAndReset} />
               ) : (
                 <>
                   <div>
                     <Label htmlFor="deckName">Deck Name</Label>
-                    <Input id="deckName" placeholder="My Commander Deck" value={deckName} onChange={(e) => setDeckName(e.target.value)} />
+                    <Input id="deckName" placeholder="My Commander Deck" value={deckName} onChange={(e) => setDeckName(e.target.value)} className="mt-1" />
                   </div>
                   <div>
                     <Label htmlFor="deckText">Decklist (one card per line, e.g. &quot;1 Sol Ring&quot;)</Label>
@@ -270,18 +138,13 @@ function DecksContent() {
                       value={deckText}
                       onChange={(e) => setDeckText(e.target.value)}
                     />
-                    <p className="mt-1.5 text-xs text-muted-foreground">Moxfield, Archidekt, MTGGoldfish and plain-text exports all work.</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Moxfield, Archidekt, MTGGoldfish and plain-text exports all work.
+                      {currentShelf && <> Filed on <span className="text-foreground">{currentShelf.name}</span>.</>}
+                    </p>
                   </div>
-                  <Button
-                    onClick={handleImport}
-                    disabled={!deckName.trim() || !deckText.trim() || importing}
-                    className="gap-2 bg-gold text-gold-foreground hover:bg-gold/90"
-                  >
-                    {importing ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" />{importStep || 'Resolving cards...'}</>
-                    ) : (
-                      <><Upload className="h-4 w-4" />Import &amp; Resolve</>
-                    )}
+                  <Button onClick={handleImport} disabled={!deckName.trim() || !deckText.trim() || importing} className="gap-2 bg-gold text-gold-foreground hover:bg-gold/90">
+                    {importing ? <><Loader2 className="h-4 w-4 animate-spin" />{importStep || 'Resolving cards…'}</> : <><Upload className="h-4 w-4" />Import &amp; Resolve</>}
                   </Button>
                 </>
               )}
@@ -290,114 +153,233 @@ function DecksContent() {
         </Dialog>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl px-5 pb-10 sm:px-10">
+      <main className="mx-auto w-full max-w-6xl px-5 pb-10 sm:px-10">
         {/* Sync status */}
         {!authLoading && !user && (
           <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm text-amber-400">
-              <CloudOff className="h-4 w-4 shrink-0" />
-              <span>Sign in to save decks to the cloud</span>
-            </div>
-            <Button size="sm" variant="ghost" onClick={signInWithGoogle} className="gap-1 text-amber-400 hover:text-amber-300">
-              <LogIn className="h-3.5 w-3.5" />
-              Sign in
-            </Button>
+            <div className="flex items-center gap-2 text-sm text-amber-400"><CloudOff className="h-4 w-4 shrink-0" /><span>Sign in to save decks to the cloud</span></div>
+            <Button size="sm" variant="ghost" onClick={signInWithGoogle} className="gap-1 text-amber-400 hover:text-amber-300"><LogIn className="h-3.5 w-3.5" />Sign in</Button>
           </div>
         )}
         {isSyncing && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg border border-border/30 bg-card/30 px-4 py-3 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading your decks...
-          </div>
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-border/30 bg-card/30 px-4 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading your decks...</div>
         )}
         {user && syncedUserId && !isSyncing && syncFailed && (
           <div className="mb-4 flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             <div className="flex items-center gap-2">
               <CloudOff className="h-4 w-4 shrink-0" />
-              <span>
-                Couldn&apos;t load your decks. This list is empty because the load failed, not because you have no
-                decks — don&apos;t re-import yet.
-              </span>
+              <span>Couldn&apos;t load your decks. This list is empty because the load failed, not because you have no decks — don&apos;t re-import yet.</span>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => loadFromFirestore(syncedUserId)} className="shrink-0 gap-1 text-destructive hover:text-destructive">
-              Retry
-            </Button>
+            <Button size="sm" variant="ghost" onClick={() => loadFromFirestore(syncedUserId)} className="shrink-0 gap-1 text-destructive hover:text-destructive">Retry</Button>
           </div>
         )}
         {user && syncedUserId && !isSyncing && !syncFailed && (
           <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
             <Cloud className="h-3.5 w-3.5 text-gold/70" />
             Synced to cloud as {user.displayName || user.email}
+            {Number.isFinite(maxDecks) && <span className="ml-auto tabular-nums">{decks.length} / {maxDecks} decks</span>}
           </div>
         )}
 
         {decks.length === 0 && !isSyncing && !syncFailed ? (
           <Alcove className="flex flex-col items-center gap-4 px-6 pb-12 pt-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/20">
-              <Upload className="h-8 w-8" />
-            </div>
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/20"><Upload className="h-8 w-8" /></div>
             <p className="font-display text-xl font-bold">The vault is empty</p>
             <p className="max-w-sm text-sm text-muted-foreground">Import a decklist to get started. Paste from Moxfield, Archidekt or anywhere else.</p>
-            <Button onClick={() => setImportOpen(true)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90">
-              <Plus className="h-4 w-4" />
-              Import Your First Deck
-            </Button>
+            <Button onClick={() => setImportOpen(true)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Plus className="h-4 w-4" />Import Your First Deck</Button>
           </Alcove>
         ) : (
           <>
-            <Eyebrow className="mb-4">{decks.length} deck{decks.length === 1 ? '' : 's'}</Eyebrow>
-            <motion.div variants={riseStagger(0.06)} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {decks.map((deck) => {
-                const totalCards = deck.totalCards || deck.cards.reduce((sum, c) => sum + c.quantity, 0);
-                const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
-                const fullyResolved = hasResolution && deck.unresolvedCount === 0;
+            {/* Shelf strip */}
+            <div role="tablist" aria-label="Shelves" className="no-scrollbar -mx-5 mb-5 flex items-center gap-2 overflow-x-auto px-5 sm:-mx-0 sm:flex-wrap sm:px-0">
+              <ShelfChip label="All decks" count={decks.length} selected={filter === 'all'} onClick={() => setFilter('all')} />
+              {shelves.map((s) => (
+                <ShelfChip key={s.id} label={s.name} accent={s.accent} count={decks.filter((d) => d.shelfId === s.id).length} selected={filter === s.id} onClick={() => setFilter(s.id)} />
+              ))}
+              {shelves.length > 0 && openCount > 0 && (
+                <ShelfChip label="In the open" count={openCount} selected={filter === 'open'} onClick={() => setFilter('open')} />
+              )}
+              {currentShelf && (
+                <Button variant="ghost" size="icon-sm" aria-label={`Edit shelf ${currentShelf.name}`} onClick={() => setShelfDialog({ open: true, shelf: currentShelf })} className="shrink-0 text-muted-foreground hover:text-gold"><Pencil /></Button>
+              )}
+              <button
+                type="button"
+                onClick={() => canShelve && setShelfDialog({ open: true, shelf: null })}
+                disabled={!canShelve}
+                title={canShelve ? undefined : 'Shelves are a Patron feature'}
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-border/60 px-3.5 text-sm text-muted-foreground transition-colors hover:border-gold/50 hover:text-gold disabled:opacity-50 disabled:hover:border-border/60 disabled:hover:text-muted-foreground"
+              >
+                {canShelve ? <Plus className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />} New shelf
+              </button>
+            </div>
 
-                return (
-                  <motion.div key={deck.id} variants={rise}>
-                    <Alcove className="group flex h-full flex-col px-5 pb-4 pt-8 transition-colors hover:border-gold/30">
-                      <div className="mb-3 flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold ring-1 ring-gold/20">
-                          <Crown className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate font-display text-lg font-bold leading-tight">{deck.name}</h3>
-                          <p className="truncate text-sm text-muted-foreground">{deck.commanderName || 'No commander set'}</p>
-                        </div>
-                      </div>
+            <Eyebrow className="mb-4">
+              {currentShelf ? currentShelf.name : filter === 'open' ? 'In the open' : 'All decks'}
+              <span className="ml-1 text-gold/40">· {visible.length}</span>
+            </Eyebrow>
 
-                      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/30 pt-3">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{totalCards} cards</span>
-                          {hasResolution && (
-                            <>
-                              <span className="text-border">·</span>
-                              {fullyResolved ? (
-                                <span className="flex items-center gap-1 text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
-                              ) : (
-                                <span className="flex items-center gap-1 text-amber-400"><AlertCircle className="h-3.5 w-3.5" />{deck.unresolvedCount} unresolved</span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-0.5">
-                          {!hasResolution && (
-                            <Button variant="ghost" size="icon-sm" onClick={() => handleResolve(deck.id)} className="text-muted-foreground hover:text-gold" title="Resolve card names against database" aria-label="Resolve card names">
-                              <Search className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon-sm" onClick={() => removeDeck(deck.id)} className="text-muted-foreground hover:text-destructive" aria-label="Delete deck">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Alcove>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
+            {visible.length === 0 ? (
+              <Alcove flat className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+                <p className="font-display text-lg font-bold">Nothing on this shelf yet</p>
+                <p className="max-w-sm text-sm text-muted-foreground">Import a deck while this shelf is selected, or move one here from its menu.</p>
+              </Alcove>
+            ) : (
+              <motion.div key={filter} variants={riseStagger(0.05)} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <AnimatePresence initial={false}>
+                  {visible.map((deck) => (
+                    <motion.div key={deck.id} variants={rise} layout exit={{ opacity: 0, scale: 0.96 }}>
+                      <DeckCard
+                        deck={deck}
+                        art={deck.commanderName ? (records.get(deck.commanderName) ? frontFace(records.get(deck.commanderName)!).art : undefined) : undefined}
+                        shelf={shelves.find((s) => s.id === deck.shelfId) ?? null}
+                        shelves={shelves}
+                        canShelve={canShelve}
+                        onMove={(id) => moveDeckToShelf(deck.id, id)}
+                        onNewShelf={() => setShelfDialog({ open: true, shelf: null })}
+                        onDelete={() => removeDeck(deck.id)}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            )}
           </>
         )}
       </main>
+
+      <ShelfDialog
+        open={shelfDialog.open}
+        onOpenChange={(open) => setShelfDialog((s) => ({ ...s, open }))}
+        shelf={shelfDialog.shelf}
+        onSave={saveShelf}
+        onDelete={shelfDialog.shelf ? () => { removeShelf(shelfDialog.shelf!.id); setFilter('all'); } : undefined}
+      />
+    </div>
+  );
+}
+
+// ─── Deck card ───────────────────────────────────────────────────────────────
+
+interface DeckCardProps {
+  deck: Deck;
+  art?: string;
+  shelf: Shelf | null;
+  shelves: Shelf[];
+  canShelve: boolean;
+  onMove: (shelfId: string | null) => void;
+  onNewShelf: () => void;
+  onDelete: () => void;
+}
+
+function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, onDelete }: DeckCardProps) {
+  const totalCards = deck.totalCards || deck.cards.reduce((sum, c) => sum + c.quantity, 0);
+  const hasResolution = deck.resolvedCount > 0 || deck.unresolvedCount > 0;
+  const notInForge = deck.cards.filter((c) => c.resolved && c.forgeResolved === false).length;
+  const fullyResolved = hasResolution && deck.unresolvedCount === 0 && notInForge === 0;
+
+  // The arch cap clips the top corners, so nothing interactive lives up there. The link covers
+  // the art and title; the footer row holds the status and the menu, side by side.
+  return (
+    <Alcove className="group flex h-full flex-col transition-colors hover:border-gold/30">
+      <Link href={`/decks/${encodeURIComponent(deck.id)}`} className="flex flex-1 flex-col focus-visible:outline-none">
+        <div className="relative h-28 overflow-hidden">
+          {art ? (
+            <Image src={art} alt="" fill sizes="480px" className="object-cover object-[center_25%] transition-transform duration-700 group-hover:scale-105" unoptimized />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,oklch(0.80_0.12_75/0.16),transparent_65%)]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+          <div className="absolute bottom-3 left-5 flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30 backdrop-blur-sm">
+            <Crown className="h-5 w-5" />
+          </div>
+        </div>
+        <div className="px-5 pb-3 pt-2">
+          <h3 className="truncate font-display text-lg font-bold leading-tight transition-colors group-hover:text-gold">{deck.name}</h3>
+          <p className="truncate text-sm text-muted-foreground">{deck.commanderName || 'No commander set'}</p>
+        </div>
+      </Link>
+
+      <div className="mx-5 flex items-center gap-2 border-t border-border/30 py-2.5 text-xs text-muted-foreground">
+        <span className="shrink-0">{totalCards} cards</span>
+        {hasResolution && (
+          <>
+            <span className="text-border">·</span>
+            {fullyResolved ? (
+              <span className="flex shrink-0 items-center gap-1 text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
+            ) : (
+              <span className="flex shrink-0 items-center gap-1 text-amber-300"><AlertCircle className="h-3.5 w-3.5" />{deck.unresolvedCount > 0 ? `${deck.unresolvedCount} unresolved` : `${notInForge} not in Forge`}</span>
+            )}
+          </>
+        )}
+        {shelf && <span className="ml-auto flex min-w-0 items-center gap-1.5 truncate"><AccentDot accent={shelf.accent} /><span className="truncate">{shelf.name}</span></span>}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${deck.name}`} className={cn('shrink-0 text-muted-foreground hover:text-gold', !shelf && 'ml-auto')} />}>
+            <MoreHorizontal />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Move to shelf</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onMove(null)} className={cn(!deck.shelfId && 'text-gold')}><Library /> In the open</DropdownMenuItem>
+            {shelves.map((s) => (
+              <DropdownMenuItem key={s.id} onClick={() => onMove(s.id)} className={cn(deck.shelfId === s.id && 'text-gold')}><AccentDot accent={s.accent} className="mx-1" /> {s.name}</DropdownMenuItem>
+            ))}
+            <DropdownMenuItem onClick={onNewShelf} disabled={!canShelve}><Plus /> New shelf…</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={onDelete}><Trash2 /> Delete deck</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </Alcove>
+  );
+}
+
+// ─── Import report ───────────────────────────────────────────────────────────
+
+function ImportReport({ report, onDone }: { report: VerifyReport; onDone: () => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-sm">
+        {report.unresolved.length === 0 ? (
+          <><CheckCircle2 className="h-5 w-5 text-green-500" /><span className="text-green-400">All {report.resolved} cards resolved in Scryfall.</span></>
+        ) : (
+          <><AlertCircle className="h-5 w-5 text-amber-500" /><span>{report.resolved} of {report.total} cards resolved in Scryfall. {report.unresolved.length} not found.</span></>
+        )}
+      </div>
+
+      {report.forgeSubstituted.length === 0 && report.forgeUnresolvable.length === 0 ? (
+        <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-5 w-5 text-green-500" /><span className="text-green-400">All cards verified in Forge engine.</span></div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm">
+          <AlertCircle className="h-5 w-5 text-amber-500" />
+          <span>
+            Forge engine:{' '}
+            {report.forgeSubstituted.length > 0 && `${report.forgeSubstituted.length} substituted`}
+            {report.forgeSubstituted.length > 0 && report.forgeUnresolvable.length > 0 && ', '}
+            {report.forgeUnresolvable.length > 0 && `${report.forgeUnresolvable.length} unavailable`}
+          </span>
+        </div>
+      )}
+
+      {report.unresolved.length > 0 && (
+        <div className="max-h-28 overflow-y-auto rounded border border-border/30 bg-card/50 p-2">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Not found in Scryfall:</p>
+          {report.unresolved.map((name) => <p key={name} className="text-xs text-destructive">{name}</p>)}
+        </div>
+      )}
+      {report.forgeSubstituted.length > 0 && (
+        <div className="max-h-28 overflow-y-auto rounded border border-blue-500/20 bg-blue-500/5 p-2">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-blue-400/70">Forge substitutions (reprints → originals):</p>
+          {report.forgeSubstituted.map((sub) => <p key={sub.original} className="text-xs text-blue-300">{sub.original} → <span className="font-medium text-blue-400">{sub.forgeName}</span></p>)}
+        </div>
+      )}
+      {report.forgeUnresolvable.length > 0 && (
+        <div className="max-h-28 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 p-2">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-red-400/70">Not found in Forge (won&apos;t work in-game):</p>
+          {report.forgeUnresolvable.map((name) => <p key={name} className="text-xs text-red-400">{name}</p>)}
+        </div>
+      )}
+
+      <Button onClick={onDone} className="bg-gold text-gold-foreground hover:bg-gold/90">Done</Button>
     </div>
   );
 }
