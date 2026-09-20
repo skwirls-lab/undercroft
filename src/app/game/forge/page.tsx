@@ -24,11 +24,13 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { MatchArchivist, type MatchAsk } from '@/components/archivist/MatchArchivist';
+import { ApprenticeStrip } from '@/components/game/ApprenticeStrip';
 import {
   Loader2,
   Flag,
   RotateCcw,
   BookOpen,
+  GraduationCap,
   Hand as HandIcon,
   ArrowRight,
   FastForward,
@@ -136,6 +138,8 @@ export function ForgeGamePage() {
   // phone). The Settings switch hides the book entirely; the plan decides whether the panel
   // answers. Nothing is sent until the player asks.
   const archivistInMatch = useSettingsStore((s) => s.archivistInMatch);
+  const apprenticeMode = useSettingsStore((s) => s.apprenticeMode);
+  const setApprenticeMode = useSettingsStore((s) => s.setApprenticeMode);
   const { canStrict } = useEntitlements();
   const archivistAvailable = archivistInMatch && (canStrict('archivist.match') || canStrict('archivist.recap'));
   const narrowForPanel = useMediaQuery('(max-width: 900px)');
@@ -148,6 +152,8 @@ export function ForgeGamePage() {
     const v = new URLSearchParams(window.location.search).get('archivist');
     if (v === 'advice' || v === 'recap') openArchivist(v);
     else if (v === '1') openArchivist(null);
+    const a = new URLSearchParams(window.location.search).get('apprentice');
+    if (a === '0' || a === '1') useSettingsStore.getState().setApprenticeMode(a === '1');
   }, [openArchivist]);
 
   // Action bar state
@@ -235,6 +241,9 @@ export function ForgeGamePage() {
             </div>
           )}
           <div className="flex items-center shrink-0" style={{ gap: 'clamp(2px,0.5vmin,1000px)' }}>
+            <Button variant="ghost" size="sm" onClick={() => setApprenticeMode(!apprenticeMode)} className={cn('p-0', apprenticeMode ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title={apprenticeMode ? 'Apprentice mode on' : 'Apprentice mode off'} aria-label="Apprentice mode" aria-pressed={apprenticeMode} data-dev-apprentice-toggle>
+              <GraduationCap style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
+            </Button>
             {archivistAvailable && (
               <Button variant="ghost" size="sm" onClick={() => (archivistOpen ? setArchivistOpen(false) : openArchivist(null))} className={cn('p-0', archivistOpen ? 'text-gold' : 'text-muted-foreground')} style={{ width: 'clamp(28px,4vh,1000px)', height: 'clamp(28px,4vh,1000px)' }} title="Ask the Archivist" aria-label="Ask the Archivist" aria-pressed={archivistOpen} data-dev-archivist>
                 <BookOpen style={{ width: 'clamp(12px,2.5vmin,1000px)', height: 'clamp(12px,2.5vmin,1000px)' }} />
@@ -259,6 +268,8 @@ export function ForgeGamePage() {
           }))}
           currentPlayerId={HUMAN_PLAYER_ID}
         />
+
+        {apprenticeMode && <ApprenticeStrip youId={HUMAN_PLAYER_ID} />}
 
         {/* ─── MAIN: stat boxes (via GameBoard) ─── */}
         <div className="flex-1 min-h-0 overflow-hidden">

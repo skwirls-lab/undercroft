@@ -52,7 +52,7 @@ jobs:
         run: npm run test:deck
 
       - name: Entitlement and metering tests
-        run: npm run test:entitlements && npm run test:metering && npm run test:archivist
+        run: npm run test:entitlements && npm run test:metering && npm run test:archivist && npm run test:lessons
 
       - name: Build
         run: npx next build

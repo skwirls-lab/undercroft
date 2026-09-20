@@ -25,6 +25,7 @@ import {
   Globe,
   Crown,
   Plus,
+  GraduationCap,
 } from 'lucide-react';
 
 // ─── Root ────────────────────────────────────────────────────────────────────
@@ -294,6 +295,18 @@ function Dashboard() {
               description="Import and manage your decklists."
               tall
             />
+          </motion.div>
+          <motion.div variants={rise} className="sm:col-span-5">
+            <Link href="/learn" className="group block" data-dev-learn-card>
+              <Alcove flat className="flex items-center gap-4 px-5 py-4 transition-colors group-hover:border-gold/30">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold ring-1 ring-gold/20"><GraduationCap className="h-5 w-5" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-lg font-bold">Learn Commander</span>
+                  <span className="block text-sm text-muted-foreground">Eleven short lessons and a glossary. Apprentice mode reads them beside the board as the game reaches each rule.</span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-gold" />
+              </Alcove>
+            </Link>
           </motion.div>
         </motion.div>
 

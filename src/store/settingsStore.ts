@@ -11,11 +11,14 @@ interface SettingsStore {
   reduceMotion: boolean;
   /** Show the Archivist's book in the game header. Off hides every in-match entry point. */
   archivistInMatch: boolean;
+  /** The Apprentice: rules guidance under the game header and on every prompt. On for new players. */
+  apprenticeMode: boolean;
 
   setSfxEnabled: (enabled: boolean) => void;
   setSfxVolume: (volume: number) => void;
   setReduceMotion: (reduce: boolean) => void;
   setArchivistInMatch: (on: boolean) => void;
+  setApprenticeMode: (on: boolean) => void;
 
   /**
    * Reset the preferences that belong to a person rather than to this device.
@@ -30,6 +33,7 @@ const DEFAULTS = {
   sfxVolume: 0.7,
   reduceMotion: false,
   archivistInMatch: true,
+  apprenticeMode: true,
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -48,6 +52,7 @@ export const useSettingsStore = create<SettingsStore>()(
       },
       setReduceMotion: (reduce) => set({ reduceMotion: reduce }),
       setArchivistInMatch: (on) => set({ archivistInMatch: on }),
+      setApprenticeMode: (on) => set({ apprenticeMode: on }),
 
       clearUserSettings: () => {
         setSfxEnabled(DEFAULTS.sfxEnabled);
@@ -63,6 +68,7 @@ export const useSettingsStore = create<SettingsStore>()(
         sfxVolume: state.sfxVolume,
         reduceMotion: state.reduceMotion,
         archivistInMatch: state.archivistInMatch,
+        apprenticeMode: state.apprenticeMode,
       }),
       // Persisted values must be pushed into the audio module after rehydration, or the
       // in-memory gates stay at their defaults and ignore the user's choices.

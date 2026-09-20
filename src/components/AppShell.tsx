@@ -7,7 +7,7 @@ import { useSettingsSheet } from '@/components/SettingsSheet';
 import { useAppConfigStore } from '@/store/appConfigStore';
 import { Megaphone } from 'lucide-react';
 import { Keystone } from '@/components/brand/Keystone';
-import { Library, Settings, Swords, Home } from 'lucide-react';
+import { Library, Settings, Swords, Home, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -21,6 +21,7 @@ const TABS = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/game', label: 'Play', icon: Swords },
   { href: '/decks', label: 'Decks', icon: Library },
+  { href: '/learn', label: 'Learn', icon: GraduationCap },
 ] as const;
 
 const HIDDEN_ON = ['/game/forge', '/dev/'];

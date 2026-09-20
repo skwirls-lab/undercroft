@@ -46,6 +46,8 @@ function choicePreset(name: string, humanHandIds: number[]): ForgeChoiceRequest 
       return { requestId: 'dev-confirm', choiceType: 'confirm_action', data: { prompt: 'Sakura-Tribe Elder — sacrifice it to search for a basic land?' } };
     case 'modes':
       return { requestId: 'dev-modes', choiceType: 'choose_modes', data: { prompt: 'Choose one — Anguished Unmaking', modes: [{ index: 0, description: 'Exile target nonland permanent. You lose 3 life.' }, { index: 1, description: 'Destroy target creature.' }], min: 1, max: 1 } };
+    case 'attackers':
+      return { requestId: 'dev-attackers', choiceType: 'declare_attackers', data: { prompt: 'Declare attackers', possibleAttackers: [LIB(9002, 'Craterhoof Behemoth', 'Creature — Beast', '{5}{G}{G}{G}', 'Haste', 'G', [5, 5]), LIB(9011, 'Serra Angel', 'Creature — Angel', '{3}{W}{W}', 'Flying, vigilance', 'W', [4, 4])], defenders: [{ id: 2, name: 'Krenko AI' }, { id: 3, name: 'Ur-Dragon AI' }, { id: 4, name: 'Control AI' }] } };
     case 'targets':
       return { requestId: 'dev-targets', choiceType: 'choose_targets', data: { prompt: 'Swords to Plowshares — choose target creature', validTargets: [LIB(9002, 'Craterhoof Behemoth', 'Creature — Beast', '{5}{G}{G}{G}', 'Haste', 'G', [5, 5]), LIB(9010, 'Krenko, Mob Boss', 'Legendary Creature — Goblin Warrior', '{2}{R}{R}', '{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.', 'R', [3, 3])], minTargets: 1, maxTargets: 1 } };
     default:
