@@ -39,6 +39,7 @@ export function slimCard(card) {
     set: card.set || '',
     set_name: card.set_name || '',
     rarity: card.rarity || '',
+    released_at: card.released_at || '',
   };
 
   if (card.power !== undefined) slim.power = card.power;
@@ -75,12 +76,41 @@ export function slimCard(card) {
   return slim;
 }
 
+/**
+ * What gets stored: English, commander-legal, and a printing that exists on paper. Digital-only
+ * printings (Arena sets such as Alchemy or Through the Omenpaths) carry art nobody has held,
+ * and every commander-legal card has a paper printing anyway.
+ */
 export const isCommanderPlayable = (card) =>
   card.lang === 'en' &&
   card.layout !== 'token' &&
   card.layout !== 'art_series' &&
   card.layout !== 'double_faced_token' &&
-  card.legalities?.commander === 'legal';
+  card.legalities?.commander === 'legal' &&
+  card.digital !== true &&
+  (!Array.isArray(card.games) || card.games.includes('paper'));
+
+/**
+ * Which printing of a card the app shows by default: the oldest ordinary paper printing —
+ * the art most players know it by. Promos, memorabilia and other odd sets lose to any
+ * regular set; among the rest, the earliest release wins. Lower is better.
+ */
+export function printingRank(card) {
+  const oddSet = ['promo', 'memorabilia', 'funny', 'minigame', 'token', 'vanguard'].includes(card.set_type || '');
+  const odd = card.promo === true || oddSet || card.full_art === true || card.oversized === true || card.border_color === 'gold';
+  return `${odd ? 1 : 0}|${card.released_at || '9999-99-99'}|${card.set || ''}|${card.collector_number || ''}`;
+}
+
+/** The id of the preferred printing for every oracle id, from a list of {id, oracle_id, rank}. */
+export function choosePreferred(printings) {
+  const best = new Map();
+  for (const p of printings) {
+    const key = p.oracle_id || p.id;
+    const cur = best.get(key);
+    if (!cur || p.rank < cur.rank) best.set(key, p);
+  }
+  return new Set([...best.values()].map((p) => p.id));
+}
 
 /** Stable digest of a slimmed card, so unchanged cards can be skipped. */
 export const digest = (slim) =>
@@ -185,7 +215,10 @@ async function main() {
   };
 
   // The export is a JSON array, one object per line. Parsing line-by-line keeps a ~2GB file
-  // from ever being resident.
+  // from ever being resident; the slimmed records (a few hundred bytes each) are kept, since
+  // the preferred printing of a card is only known once every printing has been seen.
+  const slims = [];
+  const ranks = [];
   const lines = createInterface({ input: Readable.fromWeb(res.body), crlfDelay: Infinity });
   for await (const line of lines) {
     const trimmed = line.trim().replace(/,$/, '');
@@ -201,21 +234,24 @@ async function main() {
 
     seen++;
     present.add(card.id);
+    slims.push(slimCard(card));
+    ranks.push({ id: card.id, oracle_id: card.oracle_id, rank: printingRank(card) });
+    if (seen % 10000 === 0) process.stdout.write(`\r  ${seen.toLocaleString()} scanned`);
+  }
 
-    const slim = slimCard(card);
+  const preferred = choosePreferred(ranks);
+  console.log(`\r  ${seen.toLocaleString()} printings scanned; ${preferred.size.toLocaleString()} preferred (oldest ordinary paper printing per card)`);
+
+  for (const slim of slims) {
+    slim.preferred = preferred.has(slim.id);
     const d = digest(slim);
-    if (existing.get(card.id) === d) {
+    if (existing.get(slim.id) === d) {
       unchanged++;
       continue;
     }
-
-    batch.set(cards.doc(card.id), { ...slim, _digest: d });
+    batch.set(cards.doc(slim.id), { ...slim, _digest: d });
     written++;
     if (++pending >= BATCH_SIZE) await flush();
-
-    if (seen % 10000 === 0) {
-      process.stdout.write(`\r  ${seen.toLocaleString()} scanned, ${written.toLocaleString()} to write`);
-    }
   }
   await flush();
 

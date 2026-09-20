@@ -78,6 +78,14 @@ add yourself as an admin **once, permanently**:
 Leave both in place. The point of the allowlist is that *only you* can write to `/cards`, not
 that nobody can.
 
+### Which printing the app shows
+
+The sync keeps paper printings only and marks, per card, the oldest ordinary one as
+`preferred`; the app shows that art everywhere. After deploying a sync change, run the
+**Sync cards** workflow once by hand (Actions → Sync cards → Run workflow) rather than waiting
+for Tuesday, so the flags land. Digital-only printings already stored are left in place
+(the sync never deletes) but are never chosen once a preferred printing exists.
+
 ### A Firestore update alone does not make a new set playable
 
 Two separate card databases back this app, and a new set needs both:

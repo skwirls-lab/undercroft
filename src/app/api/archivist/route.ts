@@ -101,93 +101,105 @@ export async function POST(request: Request) {
     return jsonError(503, 'disabled', 'The Archivist is not configured on this deployment.');
   }
 
+  // Every task streams from the model, JSON ones included (the client parses the whole text
+  // when it ends). The response starts the moment we have the headers: Vercel's gateway
+  // gives a function only seconds to answer before it reports a 504, and a model can take
+  // longer than that to send its first token. The upstream call therefore happens inside the
+  // stream; a failure after the headers are out is written into the body as a line the
+  // player can read.
   const upstreamBody: Record<string, unknown> = {
     model: config.archivistModel,
     messages,
     max_tokens: json ? 900 : 700,
     temperature: json ? 0.4 : 0.7,
-    stream: !json,
-    ...(json ? { response_format: { type: 'json_object' } } : { stream_options: { include_usage: true } }),
-    usage: { include: true },
+    stream: true,
+    stream_options: { include_usage: true },
+    ...(json ? { response_format: { type: 'json_object' } } : {}),
+    // Advice, not proofs: a thinking phase adds seconds before the first word for no gain.
+    reasoning: { enabled: false },
   };
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL ?? 'https://undercroft.app',
-        'X-Title': 'Undercroft',
-      },
-      body: JSON.stringify(upstreamBody),
-      signal: AbortSignal.timeout(50_000),
-    });
-  } catch (err) {
-    console.error('[archivist] upstream fetch failed', err);
-    void recordCall({ uid, task: payload.task, model: config.archivistModel, tokensIn: 0, tokensOut: 0, ms: Date.now() - startedAt, ok: false });
-    return jsonError(502, 'upstream', 'The Archivist could not reach the model.');
-  }
-
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => '');
-    console.error('[archivist] upstream', upstream.status, detail.slice(0, 500));
-    void recordCall({ uid, task: payload.task, model: config.archivistModel, tokensIn: 0, tokensOut: 0, ms: Date.now() - startedAt, ok: false });
-    return jsonError(502, 'upstream', upstream.status === 429 ? 'The model is busy. Try again in a moment.' : 'The model returned an error.');
-  }
-
-  // JSON tasks: one body.
-  if (json) {
-    const data = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-    const content = data.choices?.[0]?.message?.content ?? '';
-    void recordCall({ uid, task: payload.task, model: config.archivistModel, tokensIn: data.usage?.prompt_tokens ?? 0, tokensOut: data.usage?.completion_tokens ?? 0, ms: Date.now() - startedAt, ok: true });
-    return new Response(content, { headers });
-  }
-
-  // Prose tasks: relay the SSE stream as plain text, keep the usage block when it arrives.
-  const reader = upstream.body.getReader();
-  const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  let buffer = '';
-  let outChars = 0;
-  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  const decoder = new TextDecoder();
+  const promptChars = messages.reduce((s, m) => s + m.content.length, 0);
 
   const stream = new ReadableStream<Uint8Array>({
-    async pull(controller) {
+    async start(controller) {
+      let outChars = 0;
+      let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      const finish = (ok: boolean) => void recordCall({
+        uid, task: payload.task, model: config.archivistModel,
+        tokensIn: usage?.prompt_tokens ?? Math.round(promptChars / 4),
+        tokensOut: usage?.completion_tokens ?? Math.round(outChars / 4),
+        ms: Date.now() - startedAt, ok,
+      });
+      const fail = (message: string) => {
+        controller.enqueue(encoder.encode(json ? '' : `\n\n*${message}*`));
+        controller.close();
+        finish(false);
+      };
+
+      let upstream: Response;
       try {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          void recordCall({
-            uid, task: payload.task, model: config.archivistModel,
-            tokensIn: usage?.prompt_tokens ?? Math.round(messages.reduce((s, m) => s + m.content.length, 0) / 4),
-            tokensOut: usage?.completion_tokens ?? Math.round(outChars / 4),
-            ms: Date.now() - startedAt, ok: true,
-          });
-          return;
+        upstream = await fetch(OPENROUTER_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL ?? 'https://undercroft.app',
+            'X-Title': 'Undercroft',
+          },
+          body: JSON.stringify(upstreamBody),
+          signal: AbortSignal.timeout(55_000),
+        });
+      } catch (err) {
+        console.error('[archivist] upstream fetch failed', err);
+        return fail('The Archivist could not reach the model. Try again in a moment.');
+      }
+      console.log(`[archivist] ${payload.task} upstream ${upstream.status} after ${Date.now() - startedAt}ms (model ${config.archivistModel})`);
+
+      if (!upstream.ok || !upstream.body) {
+        const detail = await upstream.text().catch(() => '');
+        console.error('[archivist] upstream', upstream.status, detail.slice(0, 500));
+        return fail(upstream.status === 429 ? 'The model is busy. Try again in a moment.' : upstream.status === 404 || upstream.status === 400 ? 'The model this deployment is set to was not accepted (check the model id in Settings → Administration).' : 'The model returned an error.');
+      }
+
+      const reader = upstream.body.getReader();
+      let buffer = '';
+      let firstTokenAt = 0;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t.startsWith('data:')) continue;
+            const data = t.slice(5).trim();
+            if (data === '[DONE]') continue;
+            try {
+              const evt = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }>; usage?: typeof usage; error?: { message?: string } };
+              if (evt.error?.message) { console.error('[archivist] model error', evt.error.message); return fail('The model returned an error.'); }
+              if (evt.usage) usage = evt.usage;
+              const delta = evt.choices?.[0]?.delta?.content;
+              if (delta) {
+                if (!firstTokenAt) { firstTokenAt = Date.now(); console.log(`[archivist] first token after ${firstTokenAt - startedAt}ms`); }
+                outChars += delta.length;
+                controller.enqueue(encoder.encode(delta));
+              }
+            } catch { /* keep-alive comments and partial lines */ }
+          }
         }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          const t = line.trim();
-          if (!t.startsWith('data:')) continue;
-          const data = t.slice(5).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }>; usage?: typeof usage };
-            if (evt.usage) usage = evt.usage;
-            const delta = evt.choices?.[0]?.delta?.content;
-            if (delta) { outChars += delta.length; controller.enqueue(encoder.encode(delta)); }
-          } catch { /* keep-alive comments and partial lines */ }
-        }
+        if (!outChars) console.warn('[archivist] the model sent no content');
+        controller.close();
+        finish(true);
       } catch (err) {
         console.error('[archivist] stream', err);
-        controller.error(err);
+        fail('The Archivist lost the thread. Try again.');
       }
     },
-    cancel() { void reader.cancel(); },
   });
 
   return new Response(stream, { headers });

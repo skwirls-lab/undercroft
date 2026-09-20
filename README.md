@@ -93,6 +93,14 @@ default), a specific house deck, or any vault deck with a commander — includin
 are about to play, if a mirror match is the test. `src/lib/opponentDecks.ts` resolves the
 choices into `start_game` payloads; the server names each AI seat after its deck.
 
+## Card art
+
+Every card has one face in the app: its **oldest ordinary paper printing**, the art most
+players know it by. The weekly card sync (`scripts/sync-cards.mjs`) stores paper printings
+only (no Arena-only sets) and marks that printing `preferred`; the name resolver and the
+deck builder's Scryfall search (`game:paper prefer:oldest`) both pick it. Promos, full-art
+and gold-bordered printings lose to any regular set.
+
 ## In a game
 
 Every seat plaque and the board header carry an (i). It opens the **seat inspector**: life,

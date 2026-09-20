@@ -124,6 +124,18 @@ export async function searchCardsByName(namePrefix: string, limit = 20): Promise
  * Resolve multiple card names to their Scryfall data
  * Returns a map of name → card data (or null if not found)
  */
+/**
+ * Of two printings of the same card, is `a` the one to show? The sync marks the oldest
+ * ordinary paper printing `preferred`; before a sync has run, the earliest release wins.
+ */
+export function betterPrinting(a: ScryfallCardRecord, b: ScryfallCardRecord): boolean {
+  if (!!a.preferred !== !!b.preferred) return !!a.preferred;
+  const ra = a.released_at ?? '9999';
+  const rb = b.released_at ?? '9999';
+  if (ra !== rb) return ra < rb;
+  return false;
+}
+
 export async function resolveCardNames(names: string[]): Promise<Map<string, ScryfallCardRecord | null>> {
   const results = new Map<string, ScryfallCardRecord | null>();
   
@@ -143,10 +155,15 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
 
     const cardsRef = collection(db, 'cards');
     
-    // Try exact match first
+    // Try exact match first. Every printing of a name comes back; keep the preferred one.
     let q = query(cardsRef, where('name', 'in', batch));
     let snapshot = await getDocs(q);
-    const found = new Map(snapshot.docs.map(d => [d.data().name, d.data() as ScryfallCardRecord]));
+    const found = new Map<string, ScryfallCardRecord>();
+    for (const d of snapshot.docs) {
+      const rec = d.data() as ScryfallCardRecord;
+      const cur = found.get(rec.name);
+      if (!cur || betterPrinting(rec, cur)) found.set(rec.name, rec);
+    }
     
     // For unmatched names, try all variations AND double-faced card prefix search
     const unmatched = batch.filter(name => !found.has(name));
@@ -169,13 +186,13 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
         q = query(cardsRef, where('name', 'in', variantBatch));
         snapshot = await getDocs(q);
         
-        // Map results back to original names
+        // Map results back to original names, keeping the preferred printing
         snapshot.docs.forEach(doc => {
-          const cardName = doc.data().name;
-          const originalName = allVariations.get(cardName);
-          if (originalName && !found.has(originalName)) {
-            found.set(originalName, doc.data() as ScryfallCardRecord);
-          }
+          const rec = doc.data() as ScryfallCardRecord;
+          const originalName = allVariations.get(rec.name);
+          if (!originalName) return;
+          const cur = found.get(originalName);
+          if (!cur || betterPrinting(rec, cur)) found.set(originalName, rec);
         });
       }
       
@@ -221,13 +238,15 @@ export async function resolveCardNames(names: string[]): Promise<Map<string, Scr
             const oracleId = scryfallCard.oracle_id;
             
             if (oracleId) {
-              // Search Firestore by oracle_id
-              q = query(cardsRef, where('oracle_id', '==', oracleId), firestoreLimit(1));
+              // Search Firestore by oracle_id and keep the preferred printing
+              q = query(cardsRef, where('oracle_id', '==', oracleId), firestoreLimit(40));
               snapshot = await getDocs(q);
-              
-              if (!snapshot.empty) {
-                found.set(name, snapshot.docs[0].data() as ScryfallCardRecord);
+              let best: ScryfallCardRecord | null = null;
+              for (const d of snapshot.docs) {
+                const rec = d.data() as ScryfallCardRecord;
+                if (!best || betterPrinting(rec, best)) best = rec;
               }
+              if (best) found.set(name, best);
             }
           }
           

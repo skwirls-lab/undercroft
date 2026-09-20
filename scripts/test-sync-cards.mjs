@@ -9,7 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { slimCard, digest, isCommanderPlayable, resolveDownloadUri } from './sync-cards.mjs';
+import { slimCard, digest, isCommanderPlayable, resolveDownloadUri, printingRank, choosePreferred } from './sync-cards.mjs';
 
 let passed = 0;
 const test = (name, fn) => {
@@ -94,7 +94,7 @@ test('digest changes when the stored content changes', () => {
 });
 
 test('digest ignores fields that are not stored', () => {
-  assert.equal(digest(slimCard(base)), digest(slimCard({ ...base, released_at: '2026-01-01' })));
+  assert.equal(digest(slimCard(base)), digest(slimCard({ ...base, prices: { usd: '1.00' }, tcgplayer_id: 42 })));
 });
 
 // --- resolveDownloadUri -------------------------------------------------------------
@@ -161,3 +161,32 @@ await asyncTest('reports the status when the per-object endpoint fails', async (
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', failures above' : ', 0 failed'}`);
+
+test('drops a digital-only printing', () => {
+  assert.equal(isCommanderPlayable({ ...base, digital: true, games: ['arena'] }), false);
+  assert.equal(isCommanderPlayable({ ...base, games: ['arena', 'mtgo'] }), false);
+  assert.equal(isCommanderPlayable({ ...base, games: ['paper', 'arena'] }), true);
+});
+
+test('ranks the oldest ordinary printing first', () => {
+  const alpha = { id: 'a', oracle_id: 'o', released_at: '1993-08-05', set: 'lea', set_type: 'core' };
+  const promo = { id: 'p', oracle_id: 'o', released_at: '1990-01-01', set: 'pxyz', set_type: 'promo', promo: true };
+  const recent = { id: 'r', oracle_id: 'o', released_at: '2025-06-01', set: 'xyz', set_type: 'expansion' };
+  const fullArt = { id: 'f', oracle_id: 'o', released_at: '1980-01-01', set: 'sld', set_type: 'box', full_art: true };
+  assert.ok(printingRank(alpha) < printingRank(recent), 'older regular set wins');
+  assert.ok(printingRank(alpha) < printingRank(promo), 'a promo loses to a regular set even when older');
+  assert.ok(printingRank(alpha) < printingRank(fullArt), 'full art loses to a regular frame');
+  const chosen = choosePreferred([alpha, promo, recent, fullArt].map((c) => ({ id: c.id, oracle_id: c.oracle_id, rank: printingRank(c) })));
+  assert.deepEqual([...chosen], ['a']);
+});
+
+test('a card printed only as a promo still gets a preferred printing', () => {
+  const only = { id: 'p', oracle_id: 'o2', released_at: '2010-01-01', set: 'pjud', set_type: 'promo', promo: true };
+  assert.deepEqual([...choosePreferred([{ id: only.id, oracle_id: only.oracle_id, rank: printingRank(only) }])], ['p']);
+});
+
+test('the slim record carries the release date and the preferred flag survives the digest', () => {
+  const slim = slimCard({ ...base, released_at: '1993-08-05' });
+  assert.equal(slim.released_at, '1993-08-05');
+  assert.notEqual(digest({ ...slim, preferred: true }), digest({ ...slim, preferred: false }));
+});
