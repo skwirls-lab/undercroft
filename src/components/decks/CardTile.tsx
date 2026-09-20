@@ -100,8 +100,9 @@ export function CardTile({ entry, record, isCommander, editing, onOpen, onQuanti
       </button>
 
       {editing && (
-        <div className="absolute inset-x-[5%] bottom-[4%] flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center overflow-hidden rounded-md bg-black/85 ring-1 ring-white/15">
+        <div className={cn('absolute inset-x-[5%] bottom-[4%] flex items-center gap-1', isCommander ? 'justify-end' : 'justify-between')} onClick={(e) => e.stopPropagation()}>
+          {/* The commander is one card by definition; it gets no stepper. */}
+          {!isCommander && <div className="flex items-center overflow-hidden rounded-md bg-black/85 ring-1 ring-white/15">
             <button type="button" aria-label="One fewer" onClick={() => onQuantity?.(Math.max(1, entry.quantity - 1))} disabled={entry.quantity <= 1} className="flex h-7 w-7 items-center justify-center text-white hover:bg-white/10 disabled:opacity-30">
               <Minus className="h-3.5 w-3.5" />
             </button>
@@ -109,7 +110,7 @@ export function CardTile({ entry, record, isCommander, editing, onOpen, onQuanti
             <button type="button" aria-label="One more" onClick={() => onQuantity?.(entry.quantity + 1)} className="flex h-7 w-7 items-center justify-center text-white hover:bg-white/10">
               <Plus className="h-3.5 w-3.5" />
             </button>
-          </div>
+          </div>}
           <button type="button" aria-label={`Remove ${entry.cardName}`} onClick={onRemove} className="flex h-7 w-7 items-center justify-center rounded-md bg-black/85 text-white ring-1 ring-white/15 hover:bg-destructive hover:text-white">
             <X className="h-3.5 w-3.5" />
           </button>

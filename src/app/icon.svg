@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!--
+    The Keystone as a favicon: five colours of Magic set into a gold arch, WUBRG left to
+    right, on the app's charcoal. Kept simple enough to read at 16px.
+  -->
+  <defs>
+    <radialGradient id="w" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f5efd8"/><stop offset="1" stop-color="#d9d1b4"/></radialGradient>
+    <radialGradient id="u" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#a8cdf0"/><stop offset=".55" stop-color="#2f7bc4"/><stop offset="1" stop-color="#245f96"/></radialGradient>
+    <radialGradient id="b" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#9a92a6"/><stop offset=".55" stop-color="#3b3540"/><stop offset="1" stop-color="#2a252e"/></radialGradient>
+    <radialGradient id="r" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#f0a090"/><stop offset=".55" stop-color="#d34a3a"/><stop offset="1" stop-color="#a1382c"/></radialGradient>
+    <radialGradient id="g" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#a6e0b0"/><stop offset=".55" stop-color="#3f9358"/><stop offset="1" stop-color="#2f7043"/></radialGradient>
+    <linearGradient id="arch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2c46e"/><stop offset="1" stop-color="#e2c46e" stop-opacity=".45"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#15110d"/>
+  <!-- arch and piers -->
+  <path d="M 8 44 A 24 24 0 0 1 56 44" fill="none" stroke="url(#arch)" stroke-width="2.6" stroke-linecap="round"/>
+  <line x1="8" y1="44" x2="8" y2="56" stroke="#e2c46e" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round"/>
+  <line x1="56" y1="44" x2="56" y2="56" stroke="#e2c46e" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- gems: W U B R G at 162°, 126°, 90°, 54°, 18° on the arc (cx 32, cy 44, r 24) -->
+  <g stroke="#e2c46e" stroke-width="1.3">
+    <circle cx="9.2" cy="36.6" r="5.6" fill="#15110d"/><circle cx="9.2" cy="36.6" r="4.6" fill="url(#w)" stroke="none"/>
+    <circle cx="17.9" cy="24.6" r="5.6" fill="#15110d"/><circle cx="17.9" cy="24.6" r="4.6" fill="url(#u)" stroke="none"/>
+    <circle cx="32" cy="20" r="6.6" fill="#15110d"/><circle cx="32" cy="20" r="5.5" fill="url(#b)" stroke="none"/>
+    <circle cx="46.1" cy="24.6" r="5.6" fill="#15110d"/><circle cx="46.1" cy="24.6" r="4.6" fill="url(#r)" stroke="none"/>
+    <circle cx="54.8" cy="36.6" r="5.6" fill="#15110d"/><circle cx="54.8" cy="36.6" r="4.6" fill="url(#g)" stroke="none"/>
+  </g>
+  <!-- glints -->
+  <g fill="#fff" fill-opacity=".5">
+    <circle cx="7.7" cy="35" r="1.1"/><circle cx="16.4" cy="23" r="1.1"/><circle cx="30.2" cy="18.1" r="1.3"/><circle cx="44.6" cy="23" r="1.1"/><circle cx="53.3" cy="35" r="1.1"/>
+  </g>
+</svg>

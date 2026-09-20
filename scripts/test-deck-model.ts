@@ -10,6 +10,8 @@ import { AI_DECKS } from '../src/lib/aiDecks';
 import { can, limit, parsePlan, ENFORCE_ENTITLEMENTS } from '../src/lib/entitlements';
 import { deckTotals, mergeEntries, type Deck, type DeckEntry } from '../src/store/deckStore';
 import type { ScryfallCardRecord } from '../src/lib/cardTypes';
+import { checkDeck, canBeCommander, maxCopies, fitsIdentity, identityOf } from '../src/lib/deckRules';
+import { buildScryfallQuery } from '../src/lib/cardSearch';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail = '') {
@@ -106,6 +108,52 @@ check('deleted vault deck falls back to a house deck', AI_DECKS.some((h) => h.na
 const headless = resolveOpponents([{ kind: 'vault', deckId: 'v2' }], vault)[0];
 check('headless vault deck falls back to a house deck', AI_DECKS.some((h) => h.name === headless.name), headless.name);
 check('describeChoice names a missing deck honestly', describeChoice({ kind: 'vault', deckId: 'nope' }, vault).title === 'Missing deck');
+
+console.log('deck rules');
+const seven = rec('Seven Dwarves', 'Creature — Dwarf', 2, ['R'], { oracle_text: 'A deck can have up to seven cards named Seven Dwarves.' });
+const rat = rec('Relentless Rats', 'Creature — Rat', 3, ['B'], { oracle_text: 'A deck can have any number of cards named Relentless Rats.' });
+const walker = rec('Commodore Guff', 'Legendary Planeswalker — Guff', 5, ['U', 'R', 'W'], { oracle_text: 'Commodore Guff can be your commander.' });
+check('legendary creature can command', canBeCommander(records.get('Atraxa')!));
+check('planeswalker with the clause can command', canBeCommander(walker));
+check('plain creature cannot command', !canBeCommander(records.get('Craterhoof')!));
+check('basic land has no copy limit', maxCopies(records.get('Forest')!) === Infinity);
+check('"any number" has no copy limit', maxCopies(rat) === Infinity);
+check('"up to seven" caps at seven', maxCopies(seven) === 7);
+check('ordinary card caps at one', maxCopies(records.get('Sol Ring')!) === 1);
+check('colourless fits any identity', fitsIdentity(records.get('Sol Ring')!, []));
+check('off-colour card does not fit', !fitsIdentity(records.get('Counterspell')!, ['G']));
+check('identityOf is WUBRG ordered', identityOf(walker).join('') === 'WUR');
+
+const rulesRecords = new Map(records);
+rulesRecords.set('Seven Dwarves', seven);
+rulesRecords.set('Lightning Bolt', rec('Lightning Bolt', 'Instant', 1, ['R']));
+const legalDeck = { commanderName: 'Atraxa', cards: [{ cardName: 'Atraxa', quantity: 1, resolved: true, forgeResolved: true }, { cardName: 'Sol Ring', quantity: 1, resolved: true, forgeResolved: true }, { cardName: 'Forest', quantity: 98, resolved: true, forgeResolved: true }] };
+const legal = checkDeck(legalDeck, rulesRecords);
+check('a 100-card singleton deck in identity is legal', legal.legal && legal.total === 100, legal.issues.map((i) => i.kind).join(','));
+
+const messy = checkDeck({ commanderName: 'Atraxa', cards: [
+  { cardName: 'Atraxa', quantity: 1, resolved: true, forgeResolved: true },
+  { cardName: 'Sol Ring', quantity: 2, resolved: true, forgeResolved: true },
+  { cardName: 'Lightning Bolt', quantity: 1, resolved: true, forgeResolved: true },
+  { cardName: 'Seven Dwarves', quantity: 8, resolved: true, forgeResolved: true },
+  { cardName: 'Typo', quantity: 1, resolved: false },
+  { cardName: 'Craterhoof', quantity: 1, resolved: true, forgeResolved: false },
+] }, rulesRecords);
+const kinds = new Set(messy.issues.map((i) => i.kind));
+check('reports size', kinds.has('size'));
+check('reports duplicates incl. over-cap "up to" cards', kinds.has('duplicate') && messy.issues.find((i) => i.kind === 'duplicate')!.cards!.length === 2);
+check('reports off-identity (Bolt in Atraxa)', kinds.has('off-identity') && messy.issues.find((i) => i.kind === 'off-identity')!.cards![0] === 'Lightning Bolt');
+check('reports unknown and not-in-forge', kinds.has('unknown') && kinds.has('not-in-forge'));
+check('reports missing commander', checkDeck({ commanderName: '', cards: [] }, rulesRecords).issues.some((i) => i.kind === 'no-commander'));
+check('reports a commander that cannot command', checkDeck({ commanderName: 'Craterhoof', cards: [{ cardName: 'Craterhoof', quantity: 1, resolved: true }] }, rulesRecords).issues.some((i) => i.kind === 'bad-commander'));
+
+console.log('scryfall query');
+check('single word is a bare name match', buildScryfallQuery('rift') === 'rift legal:commander');
+check('multi-word input is quoted', buildScryfallQuery('sol ring') === 'name:"sol ring" legal:commander');
+check('identity filter uses id<=', buildScryfallQuery('x', { identity: ['W', 'U', 'B', 'G'] }) === 'x legal:commander id<=wubg');
+check('colourless identity is id<=c', buildScryfallQuery('x', { identity: [] }).endsWith('id<=c'));
+check('commander-only adds is:commander', buildScryfallQuery('atraxa', { commanderOnly: true }) === 'atraxa legal:commander is:commander');
+check('empty text still yields a valid query', buildScryfallQuery('', { commanderOnly: true }) === 'legal:commander is:commander');
 
 console.log('entitlements');
 check('enforcement is off before launch', ENFORCE_ENTITLEMENTS === false);

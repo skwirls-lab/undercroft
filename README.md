@@ -68,6 +68,16 @@ the commander, or replacing the whole list as text. Every edit saves as it happe
 re-verifies the changed cards against the card database and the Forge engine, the same
 pipeline import uses (`src/lib/deckCards.ts`).
 
+**Building from nothing.** "New Deck" in the vault asks for a commander (a search limited to
+cards that can lead a deck), suggests a name, and opens the deck page in edit mode. The
+**Add cards** search asks Scryfall first — word matching anywhere in a name, ranked by how
+often EDHREC sees the card, filtered to the commander's colour identity on the server side —
+and falls back to the shared card collection when Scryfall is unreachable
+(`src/lib/cardSearch.ts`). A card outside the commander's colours is shown, marked, and cannot
+be added. The **deck check** (`src/lib/deckRules.ts`) reports 100 cards, one commander, the
+singleton rule with its exceptions (basics, "any number", "up to seven"), colour identity,
+unknown names and cards the engine lacks; it is one badge in the header and a dialog on tap.
+
 **Shelves** are the vault's folders: one level, a name and an accent colour, filed on the
 player's profile document. A deck sits on at most one shelf.
 
@@ -92,7 +102,7 @@ src/
 ├── app/               # Routes: landing/dashboard, decks, game setup, game board, admin, dev
 ├── components/
 │   ├── brand/         # Keystone, Arch, Alcove — the Undercroft visual identity
-│   ├── decks/         # Deck page, card tiles, reader, add-card search, shelves
+│   ├── decks/         # Deck page, builder search, deck check, card tiles, reader, shelves
 │   ├── game/          # Board, seats, cards, hand, prompts
 │   └── ui/            # shadcn primitives
 ├── hooks/             # useFitToRow, useCardRecords, useEntitlements, useMediaQuery, Firestore sync
@@ -101,6 +111,12 @@ src/
 └── dev/               # Mock game and mock decks for the development harness
 scripts/               # Tests, protocol check, card sync, screenshot sweep
 ```
+
+## Icons
+
+`src/app/icon.svg` is the favicon: the Keystone, WUBRG left to right. `node
+scripts/render-icons.mjs` renders it to the PNGs the home-screen icon and the web app
+manifest (`src/app/manifest.ts`) need. Re-run it after editing the SVG.
 
 ## Checks
 

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useDeckStore, type Deck, type Shelf, type ShelfAccent } from '@/store/deckStore';
 import { useAuth } from '@/lib/firebase/auth';
@@ -22,6 +22,7 @@ import {
 import { AuthGuard } from '@/components/AuthGuard';
 import { Alcove, Eyebrow } from '@/components/brand/Alcove';
 import { AccentDot, ShelfChip, ShelfDialog } from '@/components/decks/Shelves';
+import { NewDeckDialog } from '@/components/decks/NewDeckDialog';
 import { rise, riseStagger } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +42,7 @@ function DecksContent() {
 
   const [filter, setFilter] = useState<Filter>('all');
   const [shelfDialog, setShelfDialog] = useState<{ open: boolean; shelf: Shelf | null }>({ open: false, shelf: null });
+  const [newDeckOpen, setNewDeckOpen] = useState(false);
 
   // Import dialog
   const [importOpen, setImportOpen] = useState(false);
@@ -104,12 +106,24 @@ function DecksContent() {
           <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">My Decks</h1>
         </div>
 
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            disabled={atDeckLimit}
+            onClick={() => setNewDeckOpen(true)}
+            title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined}
+            data-dev-new-deck
+            className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+          >
+            {atDeckLimit ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            New Deck
+          </Button>
         <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeAndReset(); else setImportOpen(true); }}>
           <DialogTrigger
             render={
-              <Button size="sm" disabled={atDeckLimit} title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100">
-                {atDeckLimit ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                Import Deck
+              <Button size="sm" variant="outline" disabled={atDeckLimit} title={atDeckLimit ? `The free vault holds ${maxDecks} decks` : undefined} className="gap-1.5 border-border/60 text-foreground">
+                <Upload className="h-4 w-4" />
+                Import
               </Button>
             }
           />
@@ -151,6 +165,7 @@ function DecksContent() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-5 pb-10 sm:px-10">
@@ -185,8 +200,11 @@ function DecksContent() {
           <Alcove className="flex flex-col items-center gap-4 px-6 pb-12 pt-16 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/20"><Upload className="h-8 w-8" /></div>
             <p className="font-display text-xl font-bold">The vault is empty</p>
-            <p className="max-w-sm text-sm text-muted-foreground">Import a decklist to get started. Paste from Moxfield, Archidekt or anywhere else.</p>
-            <Button onClick={() => setImportOpen(true)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Plus className="h-4 w-4" />Import Your First Deck</Button>
+            <p className="max-w-sm text-sm text-muted-foreground">Build a deck from a commander up, or paste a list from Moxfield, Archidekt or anywhere else.</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button onClick={() => setNewDeckOpen(true)} className="gap-1.5 bg-gold text-gold-foreground hover:bg-gold/90"><Plus className="h-4 w-4" />Build a Deck</Button>
+              <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5 border-border/60 text-foreground"><Upload className="h-4 w-4" />Import a List</Button>
+            </div>
           </Alcove>
         ) : (
           <>
@@ -246,6 +264,8 @@ function DecksContent() {
           </>
         )}
       </main>
+
+      <NewDeckDialog open={newDeckOpen} onOpenChange={setNewDeckOpen} shelfId={currentShelf?.id ?? null} />
 
       <ShelfDialog
         open={shelfDialog.open}
@@ -318,12 +338,15 @@ function DeckCard({ deck, art, shelf, shelves, canShelve, onMove, onNewShelf, on
             <MoreHorizontal />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Move to shelf</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onMove(null)} className={cn(!deck.shelfId && 'text-gold')}><Library /> In the open</DropdownMenuItem>
-            {shelves.map((s) => (
-              <DropdownMenuItem key={s.id} onClick={() => onMove(s.id)} className={cn(deck.shelfId === s.id && 'text-gold')}><AccentDot accent={s.accent} className="mx-1" /> {s.name}</DropdownMenuItem>
-            ))}
-            <DropdownMenuItem onClick={onNewShelf} disabled={!canShelve}><Plus /> New shelf…</DropdownMenuItem>
+            {/* A menu label is a group part in Base UI and must sit inside a group. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Move to shelf</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onMove(null)} className={cn(!deck.shelfId && 'text-gold')}><Library /> In the open</DropdownMenuItem>
+              {shelves.map((s) => (
+                <DropdownMenuItem key={s.id} onClick={() => onMove(s.id)} className={cn(deck.shelfId === s.id && 'text-gold')}><AccentDot accent={s.accent} className="mx-1" /> {s.name}</DropdownMenuItem>
+              ))}
+              <DropdownMenuItem onClick={onNewShelf} disabled={!canShelve}><Plus /> New shelf…</DropdownMenuItem>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onDelete}><Trash2 /> Delete deck</DropdownMenuItem>
           </DropdownMenuContent>

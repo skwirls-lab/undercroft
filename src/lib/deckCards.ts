@@ -40,23 +40,9 @@ export async function loadCardRecords(names: string[]): Promise<Map<string, Scry
   return out;
 }
 
-/** Name-prefix search for the add-card box. Case-insensitive on the first letter only, which is what Firestore can do. */
-export async function searchCards(prefix: string, limit = 12): Promise<ScryfallCardRecord[]> {
-  const q = prefix.trim();
-  if (q.length < 2) return [];
-  if (isDevMock()) {
-    const { searchMockCards } = await import('@/dev/mockCards');
-    return searchMockCards(q, limit);
-  }
-  const { searchCardsByName } = await import('@/lib/firebase/cards');
-  const cap = q.charAt(0).toUpperCase() + q.slice(1);
-  const seen = new Map<string, ScryfallCardRecord>();
-  for (const variant of new Set([cap, q])) {
-    const found = await searchCardsByName(variant, limit);
-    for (const rec of found) if (!seen.has(rec.name)) seen.set(rec.name, rec);
-    if (seen.size >= limit) break;
-  }
-  return [...seen.values()].slice(0, limit);
+/** Put a record straight into the cache — a search result that was just added to a deck. */
+export function primeCardRecord(rec: ScryfallCardRecord): void {
+  recordCache.set(rec.name, rec);
 }
 
 // ─── Faces and images ────────────────────────────────────────────────────────

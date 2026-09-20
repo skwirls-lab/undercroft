@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { AuthGuard } from '@/components/AuthGuard';
 import { DeckDetail } from '@/components/decks/DeckDetail';
@@ -9,7 +10,9 @@ export default function DeckPage() {
   const params = useParams<{ id: string }>();
   return (
     <AuthGuard>
-      <DeckDetail deckId={decodeURIComponent(params.id)} />
+      <Suspense fallback={null}>
+        <DeckDetail deckId={decodeURIComponent(params.id)} />
+      </Suspense>
     </AuthGuard>
   );
 }

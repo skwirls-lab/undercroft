@@ -54,7 +54,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0d14",
+  themeColor: "#15110d",
   width: "device-width",
   initialScale: 1,
   // The game view is full-bleed and uses 100dvh; cover lets it reach into the safe areas

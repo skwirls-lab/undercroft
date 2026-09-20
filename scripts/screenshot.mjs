@@ -25,6 +25,10 @@ const SCREENS = [
   { name: 'deck-detail', path: '/decks/mock-atraxa' },
   { name: 'deck-detail-edit', path: '/decks/mock-atraxa', click: 'button:has-text("Edit")' },
   { name: 'deck-detail-read', path: '/decks/mock-atraxa', click: '[data-card-tile]:nth-of-type(1)' },
+  { name: 'deck-detail-search', path: '/decks/mock-atraxa?edit=1', type: ['[data-dev-search]', 'so'] },
+  { name: 'deck-detail-check', path: '/decks/mock-atraxa', click: '[data-dev-check]' },
+  { name: 'deck-detail-menu', path: '/decks/mock-atraxa', click: 'button[aria-label="More actions"]' },
+  { name: 'new-deck', path: '/decks', click: '[data-dev-new-deck]', type: ['[data-dev-cmdr-search]', 'kre'] },
   { name: 'setup', path: '/game?deck=mock-atraxa' },
   { name: 'setup-opponent', path: '/game?deck=mock-atraxa', click: '[data-dev-seat="0"]' },
   { name: 'settings', path: '/', click: 'button[aria-label="Settings"]:visible' },
@@ -67,6 +71,10 @@ for (const vp of VIEWPORTS) {
       if (screen.click) {
         await page.locator(screen.click).first().click();
         await page.waitForTimeout(600);
+      }
+      if (screen.type) {
+        await page.locator(screen.type[0]).first().fill(screen.type[1]);
+        await page.waitForTimeout(900);
       }
       const file = join(outDir, `${screen.name}-${vp.tag}.png`);
       await page.screenshot({ path: file });
