@@ -43,3 +43,7 @@ next-env.d.ts
 
 # large data files (Scryfall bulk data)
 /resources/*.json
+
+# Generated locally: the emulator log and the screenshot sweep output
+firestore-debug.log
+screenshots/
