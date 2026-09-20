@@ -7,7 +7,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useDeckStore } from '@/store/deckStore';
 import { useAuth } from '@/lib/firebase/auth';
 import { sfxCastSpell } from '@/lib/audio';
-import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon } from 'lucide-react';
+import { LogOut, Volume2, VolumeX, Sparkles, User as UserIcon, GraduationCap } from 'lucide-react';
+import Link from 'next/link';
 import { Keystone } from '@/components/brand/Keystone';
 import { SectionLabel, ToggleRow } from '@/components/settings/controls';
 import { AdminPanel } from '@/components/admin/AdminPanel';
@@ -54,7 +55,7 @@ export function SettingsSheetProvider({ children }: { children: React.ReactNode 
 }
 
 function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { sfxEnabled, sfxVolume, reduceMotion, setSfxEnabled, setSfxVolume, setReduceMotion } =
+  const { sfxEnabled, sfxVolume, reduceMotion, apprenticeMode, setSfxEnabled, setSfxVolume, setReduceMotion, setApprenticeMode } =
     useSettingsStore();
   const { user, signOut } = useAuth();
   const decks = useDeckStore((s) => s.decks);
@@ -122,6 +123,18 @@ function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v
               onChange={setReduceMotion}
               icon={<Sparkles className="h-4 w-4" />}
             />
+          </section>
+
+          <section className="flex flex-col gap-4" data-dev-apprentice-settings>
+            <SectionLabel>Learning</SectionLabel>
+            <ToggleRow
+              label="Apprentice mode"
+              hint="A line under the game header explains each step and every prompt, with a link to the lesson. Free, no model involved."
+              checked={apprenticeMode}
+              onChange={setApprenticeMode}
+              icon={<GraduationCap className="h-4 w-4" />}
+            />
+            <Link href="/learn" onClick={() => onOpenChange(false)} className="px-1 text-xs text-gold underline-offset-4 hover:underline">Read the lessons →</Link>
           </section>
 
           <ArchivistSettings />

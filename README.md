@@ -100,6 +100,29 @@ poison against 10, library and hand counts, the mana pool, commander damage take
 opposing commander against the 21 that ends a game, and the graveyard, exile and command zone
 laid out as cards with a reader. Tabs across the top switch seats without closing.
 
+## The Apprentice (learning, free)
+
+Apprentice mode is the rulebook read at the right moment, with no model involved. It is on
+for new players and lives in two places:
+
+- **/learn** — eleven short lessons (what Commander is, building a deck, card types, mana,
+  the turn, priority and the stack, combat, life/poison/commander damage, the command zone,
+  mulligans) and a keyword glossary. Each lesson has small diagrams and a quiz with instant
+  feedback. Free and readable without an account.
+- **In a game** — a line under the header says which step it is, what is happening and what
+  you can do; when the engine asks something, what it is asking and how to answer with
+  these controls (`PROMPT_GUIDE`, one entry per server prompt). Notes fire once per game the
+  first time something matters: the stack, the commander leaving its zone, life at 10 or
+  less, seven poison, fifteen commander damage. Every prompt panel carries the same guide
+  at its foot. "Learn more" opens the lesson in a new tab. The deck check's issues each get a
+  "Why?" link to the rule they break.
+
+Content is typed data in `src/content/lessons/`. `npm run test:lessons` checks that every
+phase, step and server prompt the overlay renders has a guide, every quiz answer is in
+range, and every link lands on a lesson and section that exist — so a new prompt cannot
+ship without an explanation. Toggle: Settings → Learning, the cap in the game header, or the
+switch on /learn. Harness: `/dev/board?apprentice=0`, `?choice=attackers`.
+
 ## The Archivist
 
 The Archivist is the resident helper: a keeper of records who has read every card. It is
@@ -181,6 +204,7 @@ npm run test:deck         # deck grouping/stats, opponent seat resolution
 npm run test:entitlements # the price list under both launch-switch positions, plan resolution
 npm run test:metering     # Archivist allowance arithmetic
 npm run test:archivist    # prompt builders, context serialisation, swap/idea parsing
+npm run test:lessons      # Apprentice content: every phase, step and prompt explained; quiz and link integrity
 npm run test:rules        # firestore.rules against the emulator (needs Java)
 npx next build
 ```

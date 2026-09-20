@@ -3,6 +3,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { PromptGuide } from './PromptGuide';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { CardView } from './CardView';
@@ -204,6 +205,7 @@ export function ForgeChoiceOverlay() {
           style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}
         >
           <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
+          <PromptGuide choiceType={pendingChoice.choiceType} />
         </motion.div>
       </AnimatePresence>
     </div>

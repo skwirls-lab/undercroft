@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { HelpCircle } from 'lucide-react';
 import type { DeckCheck as DeckCheckResult, DeckLegality } from '@/lib/deckRules';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { ISSUE_GUIDE, lessonHref } from '@/content/lessons';
 
 /**
  * The deck's standing against the Commander rules, as one line in the header and, on tap, the
@@ -80,7 +82,8 @@ export function DeckCheckDialog({ open, onOpenChange, check, onOpenCard }: { ope
               <li key={`${issue.kind}-${i}`} className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
                 <p className="flex items-start gap-2 text-sm text-foreground">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                  <span>{issue.message}</span>
+                  <span className="min-w-0 flex-1">{issue.message}</span>
+                  <Link href={lessonHref(ISSUE_GUIDE[issue.kind])} target="_blank" rel="noopener" className="shrink-0 text-xs text-gold/80 underline-offset-4 hover:text-gold hover:underline" title="Open the lesson">Why?</Link>
                 </p>
                 {issue.cards && issue.cards.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5 pl-6">
