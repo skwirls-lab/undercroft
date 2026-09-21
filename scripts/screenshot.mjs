@@ -75,6 +75,10 @@ const SCREENS = [
   { name: 'prompt-confirm', path: '/dev/board?choice=confirm' },
   { name: 'prompt-modes', path: '/dev/board?choice=modes' },
   { name: 'prompt-targets', path: '/dev/board?choice=targets' },
+  { name: 'prompt-targets-read', path: '/dev/board?choice=targets', click: '[data-dev-option-group="Krenko AI"] [data-card-preview-safe]:nth-of-type(1)' },
+  { name: 'prompt-peek', path: '/dev/board?choice=targets', click: '[data-dev-prompt-peek]' },
+  { name: 'prompt-ability', path: '/dev/board?choice=ability' },
+  { name: 'prompt-color', path: '/dev/board?choice=color' },
 ];
 
 const VIEWPORTS = [
