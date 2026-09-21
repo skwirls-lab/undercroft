@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import type { GameState, GameAction, GameEvent } from '@/lib/gameTypes';
+import { stepKey } from '@/lib/passGuard';
 import {
   sfxTapLand, sfxCastSpell, sfxPlayCard, sfxDamage,
   sfxLifeGain, sfxTurnStart, sfxGameOver, sfxPassPriority
@@ -13,6 +14,9 @@ interface GameStore {
   isProcessing: boolean;
   autoPassUntilNextTurn: boolean;
   lockedTappedIds: Set<string>;
+  /** Has the player done anything but pass since the current step began? Resets each step. */
+  actedThisStep: boolean;
+  markActed: () => void;
 
   // Forge server mode
   forgeMode: boolean;
@@ -42,6 +46,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   aiControllers: new Map(),
   autoPassUntilNextTurn: false,
   lockedTappedIds: new Set(),
+  actedThisStep: false,
+  markActed: () => set({ actedThisStep: true }),
   forgeMode: false,
   forgePendingRequestId: null,
   forgeRespondFn: null,
@@ -61,11 +67,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   setForgeState: (gameState, events) => {
+    const stepChanged = stepKey(gameState) !== stepKey(get().gameState);
     set({
       gameState,
       events: events ?? get().events,
       // Don't clear legalActions here — they're managed by setForgeLegalActions
       isProcessing: false,
+      ...(stepChanged ? { actedThisStep: false } : {}),
     });
   },
 
@@ -92,6 +100,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (action.type === 'PASS_PRIORITY') {
         forgeRespondFn(forgePendingRequestId, { pass: true });
       } else {
+        set({ actedThisStep: true });
         const forgeIdx = action.payload?.forgeAbilityIndex as number | undefined;
         if (forgeIdx != null) {
           forgeRespondFn(forgePendingRequestId, { abilityIndex: forgeIdx });

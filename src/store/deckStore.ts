@@ -216,12 +216,19 @@ export function parseDecklist(text: string): { cards: DeckEntry[]; commanderName
 }
 
 /** Strip set codes, collector numbers, category brackets and commander markers from a card name. */
+/**
+ * A card name out of an export line. Handles the markers exports add after the name:
+ * `*CMDR*`, `*F*` (foil) and `*E*` (etched) from Arena/Moxfield, `[tags]`, the `(SET) 123`
+ * printing, and a bare collector number. A bare number is a collector number only when it is
+ * one to three digits: "Spider-Man 2099" is a card name, "Sol Ring 123" is a printing.
+ */
 function cleanCardName(input: string): string {
   return input
-    .replace(/\*CMDR\*/gi, '')
+    .replace(/\*[A-Za-z]{1,4}\*/g, ' ')
     .replace(/\[[^\]]*\]/g, '')
     .replace(/\([^)]*\)\s*\d*\s*$/g, '')
-    .replace(/\s+\d+\s*$/g, '')
+    .replace(/\s+\d{1,3}\s*$/g, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 

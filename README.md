@@ -93,6 +93,16 @@ default), a specific house deck, or any vault deck with a commander — includin
 are about to play, if a mirror match is the test. `src/lib/opponentDecks.ts` resolves the
 choices into `start_game` payloads; the server names each AI seat after its deck.
 
+## Importing a list
+
+Paste a list from Arena, Moxfield, Archidekt, TappedOut or plain text. Per line: an
+optional count, the name, then anything an export appends — `(SET) 123`, a bare collector
+number of up to three digits, `*F*` / `*E*` markers, `[tags]`, `*CMDR*`. A name may end in a
+year ("Spider-Man 2099"). `// Commander` and `Commander:` headers name the commander;
+`Sideboard`, `Maybeboard` and `Considering` sections are skipped. Names resolve against the
+card database by exact name, then spelling variations, then the front face of a double-faced
+card, then Scryfall itself, so a card newer than the last weekly sync still resolves.
+
 ## Card art
 
 Every card has one face in the app: its **oldest ordinary paper printing**, the art most
@@ -175,6 +185,15 @@ the server's codes to one typed error. When the admin switch is off every entry 
 script so the whole path can be exercised without a key; the dev harness does the same in
 mock mode (`/decks/mock-atraxa?archivist=improve|swaps|strategy`,
 `/dev/board?archivist=advice|recap`).
+
+## Passing, and the main phase
+
+Pass sends priority on. With an empty stack in your own main phase it ends the phase, so
+the button says **End main phase** then, and the priority bar says which main phase you are
+in. If you press it having done nothing that step while you still have plays available, the
+table asks "End your main phase?" once; Pass anyway goes through, and the question is not
+repeated within the same step. It never asks with a spell on the stack, on an opponent's
+turn, in combat, or with auto-pass on. `scripts/test-pass-guard.ts` pins the rule.
 
 ## Leaving the table
 
