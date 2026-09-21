@@ -145,6 +145,13 @@ check('reports duplicates incl. over-cap "up to" cards', kinds.has('duplicate') 
 check('reports off-identity (Bolt in Atraxa)', kinds.has('off-identity') && messy.issues.find((i) => i.kind === 'off-identity')!.cards![0] === 'Lightning Bolt');
 check('reports unknown and not-in-forge', kinds.has('unknown') && kinds.has('not-in-forge'));
 check('reports missing commander', checkDeck({ commanderName: '', cards: [] }, rulesRecords).issues.some((i) => i.kind === 'no-commander'));
+{
+  // Two of each basic with no record loaded for them: basics by name, never a duplicate.
+  const noBasics = new Map(rulesRecords); for (const b of ['Plains', 'Island', 'Swamp', 'Mountain', 'Forest']) noBasics.delete(b);
+  const basicsDeck = { commanderName: 'Atraxa', cards: [{ cardName: 'Atraxa', quantity: 1, resolved: true }, ...['Plains', 'Island', 'Swamp', 'Mountain', 'Forest'].map((n) => ({ cardName: n, quantity: 2, resolved: true }))] };
+  check('basic lands are never over the singleton limit, even before their records load', !checkDeck(basicsDeck, noBasics).issues.some((i) => i.kind === 'duplicate'));
+  check('a snow basic is a basic by name', !checkDeck({ commanderName: 'Atraxa', cards: [{ cardName: 'Atraxa', quantity: 1, resolved: true }, { cardName: 'Snow-Covered Forest', quantity: 9, resolved: true }] }, noBasics).issues.some((i) => i.kind === 'duplicate'));
+}
 check('reports a commander that cannot command', checkDeck({ commanderName: 'Craterhoof', cards: [{ cardName: 'Craterhoof', quantity: 1, resolved: true }] }, rulesRecords).issues.some((i) => i.kind === 'bad-commander'));
 
 const verdict = summarizeCheck(messy);

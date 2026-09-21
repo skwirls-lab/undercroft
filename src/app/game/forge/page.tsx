@@ -27,6 +27,7 @@ import { ApprenticeStrip } from '@/components/game/ApprenticeStrip';
 import { useTour } from '@/hooks/useTour';
 import { TourOverlay } from '@/components/tour/Tour';
 import { LessonSheet } from '@/components/learn/LessonSheet';
+import { shouldAskBeforePass } from '@/lib/passGuard';
 import { useLessonSheet } from '@/store/lessonSheetStore';
 import {
   Loader2,
@@ -65,7 +66,9 @@ export function ForgeGamePage() {
     canRematch,
   } = useForgeGameStore();
 
-  const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass } = useGameStore();
+  const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass, actedThisStep, markActed } = useGameStore();
+  /** A pass that would skip your main phase with nothing done: ask first. */
+  const [passPrompt, setPassPrompt] = useState(false);
 
   // Hand data — derived from gameStore so the hand can live outside GameBoard
   const handCardIds = gameState ? getCardsInZone(gameState, HUMAN_PLAYER_ID, 'hand') : [];
@@ -167,6 +170,9 @@ export function ForgeGamePage() {
   const hasPriorityForActions = gameState?.priority.playerWithPriority === HUMAN_PLAYER_ID;
   const isMyTurn = gameState?.turn.activePlayerId === HUMAN_PLAYER_ID;
   const inCombatPhase = gameState?.turn.phase === 'combat';
+  const inMainPhase = gameState?.turn.phase === 'precombat_main' || gameState?.turn.phase === 'postcombat_main';
+  // With an empty stack in your own main phase, Pass ends the phase: say so on the button.
+  const passLabel = hasPriorityForActions && isMyTurn && inMainPhase && (gameState?.stack.length ?? 0) === 0 ? 'End main phase' : 'Pass';
 
   // Count transitions INTO priority so the bar's sweep replays each time it becomes yours.
   const [prioritySweep, setPrioritySweep] = useState(0);
@@ -176,10 +182,17 @@ export function ForgeGamePage() {
     hadPriority.current = !!hasPriorityForActions;
   }, [hasPriorityForActions]);
 
-  const handlePassPriority = useCallback(() => {
+  const passNow = useCallback(() => {
     const action = legalActions.find((a: { type: string }) => a.type === 'PASS_PRIORITY');
     if (action) performAction(action);
   }, [legalActions, performAction]);
+  const handlePassPriority = useCallback(() => {
+    if (shouldAskBeforePass(gameState, legalActions, HUMAN_PLAYER_ID, actedThisStep) && !autoPassUntilNextTurn) {
+      setPassPrompt(true);
+      return;
+    }
+    passNow();
+  }, [gameState, legalActions, actedThisStep, autoPassUntilNextTurn, passNow]);
 
   /**
    * Keyboard shortcuts. The game view had none at all, which makes desktop play needlessly
@@ -195,21 +208,22 @@ export function ForgeGamePage() {
 
       if (e.key === 'Escape') {
         // Back out of the innermost thing that is open.
-        if (pendingExit) { setPendingExit(null); e.preventDefault(); }
+        if (passPrompt) { setPassPrompt(false); e.preventDefault(); }
+        else if (pendingExit) { setPendingExit(null); e.preventDefault(); }
         else if (expandedPlayerId) { setExpandedPlayerId(null); e.preventDefault(); }
         return;
       }
       // Space / Enter passes priority, but only when it is actually yours to pass and
       // nothing is waiting on a decision.
       if ((e.key === ' ' || e.key === 'Enter') && hasPriorityForActions && !isGameOver
-          && !pendingChoice && !isAwaitingServer && !pendingExit) {
+          && !pendingChoice && !isAwaitingServer && !pendingExit && !passPrompt) {
         e.preventDefault();
         handlePassPriority();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [expandedPlayerId, pendingExit, hasPriorityForActions, isGameOver, pendingChoice, isAwaitingServer, handlePassPriority]);
+  }, [expandedPlayerId, pendingExit, passPrompt, hasPriorityForActions, isGameOver, pendingChoice, isAwaitingServer, handlePassPriority]);
 
   // If not connected, redirect back to setup
   useEffect(() => {
@@ -345,7 +359,7 @@ export function ForgeGamePage() {
             {isGameOver ? 'Game Over'
               : isAwaitingServer ? 'Resolving...'
               : isProcessing ? 'AI thinking...'
-              : hasPriorityForActions ? (isMyTurn ? (inCombatPhase ? 'Combat Phase' : 'Your Turn') : 'You have priority')
+              : hasPriorityForActions ? (isMyTurn ? (inCombatPhase ? 'Combat Phase' : inMainPhase ? (gameState?.turn.phase === 'precombat_main' ? 'Your main phase' : 'Your second main phase') : 'Your Turn') : 'You have priority')
               : `${gameState?.players.find(p => p.id === gameState?.priority.playerWithPriority)?.name}'s turn`}
           </span>
           <Button
@@ -359,7 +373,7 @@ export function ForgeGamePage() {
             )}
             style={{ height: 'clamp(28px,4.5vh,1000px)', padding: '0 clamp(10px,2vmin,1000px)', fontSize: 'clamp(10px,2vmin,1000px)', gap: 'clamp(3px,0.6vmin,1000px)' }}
           >
-            <ArrowRight style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} /> Pass
+            <ArrowRight style={{ width: 'clamp(12px,2vmin,1000px)', height: 'clamp(12px,2vmin,1000px)' }} /> {passLabel}
           </Button>
           <Button
             size="sm"
@@ -395,6 +409,22 @@ export function ForgeGamePage() {
         />
       )}
       </div>
+
+      {passPrompt && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPassPrompt(false)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="pass-dialog-title" className="relative z-10 mx-4 w-full max-w-sm rounded-xl border border-gold/40 bg-card p-5 shadow-2xl" data-dev-pass-prompt>
+            <h2 id="pass-dialog-title" className="text-base font-semibold">End your main phase?</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              You have plays available and have not done anything yet. Passing now moves the turn on{gameState?.turn.phase === 'precombat_main' ? ' to combat' : ' to the end step'}.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPassPrompt(false)}>Stay and play</Button>
+              <Button className="bg-gold text-gold-foreground hover:bg-gold/90" onClick={() => { setPassPrompt(false); markActed(); passNow(); }} data-dev-pass-anyway>Pass anyway</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingExit && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">

@@ -55,6 +55,8 @@ const SCREENS = [
   { name: 'learn-keywords', path: '/learn/keywords' },
   { name: 'board', path: '/dev/board' },
   { name: 'board-apprentice-off', path: '/dev/board?apprentice=0' },
+  { name: 'board-main-phase', path: '/dev/board?emptystack=1' },
+  { name: 'board-pass-guard', path: '/dev/board?emptystack=1', click: 'button:has-text("End main phase")' },
   { name: 'lesson-drawer', path: '/dev/board?lesson=the-stack%23stack' },
   { name: 'board-leave', path: '/dev/board', click: '[data-dev-home]' },
   { name: 'return-banner', path: '/dev/board', clicks: ['[data-dev-home]', 'button:has-text("Leave, keep playing later")'], wait: 1200 },

@@ -29,8 +29,14 @@ export function canBeCommander(rec: ScryfallCardRecord): boolean {
 }
 
 export function isBasicLand(rec: ScryfallCardRecord): boolean {
-  return /\bbasic\b/i.test(rec.type_line ?? '');
+  return /\bbasic\b/i.test(rec.type_line ?? '') || BASIC_LAND_NAMES.has(rec.name);
 }
+
+/** The basic lands by name, so a deck is judged right even before their records have loaded. */
+export const BASIC_LAND_NAMES: ReadonlySet<string> = new Set([
+  'Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes',
+  'Snow-Covered Plains', 'Snow-Covered Island', 'Snow-Covered Swamp', 'Snow-Covered Mountain', 'Snow-Covered Forest', 'Snow-Covered Wastes',
+]);
 
 /** How many copies a deck may hold: unlimited for basics and "any number" cards, N for "up to N", else one. */
 export function maxCopies(rec: ScryfallCardRecord): number {
@@ -133,7 +139,7 @@ export function checkDeck(
   const dupes: string[] = [];
   for (const e of deck.cards) {
     const rec = records.get(e.cardName);
-    const max = rec ? maxCopies(rec) : 1;
+    const max = rec ? maxCopies(rec) : BASIC_LAND_NAMES.has(e.cardName) ? Infinity : 1;
     if (e.quantity > max) dupes.push(`${e.cardName} ×${e.quantity}`);
   }
   if (dupes.length) issues.push({ kind: 'duplicate', message: `${dupes.length} card${dupes.length === 1 ? '' : 's'} over the singleton limit.`, cards: dupes });

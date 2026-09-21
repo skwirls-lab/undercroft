@@ -19,6 +19,21 @@ interface Case {
 
 const cases: Case[] = [
   {
+    name: 'Arena export — foil marker after the printing, a name ending in a year, a sideboard',
+    input: `// COMMANDER
+1 Cosmic Spider-Man (SPM) 127
+
+1 Gwenom, Remorseless (SPM) 286 *F*
+1 Spider-Man 2099 (SPM) 150
+1 SP//dr, Piloted by Peni (SPM) 147
+2 Forest (SOS) 280
+
+// SIDEBOARD
+1 Web-Warriors (SPM) 159`,
+    commander: 'Cosmic Spider-Man',
+    entries: 5,
+  },
+  {
     name: 'Moxfield — commander alone in the first block',
     input: `1 Atraxa, Praetors' Voice (CMR) 1
 
@@ -99,8 +114,16 @@ for (const c of cases) {
   if (cards.length !== c.entries) {
     problems.push(`entries: got ${cards.length}, want ${c.entries}`);
   }
-  // No card name should retain set codes, collector numbers, brackets or markers.
-  const unclean = cards.filter((x) => /[()[\]]|\d$|\bCMDR\b/i.test(x.cardName));
+  // No card name should retain set codes, collector numbers, brackets or markers. A name may
+  // end in a four-digit year ("Spider-Man 2099"), never in a one-to-three-digit number.
+  const unclean = cards.filter((x) => /[()[\]*]|(?<!\d)\d{1,3}$|\bCMDR\b/i.test(x.cardName));
+  if (c.name.startsWith('Arena export')) {
+    const names = cards.map((x) => x.cardName);
+    if (!names.includes('Gwenom, Remorseless')) problems.push('foil marker not stripped: ' + JSON.stringify(names));
+    if (!names.includes('Spider-Man 2099')) problems.push('the year was stripped from Spider-Man 2099: ' + JSON.stringify(names));
+    if (!names.includes('SP//dr, Piloted by Peni')) problems.push('a // in a single-faced name was mangled');
+    if (names.includes('Web-Warriors')) problems.push('the sideboard was imported');
+  }
   if (unclean.length > 0) {
     problems.push(`unclean names: ${JSON.stringify(unclean.map((x) => x.cardName))}`);
   }

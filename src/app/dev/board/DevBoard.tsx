@@ -61,6 +61,8 @@ export function DevBoard() {
 
   useEffect(() => {
     const forgeState = buildMockGame();
+    // ?emptystack=1 clears the stack, so a pass in the main phase triggers the "end your main phase?" guard.
+    if (new URLSearchParams(window.location.search).get('emptystack') === '1') forgeState.stack = [];
     const adapted = adaptForgeState(forgeState);
 
     // Give the human a plausible set of legal actions so affordances light up.
