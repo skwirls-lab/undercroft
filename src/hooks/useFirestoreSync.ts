@@ -8,6 +8,7 @@ import { useAppConfigStore } from '@/store/appConfigStore';
 import { upsertUserProfile } from '@/lib/firebase/firestore';
 import { isDevMock } from '@/lib/devMock';
 import { DEV_MOCK_DECKS, DEV_MOCK_SHELVES } from '@/dev/mockDecks';
+import { useMatchHistoryStore } from '@/store/matchHistoryStore';
 
 /**
  * Wires Firebase Auth state to deck store Firestore sync.
@@ -44,7 +45,9 @@ export function useFirestoreSync() {
     if (previousUid !== null && previousUid !== uid) {
       clearSync();
       clearUserSettings();
+      useMatchHistoryStore.getState().clear();
     }
+    if (uid) void useMatchHistoryStore.getState().load(uid);
 
     // App-wide config (allowances, notice, whether the Archivist is resting) follows sign-in.
     if (uid) void useAppConfigStore.getState().refresh();

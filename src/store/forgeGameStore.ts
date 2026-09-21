@@ -26,6 +26,8 @@ import { synthesizeGameEvents } from '@/lib/gameEventSynth';
 import { useGameStore } from '@/store/gameStore';
 import type { GameAction, GameState, CardData } from '@/lib/gameTypes';
 import type { GameOverPayload } from '@/lib/forgeClient';
+import { buildMatchRecord, type MatchMeta } from '@/lib/matchHistory';
+import { useMatchHistoryStore } from '@/store/matchHistoryStore';
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 
 // ===================================================================
@@ -158,6 +160,15 @@ export interface ForgeGameStoreState {
   richLog: boolean;
   /** The server's account of the finished game: turns and every seat's outcome. */
   gameOverDetails: GameOverPayload | null;
+  /** What the setup screen knew about this match's decks; the record is built from it. */
+  matchMeta: MatchMeta | null;
+  matchId: string | null;
+  matchStartedAt: number | null;
+  /** True once this match has been written to the history, so leaving cannot write it twice. */
+  matchRecorded: boolean;
+  setMatchMeta: (meta: MatchMeta | null) => void;
+  /** Build and store the match record. `abandoned` when the player left before the end. */
+  recordMatch: (abandoned: boolean) => void;
   isGameOver: boolean;
   winner: string | null;
 
@@ -260,8 +271,36 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   gameEvents: [],
   richLog: false,
   gameOverDetails: null,
+  matchMeta: null,
+  matchId: null,
+  matchStartedAt: null,
+  matchRecorded: false,
   isGameOver: false,
   winner: null,
+
+  setMatchMeta: (meta) => set({ matchMeta: meta }),
+
+  recordMatch: (abandoned) => {
+    const s = get();
+    if (s.matchRecorded || !s.matchId || !s.matchStartedAt) return;
+    // Nothing happened yet: a game left at the mulligan is not a match.
+    const turn = s.gameState?.turn.turnNumber ?? 0;
+    if (abandoned && turn < 1) return;
+    const youName = s.gameState?.players.find((p) => !p.isAI)?.name ?? s.lastStartPayload?.playerName ?? 'Player';
+    const record = buildMatchRecord({
+      id: s.matchId,
+      startedAt: s.matchStartedAt,
+      endedAt: Date.now(),
+      meta: s.matchMeta,
+      youName,
+      state: s.gameState,
+      events: s.gameEvents,
+      outcome: s.gameOverDetails,
+      abandoned,
+    });
+    set({ matchRecorded: true });
+    void useMatchHistoryStore.getState().record(record);
+  },
 
   connect: async (serverUrl: string) => {
     const client = new ForgeGameClient(serverUrl, {
@@ -432,6 +471,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
           pendingChoice: null,
           isAwaitingServer: false,
         });
+        get().recordMatch(false);
       },
 
       onError: (message) => {
@@ -445,7 +485,9 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   },
 
   disconnect: () => {
-    const { client } = get();
+    const { client, gameState, isGameOver } = get();
+    // Walking away from a running game still leaves a line in the history.
+    if (gameState && !isGameOver) get().recordMatch(true);
     client?.disconnect();
     imageUrisCache.clear();
     set({
@@ -457,15 +499,23 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       gameEvents: [],
       richLog: false,
       gameOverDetails: null,
+      matchId: null,
+      matchStartedAt: null,
+      matchRecorded: false,
       isGameOver: false,
       winner: null,
     });
   },
 
   startGame: (deckList, commander, playerName, aiCount, aiDecks) => {
-    const { client } = get();
+    const { client, gameState, isGameOver } = get();
     if (client) {
+      // A rematch from a running game abandons the running one.
+      if (gameState && !isGameOver) get().recordMatch(true);
       set({
+        matchId: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        matchStartedAt: Date.now(),
+        matchRecorded: false,
         gameState: null,
         pendingChoice: null,
         pendingAbilitySelection: null,

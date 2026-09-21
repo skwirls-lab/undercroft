@@ -225,6 +225,18 @@ asks before leaving, and a gold banner at the top of every page returns you to t
 until the game ends. Reloading the page or closing the tab does end it (the engine session is
 a live socket; there is no reconnect yet).
 
+## Match history
+
+Every game you finish — or walk away from after turn 1 — is written to
+`users/{uid}/matches/{matchId}` and listed under **History**: the result and how it was
+decided (the reason the last seat fell: life, poison, commander damage, a card), the turn
+count and length, your deck and commander against every opponent's, and per seat the
+finishing place, final life, spells cast, damage dealt and life lost, and how and when it was
+eliminated. The Archivist's recap, if you asked for one at the end, is saved on the record.
+The dashboard shows the last match. `src/lib/matchHistory.ts` builds the record from the
+final state, the described log and the server's per-seat outcome (`npm run
+test:match-history`); an older server still yields a record with the winner and the turns.
+
 ## Administration
 
 Settings has an Administration section for the admin allowlist: the Archivist's master
@@ -266,6 +278,7 @@ src/
 │   ├── decks/         # Deck page, builder search, deck check, card tiles, reader, shelves
 │   ├── game/          # Board, seats, cards, hand, prompts, the Apprentice strip and prompt guide
 │   ├── archivist/     # The Archivist's sheet, in-game panel, commander ideas, notices
+│   ├── history/       # The match ledger
 │   ├── learn/         # The lessons index, a lesson with diagrams and quiz
 │   ├── tour/          # The spotlight tour overlay
 │   ├── patron/        # The Patron sheet and upsell provider

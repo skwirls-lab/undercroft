@@ -8,7 +8,7 @@ import { useAppConfigStore } from '@/store/appConfigStore';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { Megaphone } from 'lucide-react';
 import { Keystone } from '@/components/brand/Keystone';
-import { Library, Settings, Swords, Home, GraduationCap } from 'lucide-react';
+import { Library, Settings, Swords, Home, GraduationCap, ScrollText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -22,6 +22,7 @@ const TABS = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/game', label: 'Play', icon: Swords },
   { href: '/decks', label: 'Decks', icon: Library },
+  { href: '/history', label: 'History', icon: ScrollText },
   { href: '/learn', label: 'Learn', icon: GraduationCap },
 ] as const;
 

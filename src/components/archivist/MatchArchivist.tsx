@@ -14,6 +14,7 @@ import type { ChatMessage } from '@/lib/archivist/types';
 import { Answer } from './Answer';
 import { ArchivistNotice, Thinking, UsageLine } from './Notice';
 import { useArchivistAccess, stateFromError } from './access';
+import { useMatchHistoryStore } from '@/store/matchHistoryStore';
 import { cn } from '@/lib/utils';
 
 export type MatchAsk = 'advice' | 'recap';
@@ -89,6 +90,11 @@ function Panel({ youId, onClose, docked, initialAsk }: { youId: string; onClose:
       : await ask({ task: 'match.advice', match: matchContext(gameState, legalActions, youId), question: text.trim() }, history);
     setPending(null);
     if (result != null) setMessages((m) => [...m, { role: 'user', content: shown }, { role: 'assistant', content: result }]);
+    // A recap is worth keeping: it goes on the match's record, readable from the history.
+    if (result != null && kind === 'recap') {
+      const matchId = useForgeGameStore.getState().matchId;
+      if (matchId) void useMatchHistoryStore.getState().setRecap(matchId, result);
+    }
   }, [ask, gameState, legalActions, gameEvents, youId, winner, deck, lastStart, messages]);
 
   // Ask once, on the next tick, so the panel paints before the request starts.

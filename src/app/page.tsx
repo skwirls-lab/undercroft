@@ -9,6 +9,9 @@ import { PlanComparison } from '@/components/patron/PlanComparison';
 import { PATRON_PRICE_LABEL } from '@/lib/entitlements';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useDeckStore } from '@/store/deckStore';
+import { useMatchHistoryStore } from '@/store/matchHistoryStore';
+import { ResultChip, tableLine } from '@/components/history/MatchHistory';
+import { summarizeResult } from '@/lib/matchHistory';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Keystone } from '@/components/brand/Keystone';
@@ -30,6 +33,7 @@ import {
   Crown,
   Plus,
   GraduationCap,
+  ScrollText,
 } from 'lucide-react';
 
 // ─── Root ────────────────────────────────────────────────────────────────────
@@ -276,6 +280,7 @@ function Dashboard() {
   const { openPatron } = usePatron();
   const recent = [...decks].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4);
   const firstName = user?.displayName ? user.displayName.split(' ')[0] : null;
+  const lastMatch = useMatchHistoryStore((s) => s.matches[0] ?? null);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -341,6 +346,31 @@ function Dashboard() {
             </Link>
           </motion.div>
         </motion.div>
+
+        {/* The last match, and the way to the rest */}
+        {lastMatch && (
+          <motion.section variants={riseStagger(0.06, 0.25)} initial="hidden" animate="show" className="flex flex-col gap-4">
+            <motion.div variants={rise}>
+              <Eyebrow>Last match</Eyebrow>
+            </motion.div>
+            <motion.div variants={rise}>
+              <Link href="/history" className="group block" data-dev-last-match>
+                <Alcove flat className="flex items-center gap-4 px-5 py-4 transition-colors group-hover:border-gold/30">
+                  <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1', lastMatch.result === 'won' ? 'bg-gold/10 text-gold ring-gold/20' : 'bg-muted/30 text-muted-foreground ring-border/40')}><ScrollText className="h-5 w-5" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <ResultChip result={lastMatch.result} />
+                      <span className="truncate font-display text-lg font-bold">{tableLine(lastMatch).yours}</span>
+                      <span className="text-sm text-muted-foreground">vs {tableLine(lastMatch).opponents}</span>
+                    </span>
+                    <span className="block text-sm text-muted-foreground">{summarizeResult(lastMatch)}{lastMatch.recap ? ' · the Archivist\'s recap is on record' : ''}. Every match is in the history.</span>
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-gold" />
+                </Alcove>
+              </Link>
+            </motion.div>
+          </motion.section>
+        )}
 
         {/* Recent decks */}
         {recent.length > 0 && (
