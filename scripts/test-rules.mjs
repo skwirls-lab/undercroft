@@ -89,6 +89,9 @@ await check('a signed-out visitor cannot read cards', assertFails(getDoc(doc(ano
 await check('a player cannot write cards', assertFails(setDoc(doc(alice, 'cards', 'c2'), { name: 'x' })));
 await check('a player writes their own deck', assertSucceeds(setDoc(doc(alice, 'users', ALICE, 'decks', 'd1'), { name: 'Deck' })));
 await check("a player cannot read another's deck", assertFails(getDoc(doc(alice, 'users', BOB, 'decks', 'd1'))));
+await check('a player writes their own match record', assertSucceeds(setDoc(doc(alice, 'users', ALICE, 'matches', 'm1'), { result: 'won', turns: 12 })));
+await check("a player cannot read another's match history", assertFails(getDoc(doc(alice, 'users', BOB, 'matches', 'm1'))));
+await check("a player cannot write another's match history", assertFails(setDoc(doc(alice, 'users', BOB, 'matches', 'm2'), { result: 'lost' })));
 await check('an unknown collection is closed', assertFails(setDoc(doc(alice, 'anything', 'x'), { a: 1 })));
 
 await env.cleanup();

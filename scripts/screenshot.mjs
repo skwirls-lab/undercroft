@@ -83,6 +83,8 @@ const SCREENS = [
   { name: 'prompt-mana-life', path: '/dev/board?choice=mana' },
   { name: 'game-log', path: '/dev/board', click: '[data-tour="board-ticker"]' },
   { name: 'game-log-since', path: '/dev/board', clicks: ['[data-tour="board-ticker"]', '[data-dev-game-log] button:has-text("Since my last turn")'] },
+  { name: 'history', path: '/history' },
+  { name: 'history-detail', path: '/history', click: '[data-dev-history-row] >> nth=0' },
   { name: 'reader-tags', path: '/dev/board?open=me', clicks: ['[data-card-preview-safe]:has-text("Angel") >> nth=0', '[data-dev-reader-keyword] >> nth=0'] },
 ];
 

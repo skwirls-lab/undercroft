@@ -50,7 +50,7 @@ function GameSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { decks, isSyncing } = useDeckStore();
-  const { connect, startGame, connectionStatus } = useForgeGameStore();
+  const { connect, startGame, connectionStatus, setMatchMeta } = useForgeGameStore();
   const { can, isReadOnly } = useEntitlements();
   const { openPatron } = usePatron();
   const tour = useTour('setup', { ready: !isSyncing });
@@ -147,6 +147,18 @@ function GameSetupContent() {
       }
 
       setConnectPhase('Dealing opening hands...');
+      // For the match record: which decks sat at the table, and whose they were.
+      setMatchMeta({
+        deckId: selectedDeck?.id ?? null,
+        deckName: selectedDeck?.name ?? 'Goblin starter',
+        commander: playerDeck.commander ?? null,
+        opponents: aiDecks.map((d, i) => ({
+          name: d.name ?? `AI Opponent ${i + 1}`,
+          deckName: d.name ?? 'House deck',
+          commander: d.commander ?? null,
+          source: (() => { const c = opponents[i]; return c?.kind === 'vault' && decks.some((x) => x.id === c.deckId) ? 'vault' : 'house'; })(),
+        })),
+      });
       startGame(playerDeck.deckList, playerDeck.commander ?? undefined, 'Player', aiCount, aiDecks);
       setTimeout(() => router.push('/game/forge'), 500);
     } catch (e) {
@@ -156,7 +168,7 @@ function GameSetupContent() {
       clearTimeout(slow);
       clearTimeout(slower);
     }
-  }, [aiCount, connect, connectionStatus, decks, opponents, router, selectedDeck, startGame, preflight]);
+  }, [aiCount, connect, connectionStatus, decks, opponents, router, selectedDeck, startGame, setMatchMeta, preflight]);
 
   return (
     <div className="flex flex-1 flex-col">

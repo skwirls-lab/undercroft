@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useForgeGameStore } from '@/store/forgeGameStore';
@@ -309,7 +310,7 @@ export function ForgeGamePage() {
           {isGameOver && (
             <div className="shrink-0 mx-2 mt-1 rounded-xl border border-gold/30 bg-gold/10 text-center p-2">
               <h2 className="text-base font-bold text-gold">Game Over</h2>
-              <p className="text-xs mt-0.5">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`}</p>
+              <p className="text-xs mt-0.5">{winner === 'draw' ? 'Draw!' : `Winner: ${winner}`} <span className="text-muted-foreground">· recorded in your <Link href="/history" className="text-gold underline underline-offset-2">match history</Link></span></p>
               <div className="mt-1 flex items-center justify-center gap-2">
                 {/* Rematch replays the same decks on the same connection, instead of sending
                     you back through deck selection for every single game. */}

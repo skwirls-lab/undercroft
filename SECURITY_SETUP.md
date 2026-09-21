@@ -31,6 +31,7 @@ created in the console.
 | `/cards/{cardId}` | any signed-in user | admins only (`isAdmin()` — add your UID) |
 | `/users/{userId}` | that user only | that user only, except the `plan` field (billing webhook only) |
 | `/users/{userId}/decks/{deckId}` | that user only | that user only |
+| `/users/{userId}/matches/{matchId}` | that user only | that user only |
 | anything else | denied | denied |
 
 Two changes from the previous version:

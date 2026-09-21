@@ -87,6 +87,12 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Match history: one document per finished (or abandoned) game, written by the browser
+    // at the end of the game and read back on the History page. The player's own record.
+    match /users/{userId}/matches/{matchId} {
+      allow read, write: if isOwner(userId);
+    }
+
     // Anything not matched above is denied. Stated explicitly so a future collection is
     // closed by default rather than inheriting a permissive parent by accident.
     match /{document=**} {
