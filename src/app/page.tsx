@@ -211,8 +211,8 @@ function MarketingPage() {
         <div className="mx-auto max-w-3xl">
           <Eyebrow className="mb-3 justify-center [&>span:last-child]:hidden">Start free. Stay free, or go further.</Eyebrow>
           <p className="mx-auto mb-8 max-w-xl text-center text-sm leading-relaxed text-muted-foreground">
-            Everything you need to play is free: the engine, the deck builder, the lessons, two decks and a pod of three.
-            Patrons pay <strong className="font-semibold text-foreground">{PATRON_PRICE_LABEL}</strong> for an unlimited vault, hand-picked opponents, full pods and the Archivist at the table. Cancel any time.
+            Playing is free, all of it: the engine, full four-player pods, choosing what every opponent plays, the deck builder, the lessons and your match history.
+            Patrons pay <strong className="font-semibold text-foreground">{PATRON_PRICE_LABEL}</strong> to keep more than two decks in the vault and to have the Archivist at the table. Cancel any time.
           </p>
           <motion.div
             initial={{ opacity: 0, y: 16 }}

@@ -46,7 +46,7 @@ const SCREENS = [
   { name: 'vault-locked', path: '/decks?enforce=1&plan=free' },
   { name: 'vault-locked-upsell', path: '/decks?enforce=1&plan=free', click: '[data-dev-new-deck]' },
   { name: 'deck-readonly', path: '/decks/mock-ur-dragon?enforce=1&plan=free' },
-  { name: 'setup-locked', path: '/game?deck=mock-atraxa&enforce=1&plan=free' },
+  { name: 'setup-free', path: '/game?deck=mock-atraxa&enforce=1&plan=free' },
   { name: 'dashboard-free', path: '/?enforce=1&plan=free' },
   { name: 'learn', path: '/learn' },
   { name: 'learn-turn', path: '/learn/the-turn' },

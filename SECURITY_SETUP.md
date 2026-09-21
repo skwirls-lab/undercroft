@@ -252,8 +252,9 @@ only learns "this uid is a Patron" from Stripe's webhook.
    the dashboard. Cancel from the portal: the profile shows `subscriptionStatus: 'canceling'`
    and `patronUntil` until the period ends, then the deletion event makes it free.
 7. **Switch the paywall on** when you are ready to advertise: `NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1`
-   on Vercel and redeploy. Until then every vault, opponent and pod gate answers yes for
-   everyone; the Archivist's plan gate and allowance are enforced regardless.
+   on Vercel and redeploy. Until then the vault gate answers yes for everyone; the
+   Archivist's plan gate and allowance are enforced regardless. Play (every pod size,
+   choosing opponents, shelves) is free on both plans by design.
 
 What the webhook will never do: revoke or overwrite a plan whose `planSource` is `admin`.
 Grants from the Administration section stay until you revoke them there.
@@ -305,9 +306,9 @@ explained above.
 5. **Your own account**: grant yourself Patron from the Administration section so the switch
    never locks the keeper out (§5).
 6. **A fresh account**: sign in with a second Google account and walk the free tier: two
-   decks, the third refused with the Patron sheet, random opponents only, the two-AI pod,
-   ten Archivist requests, the tours and the Apprentice. Then Become a Patron in test mode
-   and see every lock open.
+   decks, the third refused with the Patron sheet, a full four-player pod with chosen
+   opponents (free), ten Archivist requests, the tours and the Apprentice. Then Become a
+   Patron in test mode and see the vault lock open.
 7. **The game server** (still open, below): before a public URL, put the Forge server behind
    authentication or an origin check and cap concurrent games.
 

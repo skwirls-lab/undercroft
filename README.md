@@ -247,17 +247,20 @@ auth, config cache, usage metering) and is reached through route handlers under
 
 ## Plans and the Patron tier
 
-Two plans. **Free**: two decks in the vault, the deck builder and deck check, random house
-opponents, pods of up to three, ten Archivist requests a month, the Apprentice and the
-tutorials. **Patron ($4.99/month)**: unlimited decks, shelves, choose what each opponent
-plays, four-player pods, the Archivist at the table and after the game, commander ideas,
-and a larger monthly allowance.
+Two plans, and one line between them: **everything that is play is free**. Free: the
+engine, pods of any size, choosing what each opponent plays, two decks in the vault with
+shelves, the deck builder and deck check, ten Archivist requests a month, the Apprentice,
+the tutorials and the match history. **Patron ($4.99/month)** buys the two things that cost
+money to provide: room in the vault beyond two decks, and the Archivist's model calls — a
+larger monthly allowance plus the tasks that only make sense with one (the Archivist at the
+table, the post-game recap, commander ideas). Wizards' Fan Content Policy asks that fan
+content be free to play and allows Patreon-style support; the line is drawn to keep to that.
 
 `src/lib/entitlements.ts` is the single price list (`FEATURES`, `LIMITS`); `useEntitlements()`
 is what a screen asks before showing a gated control, and every locked control opens the
 **Patron sheet** with the reason rather than sitting dead. The launch switch is
-`NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1`: while it is unset every vault, opponent and pod gate
-answers yes. The Archivist's plan gate and allowance are enforced on the server regardless.
+`NEXT_PUBLIC_ENFORCE_ENTITLEMENTS=1`: while it is unset the vault gate answers yes. The
+Archivist's plan gate and allowance are enforced on the server regardless.
 A free account with more than two decks keeps them all: the two most recently touched stay
 live, the rest are **read-only** (badge, banner, not playable) until the player becomes a Patron.
 

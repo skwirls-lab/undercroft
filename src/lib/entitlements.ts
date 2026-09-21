@@ -16,6 +16,12 @@
  *
  * Keep gating decisions out of the game itself: the Forge session does not know or care what
  * plan a player is on, and a free player's game never behaves differently mid-match.
+ *
+ * The line: everything that is play is free — every pod size, choosing what each opponent
+ * plays, shelves, the lessons, the history. Patron buys the two things that cost us money to
+ * provide: room in the vault beyond two decks, and the Archivist's model calls (a larger
+ * allowance, and the tasks that only make sense with one). Wizards' Fan Content Policy asks
+ * that fan content be free to play and allows Patreon-style support; this keeps to that.
  */
 
 import type { Plan } from '@/lib/plan';
@@ -25,9 +31,9 @@ export { parsePlan, type Plan } from '@/lib/plan';
 export const ENFORCE_ENTITLEMENTS: boolean = process.env.NEXT_PUBLIC_ENFORCE_ENTITLEMENTS === '1';
 
 export type Feature =
-  | 'vault.shelves'      // organise decks into shelves
-  | 'opponents.choose'   // pick what each AI seat plays (house deck or vault deck)
-  | 'game.fourPlayer'    // three AI opponents (a full pod)
+  | 'vault.shelves'      // organise decks into shelves (free)
+  | 'opponents.choose'   // pick what each AI seat plays (house deck or vault deck) (free)
+  | 'game.fourPlayer'    // three AI opponents (a full pod) (free)
   | 'archivist.deck'     // deck advice, swaps, strategy, rules questions
   | 'archivist.match'    // the in-match assistant
   | 'archivist.recap'    // post-game recap
@@ -46,9 +52,9 @@ interface FeatureRule {
 
 /** The price list. One row per feature; the launch switch decides whether it applies. */
 export const FEATURES: Record<Feature, FeatureRule> = {
-  'vault.shelves':    { plans: ['patron'],         label: 'Shelves' },
-  'opponents.choose': { plans: ['patron'],         label: 'Choose opponent decks' },
-  'game.fourPlayer':  { plans: ['patron'],         label: 'Four-player pods' },
+  'vault.shelves':    { plans: ['free', 'patron'], label: 'Shelves' },
+  'opponents.choose': { plans: ['free', 'patron'], label: 'Choose what each opponent plays' },
+  'game.fourPlayer':  { plans: ['free', 'patron'], label: 'Four-player pods' },
   'archivist.deck':   { plans: ['free', 'patron'], label: 'Deck advice from the Archivist' },
   'archivist.match':  { plans: ['patron'],         label: 'The Archivist at the table' },
   'archivist.recap':  { plans: ['patron'],         label: 'Post-game recap' },
@@ -57,7 +63,7 @@ export const FEATURES: Record<Feature, FeatureRule> = {
 
 export const LIMITS: Record<Limit, Record<Plan, number>> = {
   'vault.maxDecks': { free: 2, patron: Infinity },
-  'game.maxAI':     { free: 2, patron: 3 },
+  'game.maxAI':     { free: 3, patron: 3 },
 };
 
 export const PLAN_LABEL: Record<Plan, string> = {
