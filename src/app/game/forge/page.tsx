@@ -10,6 +10,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { Hand } from '@/components/game/Hand';
 import { CardPreviewProvider, useCardPreview } from '@/components/game/CardPreviewContext';
 import { ForgeChoiceOverlay } from '@/components/game/ForgeChoiceOverlay';
+import { ReaderTags } from '@/components/game/ReaderTags';
 import { EventTicker } from '@/components/game/EventTicker';
 import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
@@ -118,6 +119,7 @@ export function ForgeGamePage() {
       sourceIdSet: new Set(sources.map((s) => `forge-${s.id}`)),
       manaCost: (data.manaCost as string) || '?',
       spellName: (data.spellName as string) || 'spell',
+      lifeForPhyrexian: typeof data.lifeForPhyrexian === 'number' ? data.lifeForPhyrexian : 0,
       requestId: pendingChoice.requestId,
     };
   }, [isManaPayment, pendingChoice]);
@@ -132,6 +134,11 @@ export function ForgeGamePage() {
   const handleCancelManaPayment = useCallback(() => {
     if (!manaPaymentData) return;
     respondToChoice(manaPaymentData.requestId, { cancel: true });
+  }, [manaPaymentData, respondToChoice]);
+
+  const handlePayLifeForMana = useCallback(() => {
+    if (!manaPaymentData?.lifeForPhyrexian) return;
+    respondToChoice(manaPaymentData.requestId, { payLife: true });
   }, [manaPaymentData, respondToChoice]);
 
   // Unified expanded overlay: null = collapsed, playerId = expanded battlefield (with hand for current player)
@@ -291,6 +298,7 @@ export function ForgeGamePage() {
             id: `f${i}`,
           }))}
           currentPlayerId={HUMAN_PLAYER_ID}
+          youName={gameState?.players.find((p) => p.id === HUMAN_PLAYER_ID)?.name}
         />
 
         {apprenticeMode && <ApprenticeStrip youId={HUMAN_PLAYER_ID} />}
@@ -330,9 +338,10 @@ export function ForgeGamePage() {
             hideActionBar
             className="h-full"
             manaPaymentSourceIds={manaPaymentData?.sourceIdSet}
-            manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName } : undefined}
+            manaPaymentInfo={manaPaymentData ? { manaCost: manaPaymentData.manaCost, spellName: manaPaymentData.spellName, lifeForPhyrexian: manaPaymentData.lifeForPhyrexian } : undefined}
             onTapForManaPayment={manaPaymentData ? handleTapForManaPayment : undefined}
             onCancelManaPayment={manaPaymentData ? handleCancelManaPayment : undefined}
+            onPayLifeForMana={manaPaymentData?.lifeForPhyrexian ? handlePayLifeForMana : undefined}
             externalExpandedPlayerId={expandedPlayerId}
             onExpandedPlayerChange={setExpandedPlayerId}
           />
@@ -594,36 +603,8 @@ function CardPreviewFloating() {
                 <OracleText text={previewCard.cardData.oracleText} />
               </div>
             )}
-            {/* Keywords */}
-            {previewCard.cardData.keywords.length > 0 && (
-              <div className="flex flex-wrap" style={{ gap: 'clamp(3px,0.4vmin,1000px)' }}>
-                {previewCard.cardData.keywords.map((kw) => (
-                  <span key={kw} className="rounded bg-amber-600/80 font-semibold text-amber-100" style={{ fontSize: 'clamp(8px,1.3vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(4px,0.5vmin,1000px)' }}>
-                    {kw}
-                  </span>
-                ))}
-              </div>
-            )}
-            {/* Counters */}
-            {Object.keys(previewCard.counters).length > 0 && (
-              <div className="flex flex-wrap" style={{ gap: 'clamp(3px,0.4vmin,1000px)' }}>
-                {Object.entries(previewCard.counters).map(([type, count]) => (
-                  <span key={type} className={`rounded font-bold text-white ${type === '+1/+1' ? 'bg-green-600/80' : type === '-1/-1' ? 'bg-red-600/80' : 'bg-purple-600/80'}`} style={{ fontSize: 'clamp(8px,1.3vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(4px,0.5vmin,1000px)' }}>
-                    {count > 1 ? `${count}x ` : ''}{type}
-                  </span>
-                ))}
-              </div>
-            )}
-            {/* Attachments */}
-            {previewCard.attachmentNames.length > 0 && (
-              <div className="flex flex-wrap" style={{ gap: 'clamp(3px,0.4vmin,1000px)' }}>
-                {previewCard.attachmentNames.map((name, i) => (
-                  <span key={i} className="rounded bg-sky-600/80 font-semibold text-sky-100" style={{ fontSize: 'clamp(8px,1.3vmin,1000px)', padding: 'clamp(1px,0.15vmin,1000px) clamp(4px,0.5vmin,1000px)' }}>
-                    ⚔ {name}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Keywords, counters and attachments — each one answers a tap */}
+            <ReaderTags card={previewCard} onSwap={(c) => setPreviewCard(c)} fontSize="clamp(8px,1.3vmin,1000px)" gap="clamp(3px,0.4vmin,1000px)" />
             {previewCard.cardData.power !== undefined && (
               <div className="mt-auto border-t border-white/10 text-right font-bold text-white/90" style={{ fontSize: 'clamp(12px,2vmin,1000px)', paddingTop: 'clamp(4px,0.6vmin,1000px)' }}>
                 {previewCard.cardData.power}/{previewCard.cardData.toughness}

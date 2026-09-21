@@ -85,7 +85,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
       manaPool,
       commanderDamageReceived: fp.commanderDamage ?? {},
       commanderCastCount: {},
-      hasLost: false,
+      hasLost: fp.eliminated ?? false,
       hasConceded: false,
       poisonCounters: fp.poison ?? 0,
       landPlayedThisTurn: false,

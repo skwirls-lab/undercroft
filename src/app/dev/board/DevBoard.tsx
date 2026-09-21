@@ -16,7 +16,7 @@ import type { ForgeChoiceRequest } from '@/lib/forgeClient';
  * Query params:
  *   ?open=me | ai-2 | ai-3 | ai-4   open the expanded board for that player on load
  *   ?inspect=me | ai-2 | ai-3 | ai-4   open the seat inspector for that player on load
- *   ?choice=tutor | discard | confirm | modes | scry | targets | attackers | ability | color
+ *   ?choice=tutor | discard | confirm | modes | scry | targets | attackers | ability | color | combo | mana
  *                                   seed a server prompt so the choice overlay renders
  */
 
@@ -66,6 +66,10 @@ function choicePreset(name: string, humanHandIds: number[]): ForgeChoiceRequest 
         { index: 0, description: '{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.', cardName: 'Krenko, Mob Boss', isAbility: true },
         { index: 1, description: 'Cast Krenko, Mob Boss ({2}{R}{R})', cardName: 'Krenko, Mob Boss', isSpell: true },
       ] } };
+    case 'combo':
+      return { requestId: 'dev-combo', choiceType: 'choose_mana_combo', data: { prompt: 'Vivi Ornitier — choose 3 mana', cardName: 'Vivi Ornitier', amount: 3, different: false, colors: [{ mask: 2, name: 'Blue', symbol: 'U' }, { mask: 8, name: 'Red', symbol: 'R' }] } };
+    case 'mana':
+      return { requestId: 'dev-mana', choiceType: 'mana_payment', data: { manaCost: '{1}{U/P}', spellName: 'Gitaxian Probe', canCancel: true, lifeForPhyrexian: 2, sources: [{ id: 9101, name: 'Island', type: 'Basic Land — Island' }, { id: 9102, name: 'Sol Ring', type: 'Artifact' }] } };
     case 'color':
       return { requestId: 'dev-color', choiceType: 'choose_color', data: { prompt: 'Command Tower — choose a colour of mana', colors: [
         { mask: 1, name: 'White', symbol: 'W' }, { mask: 2, name: 'Blue', symbol: 'U' }, { mask: 4, name: 'Black', symbol: 'B' }, { mask: 8, name: 'Red', symbol: 'R' }, { mask: 16, name: 'Green', symbol: 'G' },
@@ -132,11 +136,26 @@ export function DevBoard() {
       isGameOver: false,
       pendingChoice: preset,
       gameEvents: [
-        { eventType: 'GAME_STARTED' },
-        { eventType: 'TURN_STARTED', turnNumber: 9, activePlayer: 'Player' },
-        { eventType: 'SPELL_CAST', cardName: 'Ancestral Recall', playerName: 'You' },
-        { eventType: 'SPELL_CAST', cardName: 'Counterspell', playerName: 'Control AI' },
-        { eventType: 'LIFE_CHANGED', playerName: 'Krenko AI', newLife: 18, delta: -4 },
+        { eventType: 'GAME_STARTED', turn: 0 },
+        { eventType: 'TURN_STARTED', turnNumber: 7, activePlayer: 'Player', rich: true, turn: 7 },
+        { eventType: 'CARD_PLAYED', playerName: 'Player', cardName: 'Forest', rich: true, turn: 7 },
+        { eventType: 'MANA_TAPPED', playerName: 'Player', cardName: 'Forest', ability: '{T}: Add {G}.', rich: true, turn: 7 },
+        { eventType: 'SPELL_CAST', playerName: 'Player', cardName: 'Cultivate', rich: true, turn: 7 },
+        { eventType: 'SPELL_RESOLVED', cardName: 'Cultivate', rich: true, turn: 7 },
+        { eventType: 'CARD_RETURNED_TO_BATTLEFIELD', playerName: 'Player', cardName: 'Island', from: 'Library', cause: 'Cultivate', rich: true, turn: 7 },
+        { eventType: 'TURN_STARTED', turnNumber: 8, activePlayer: 'Krenko AI', rich: true, turn: 8 },
+        { eventType: 'CARD_DRAWN', playerName: 'Krenko AI', cardName: '', hidden: true, rich: true, turn: 8 },
+        { eventType: 'SPELL_CAST', playerName: 'Krenko AI', cardName: 'Krenko, Mob Boss', isAbility: true, description: 'Krenko, Mob Boss - {T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.', rich: true, turn: 8 },
+        { eventType: 'TOKEN_CREATED', playerName: 'Krenko AI', cardName: 'Goblin', rich: true, turn: 8 },
+        { eventType: 'TOKEN_CREATED', playerName: 'Krenko AI', cardName: 'Goblin', rich: true, turn: 8 },
+        { eventType: 'TOKEN_CREATED', playerName: 'Krenko AI', cardName: 'Goblin', rich: true, turn: 8 },
+        { eventType: 'CREATURE_ATTACKED', playerName: 'Krenko AI', cardName: 'Goblin Chieftain', defender: 'Player', rich: true, turn: 8 },
+        { eventType: 'DAMAGE_DEALT', targetName: 'Player', playerName: 'Player', sourceName: 'Goblin Chieftain', sourceController: 'Krenko AI', amount: 4, combat: true, rich: true, turn: 8 },
+        { eventType: 'LIFE_CHANGED', playerName: 'Player', oldLife: 35, newLife: 31, delta: -4, cause: 'Goblin Chieftain', causeController: 'Krenko AI', causeKind: 'combat', rich: true, turn: 8 },
+        { eventType: 'TURN_STARTED', turnNumber: 9, activePlayer: 'Control AI', rich: true, turn: 9 },
+        { eventType: 'SPELL_CAST', playerName: 'Control AI', cardName: 'Lightning Bolt', targets: ['Player'], rich: true, turn: 9 },
+        { eventType: 'SPELL_CAST', playerName: 'Player', cardName: 'Counterspell', targets: ['Lightning Bolt'], rich: true, turn: 9 },
+        { eventType: 'LIFE_CHANGED', playerName: 'Krenko AI', oldLife: 22, newLife: 18, delta: -4, cause: 'Vivi Ornitier', causeController: 'Player', causeKind: 'effect', rich: true, turn: 9 },
       ],
     });
   }, []);

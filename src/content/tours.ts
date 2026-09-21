@@ -71,7 +71,7 @@ export const TOURS: Record<TourName, Tour> = {
       { target: 'board-stack', title: 'The stack', body: 'When something is waiting to resolve it shows here, newest first. While it is showing you can still respond; nothing on it has happened yet.', placement: 'top' },
       { target: 'board-pass', title: 'Pass', body: 'The engine asks you at every point where you could act. Pass when you have nothing to do. It glows gold when it is your priority.', placement: 'top' },
       { target: 'board-autopass', title: 'Auto-pass', body: 'Auto-pass keeps passing for you until your next turn, or until something goes on the stack that you might want to answer.', placement: 'top' },
-      { target: 'board-hand', title: 'Your hand', body: 'Tap a card in the strip to play it: a land goes straight down, a spell goes to the stack. Then the engine asks you to pay: tap the lands it lights up, one at a time.', placement: 'top' },
+      { target: 'board-hand', title: 'Your hand', body: 'Tap a card in the strip to play it: a land goes straight down, a spell goes to the stack. Then the engine asks you to pay: tap the lands it lights up, one at a time. Whenever a prompt is up, Peek at the table hides it so you can look around; nothing is sent until you come back.', placement: 'top' },
       { target: 'board-ticker', title: 'The log', body: 'The ticker shows the last few things that happened. Tap it for the full log of the game.', placement: 'bottom' },
       { target: 'board-archivist', title: 'The Archivist', body: 'The book opens the Archivist beside the board. Ask what to do this turn, or anything about the board or the rules. Nothing is sent until you ask.', placement: 'bottom' },
     ],
