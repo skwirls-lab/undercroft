@@ -20,7 +20,7 @@ export function planRows(): Row[] {
   const rows: Row[] = [
     { label: 'Decks in the vault', free: `${LIMITS['vault.maxDecks'].free}`, patron: 'Unlimited' },
     { label: 'Deck builder and deck check', free: true, patron: true },
-    { label: 'AI opponents per game', free: `Up to ${LIMITS['game.maxAI'].free}`, patron: `Up to ${LIMITS['game.maxAI'].patron}` },
+    { label: 'Match history', free: true, patron: true },
     { label: 'The Archivist: deck advice and rules questions', free: `${DEFAULT_APP_CONFIG.allowance.free} a month`, patron: `${DEFAULT_APP_CONFIG.allowance.patron} a month` },
   ];
   for (const f of ORDER) {

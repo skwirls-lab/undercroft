@@ -127,7 +127,7 @@ function PatronSheet({ open, onOpenChange, reason }: { open: boolean; onOpenChan
               </li>
             ))}
             <li className="flex items-start gap-2.5 text-sm text-muted-foreground">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-gold/60" /> The deck builder, the deck check, the Apprentice and the tutorials stay free for everyone.
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-gold/60" /> Playing stays free for everyone: every pod size, choosing opponents, shelves, the deck builder, the Apprentice, the tutorials and your match history.
             </li>
           </ul>
 

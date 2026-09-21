@@ -22,15 +22,17 @@ for (const l of Object.keys(LIMITS) as Limit[]) {
 }
 
 console.log('switch on');
-check('shelves are Patron-only', !can('free', 'vault.shelves', true) && can('patron', 'vault.shelves', true));
-check('choosing opponent decks is Patron-only', !can('free', 'opponents.choose', true) && can('patron', 'opponents.choose', true));
-check('four-player pods are Patron-only', !can('free', 'game.fourPlayer', true) && can('patron', 'game.fourPlayer', true));
+// Everything that is play is free: pod size, opponent choice and shelves never gate.
+check('shelves are free', can('free', 'vault.shelves', true) && can('patron', 'vault.shelves', true));
+check('choosing opponent decks is free', can('free', 'opponents.choose', true) && can('patron', 'opponents.choose', true));
+check('four-player pods are free', can('free', 'game.fourPlayer', true) && can('patron', 'game.fourPlayer', true));
 check('deck advice is on both plans', can('free', 'archivist.deck', true) && can('patron', 'archivist.deck', true));
 check('the match assistant is Patron-only', !can('free', 'archivist.match', true) && can('patron', 'archivist.match', true));
 check('free vault holds 2 decks', limit('free', 'vault.maxDecks', true) === 2);
 check('patron vault is unbounded', limit('patron', 'vault.maxDecks', true) === Infinity);
-check('free pods have 2 AI seats, patron 3', limit('free', 'game.maxAI', true) === 2 && limit('patron', 'game.maxAI', true) === 3);
-check('patronOnlyFeatures lists exactly the six Patron rows', patronOnlyFeatures().every((f) => !FEATURES[f].plans.includes('free')) && patronOnlyFeatures().length === 6);
+check('every plan seats 3 AI opponents', limit('free', 'game.maxAI', true) === 3 && limit('patron', 'game.maxAI', true) === 3);
+check('the only Patron-only rows are the Archivist tasks', patronOnlyFeatures().every((f) => f.startsWith('archivist.')) && patronOnlyFeatures().length === 3);
+check('the vault limit is the one play-adjacent gate', limit('free', 'vault.maxDecks', true) === 2);
 
 console.log('plan resolution');
 const now = Date.parse('2026-09-20T00:00:00Z');
