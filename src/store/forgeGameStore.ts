@@ -25,12 +25,30 @@ import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { synthesizeGameEvents } from '@/lib/gameEventSynth';
 import { useGameStore } from '@/store/gameStore';
 import type { GameAction, GameState, CardData } from '@/lib/gameTypes';
+import type { ScryfallCardRecord } from '@/lib/cardTypes';
 
 // ===================================================================
 // Image URL cache — persists for the game session so we don't
 // re-fetch Firestore for the same card name on every state update
 // ===================================================================
 const imageUrisCache = new Map<string, CardData['imageUris'] | null>();
+
+/**
+ * The art a card record carries, wherever Scryfall put it. A double-faced or modal card
+ * (transform, MDFC, "The Emperor of Palamecia") has no top-level `image_uris`: each face has
+ * its own, and the front face is the one to show. Reading only the top level left every such
+ * card as a blank slab on the board and in prompts.
+ */
+function toImageUris(card: ScryfallCardRecord | null | undefined): CardData['imageUris'] | null {
+  const uris = card?.image_uris ?? card?.card_faces?.[0]?.image_uris;
+  if (!uris) return null;
+  return {
+    artCrop: uris.art_crop || undefined,
+    normal: uris.normal || undefined,
+    small: uris.small || undefined,
+    large: uris.large || undefined,
+  };
+}
 
 async function enrichAndUpdateImages(adapted: GameState) {
   const namesToFetch: string[] = [];
@@ -54,16 +72,7 @@ async function enrichAndUpdateImages(adapted: GameState) {
       const resolved = await resolveCardNames(uniqueNames);
 
       for (const [name, card] of resolved) {
-        if (card?.image_uris) {
-          imageUrisCache.set(name, {
-            artCrop: card.image_uris.art_crop || undefined,
-            normal: card.image_uris.normal || undefined,
-            small: card.image_uris.small || undefined,
-            large: card.image_uris.large || undefined,
-          });
-        } else {
-          imageUrisCache.set(name, null);
-        }
+        imageUrisCache.set(name, toImageUris(card));
       }
     } catch (err) {
       console.error('[ForgeGameStore] Failed to fetch card images:', err);
@@ -116,17 +125,7 @@ export async function prefetchImageUris(names: string[]): Promise<Map<string, Ca
       const { resolveCardNames } = await import('@/lib/firebase/cards');
       const resolved = await resolveCardNames(missing);
       for (const [name, card] of resolved) {
-        imageUrisCache.set(
-          name,
-          card?.image_uris
-            ? {
-                artCrop: card.image_uris.art_crop || undefined,
-                normal: card.image_uris.normal || undefined,
-                small: card.image_uris.small || undefined,
-                large: card.image_uris.large || undefined,
-              }
-            : null
-        );
+        imageUrisCache.set(name, toImageUris(card));
       }
     } catch (err) {
       console.error('[ForgeGameStore] Failed to fetch prompt card images:', err);

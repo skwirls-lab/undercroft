@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
+import { Eye, Undo2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { PromptGuide } from './PromptGuide';
@@ -98,7 +99,7 @@ function optionToInstance(opt: CardOption, known: CardInstance | undefined, imag
 }
 
 /** The readable part: everything on the card that is not the picture. */
-function CardDetail({ card, zone }: { card: CardInstance | null; zone?: string }) {
+function CardDetail({ card, zone, controller, owner }: { card: CardInstance | null; zone?: string; controller?: string | null; owner?: string | null }) {
   if (!card) {
     return (
       <div className="flex h-full min-h-[96px] items-center justify-center rounded-lg border border-dashed border-border/40 px-4 text-center text-xs text-muted-foreground/60">
@@ -114,6 +115,12 @@ function CardDetail({ card, zone }: { card: CardInstance | null; zone?: string }
         {d.manaCost && <ManaCostDisplay manaCost={d.manaCost} size="sm" className="mt-0.5 shrink-0" />}
       </div>
       {d.typeLine && <span className="text-[11px] italic text-muted-foreground">{d.typeLine}{zone ? ` · ${zone.toLowerCase()}` : ''}</span>}
+      {controller && (
+        <span className="text-[11px] text-gold/90" data-dev-card-controller>
+          {controller === 'You' ? 'Yours' : `Controlled by ${controller}`}
+          {owner && owner !== controller ? ` · owned by ${owner}` : ''}
+        </span>
+      )}
       {d.oracleText ? (
         <div className="scroll-thin max-h-[30vh] overflow-y-auto text-[12px] leading-relaxed text-foreground/85">
           <OracleText text={d.oracleText} />
@@ -144,30 +151,16 @@ export function ForgeChoiceOverlay() {
     // Must use the same modal shell as every other prompt. Rendered bare it lands in the
     // page's `flex-1 min-h-0 overflow-hidden` container and gets clipped.
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.15 }}
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
+      <PromptShell id={`local-${pendingAbilitySelection.cardName}`} title={`${pendingAbilitySelection.cardName} — which ability?`}>
+        <AbilitySelectionPanel
+          selection={pendingAbilitySelection}
+          onPick={(action) => {
+            setPendingAbilitySelection(null);
+            performAction(action);
+          }}
+          onCancel={() => setPendingAbilitySelection(null)}
         />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.7 }}
-          className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto"
-          style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}
-        >
-          <AbilitySelectionPanel
-            selection={pendingAbilitySelection}
-            onPick={(action) => {
-              setPendingAbilitySelection(null);
-              performAction(action);
-            }}
-            onCancel={() => setPendingAbilitySelection(null)}
-          />
-        </motion.div>
-      </div>
+      </PromptShell>
     );
   }
 
@@ -184,6 +177,72 @@ export function ForgeChoiceOverlay() {
 
   // Render as a centered modal overlay for better visibility
   return (
+    <PromptShell id={pendingChoice.requestId} title={promptTitle(pendingChoice)}>
+      <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
+      <PromptGuide choiceType={pendingChoice.choiceType} />
+    </PromptShell>
+  );
+}
+
+/** One line naming the prompt, for the pill that brings you back to it. */
+function promptTitle(choice: ForgeChoiceRequest): string {
+  const data = choice.data as Record<string, unknown>;
+  const explicit = (data.prompt as string) || (data.message as string) || (data.abilityDescription as string) || '';
+  if (explicit) return explicit;
+  switch (choice.choiceType) {
+    case 'declare_attackers': return 'Declare attackers';
+    case 'declare_blockers': return 'Declare blockers';
+    case 'mana_payment': return `Pay ${(data.manaCost as string) || 'mana'} for ${(data.spellName as string) || 'the spell'}`;
+    default: return choice.choiceType.replace(/_/g, ' ');
+  }
+}
+
+// ============================================================
+// PromptShell — the modal chrome every prompt shares, plus "Peek at the table"
+// ============================================================
+
+/**
+ * A prompt used to be a wall: while the engine waited for an answer, the boards behind it
+ * were blurred and untouchable, so a player choosing a target in a four-seat game could not
+ * check who was at 6 life, and one declaring attackers could not count blockers. Peeking
+ * hides the prompt (the request stays pending; nothing is sent) and leaves a pill to come
+ * back. Escape also returns. Remembered per request, so a new prompt always opens face-up.
+ */
+function PromptShell({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  const [peekedId, setPeekedId] = React.useState<string | null>(null);
+  const peeking = peekedId === id;
+
+  useEffect(() => {
+    if (!peeking) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPeekedId(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [peeking]);
+
+  if (peeking) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3" style={{ top: 'clamp(40px,6vh,64px)' }}>
+        <motion.button
+          type="button"
+          onClick={() => setPeekedId(null)}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.7 }}
+          className="pointer-events-auto flex max-w-[min(92vw,560px)] items-center gap-2 rounded-full border border-gold/50 bg-card/95 py-1.5 pl-3 pr-4 text-left shadow-xl backdrop-blur hover:bg-gold/10"
+          data-dev-prompt-return
+          aria-label="Back to the prompt"
+        >
+          <Undo2 className="h-4 w-4 shrink-0 text-gold" />
+          <span className="min-w-0 truncate text-xs text-foreground">
+            <span className="font-semibold text-gold">Back to the prompt</span>
+            <span className="text-muted-foreground"> · {title}</span>
+          </span>
+        </motion.button>
+      </div>
+    );
+  }
+
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Semi-transparent backdrop */}
       <motion.div
@@ -196,7 +255,7 @@ export function ForgeChoiceOverlay() {
           rather than the hard flicker-replace it used to be. */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={pendingChoice.requestId}
+          key={id}
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.98, y: -4 }}
@@ -204,8 +263,18 @@ export function ForgeChoiceOverlay() {
           className="relative z-10 w-full mx-4 pointer-events-auto overflow-y-auto"
           style={{ maxWidth: 'clamp(400px,80vmin,1200px)', maxHeight: '90vh' }}
         >
-          <ChoicePanel choice={pendingChoice} onRespond={respondToChoice} />
-          <PromptGuide choiceType={pendingChoice.choiceType} />
+          <div className="mb-1.5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setPeekedId(id)}
+              className="flex items-center gap-1.5 rounded-full border border-border/40 bg-card/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-gold/40 hover:text-gold"
+              title="Hide this prompt and look at the boards. Nothing is sent until you come back."
+              data-dev-prompt-peek
+            >
+              <Eye className="h-3.5 w-3.5" /> Peek at the table
+            </button>
+          </div>
+          {children}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -432,9 +501,9 @@ function ChoicePanel({ choice, onRespond }: {
     // server never saw a selection and silently auto-picked the first `num` abilities.
     const abilityResponse = (index: number): Record<string, unknown> =>
       choiceType === 'choose_spell_abilities' ? { indices: [index] } : { index };
-    // Cancel sends index -1, not {cancel:true}: the server has no `cancel` handling here, and
-    // with no `index` key at all it defaults to 0 and plays ability 0. getAbilityToPlay
-    // bounds-checks and returns null for -1, which is a genuine "chose nothing".
+    // Cancel sends index -1 as well as cancel:true: with no `index` key at all an older server
+    // defaults to 0 and plays ability 0. getAbilityToPlay bounds-checks and returns null for -1,
+    // which is a genuine "chose nothing".
     return (
       <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
         <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>{prompt || 'Choose an ability'}</h3>
@@ -450,17 +519,22 @@ function ChoicePanel({ choice, onRespond }: {
               <div className="text-muted-foreground/70 max-w-[250px] truncate" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>{a.description}</div>
             </Button>
           ))}
-          {abilities.length === 0 && (
+        </div>
+        {/* Only getAbilityToPlay treats "nothing" as a real answer (the card is simply not
+            played). The two effect prompts fall back to the first option on the server, so a
+            Cancel there would lie. */}
+        {(choiceType === 'choose_ability' || abilities.length === 0) && (
+          <div className="flex" style={{ marginTop: 'clamp(8px,1.5vmin,1000px)' }}>
             <Button
               variant="outline"
-              onClick={() => onRespond(choice.requestId, { index: -1 })}
+              onClick={() => onRespond(choice.requestId, { index: -1, cancel: true })}
               className="rounded-lg border bg-card/60 font-medium hover:border-red-500/40 hover:bg-red-500/10"
               style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
             >
-              Cancel
+              {abilities.length === 0 ? 'Cancel' : 'Never mind'}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1008,6 +1082,8 @@ function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
 
   const label = (c: CardOption) =>
     `${c.name}${c.power !== undefined ? ` ${c.power}/${c.toughness}` : ''}`;
+  // In a pod, several opponents may attack at once — say whose creature each attacker is.
+  const attackerSeats = new Set(attackers.map((a) => a.controller).filter(Boolean));
 
   const assign = (attackerId: number) => {
     if (activeBlocker == null) return;
@@ -1072,6 +1148,7 @@ function DeclareBlockersPanel({ blockers, attackers, requestId, onRespond }: {
               style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
             >
               {label(a)}
+              {a.controller && attackerSeats.size > 1 && <span className="ml-1 text-muted-foreground/70">({a.controller})</span>}
             </Button>
           ))}
         </div>
@@ -1199,6 +1276,8 @@ function BinaryChoicePanel({ prompt, kind, requestId, onRespond }: {
 // ColorChoicePanel — "choose a color" (mana, protection, ...)
 // ============================================================
 
+// Each swatch names its own text colour. A trailing `text-foreground` on the button used to
+// win the merge, which put near-white text on the white and blue swatches.
 const COLOR_SWATCH: Record<string, string> = {
   W: 'bg-[#f8f6d8] text-black',
   U: 'bg-[#c1d7e9] text-black',
@@ -1222,7 +1301,7 @@ function ColorChoicePanel({ prompt, colors, requestId, onRespond }: {
           <Button
             key={c.mask}
             onClick={() => onRespond(requestId, { mask: c.mask })}
-            className={`rounded-lg border border-border/40 font-bold ${COLOR_SWATCH[c.symbol] ?? 'bg-card/60'} text-foreground`}
+            className={`rounded-lg border border-border/40 font-bold ${COLOR_SWATCH[c.symbol] ?? 'bg-card/60 text-foreground'}`}
             style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
           >
             {c.symbol} · {c.name}
@@ -1358,6 +1437,41 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
   const focusedCard = focusedId != null ? cards.get(focusedId) ?? null : null;
   const pickCount = isSingle ? (focusedId != null ? 1 : 0) : selected.size;
 
+  // Whose card each option is. The server names the controller on most prompts; for the rest
+  // the client's own instance of the card knows. A card the human controls reads "You".
+  const youName = gameState?.players.find((p) => !p.isAI)?.name;
+  const seatOf = useCallback((opt: CardOption): string | null => {
+    if (opt.type === 'player') return null;
+    let name = opt.controller ?? null;
+    if (!name) {
+      const known = gameState?.cardInstances.get(`forge-${opt.id}`);
+      if (known) name = gameState?.players.find((p) => p.id === known.controllerId)?.name ?? null;
+    }
+    if (!name) return null;
+    return name === youName ? 'You' : name;
+  }, [gameState, youName]);
+  const ownerOf = (opt: CardOption): string | null => {
+    if (!opt.owner) return null;
+    return opt.owner === youName ? 'You' : opt.owner;
+  };
+
+  // With options from more than one seat, group by controller — yours first, then each
+  // opponent, then players as targets. A flat wall of "any target" candidates in a four-seat
+  // game gave no way to tell whose Krenko was whose.
+  const groups = useMemo(() => {
+    const byKey = new Map<string, { label: string; opts: CardOption[] }>();
+    for (const opt of options) {
+      const seat = opt.type === 'player' ? '__players' : seatOf(opt) ?? '__unknown';
+      const label = seat === '__players' ? 'Players' : seat === '__unknown' ? 'Cards' : seat === 'You' ? 'Yours' : `${seat}'s`;
+      const g = byKey.get(seat) ?? { label, opts: [] };
+      g.opts.push(opt);
+      byKey.set(seat, g);
+    }
+    const order = (k: string) => (k === 'You' ? 0 : k === '__players' ? 2 : k === '__unknown' ? 3 : 1);
+    return [...byKey.entries()].sort((a, b) => order(a[0]) - order(b[0])).map(([key, g]) => ({ key, ...g }));
+  }, [options, seatOf]);
+  const grouped = groups.length > 1;
+
   return (
     <div className="prompt-panel prompt-default" style={{ padding: 'clamp(12px,2vmin,20px)' }}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -1373,39 +1487,51 @@ function CardSelectPanel({ prompt, options, min, max, requestId, onRespond, resp
       {hasOptions ? (
         <div className="mb-3 flex flex-col gap-3 sm:flex-row">
           {/* The cards */}
-          <div className="scroll-thin flex min-w-0 flex-1 flex-wrap content-start gap-2 overflow-y-auto" style={{ maxHeight: '48vh' }}>
-            {options.map((opt) => {
-              const card = cards.get(opt.id);
-              const isPicked = isSingle ? focusedId === opt.id : selected.has(opt.id);
-              const isFocused = focusedId === opt.id;
-              return (
-                <div
-                  key={opt.id}
-                  onClick={() => toggle(opt.id)}
-                  className={`relative shrink-0 cursor-pointer rounded-lg transition-all duration-150 ${
-                    isPicked ? 'affordance-selected z-10' : isFocused ? 'ring-1 ring-gold/40' : 'hover:ring-1 hover:ring-border/60'
-                  }`}
-                >
-                  {card ? (
-                    <CardView card={card} mode="art" interactive={false} preview={false} />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-card/60 p-2" style={{ width: 'clamp(72px,10vmin,140px)', height: 'clamp(100px,14vmin,196px)' }}>
-                      <span className="text-center text-sm font-semibold leading-tight">{opt.name}</span>
-                      {opt.type === 'player' && <span className="mt-1 text-xs text-muted-foreground">Life {opt.life}</span>}
-                    </div>
-                  )}
-                  {isPicked && !isSingle && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-gold-foreground shadow">
-                      {[...selected].indexOf(opt.id) + 1}
-                    </span>
-                  )}
+          <div className="scroll-thin flex min-w-0 flex-1 flex-col content-start gap-2 overflow-y-auto" style={{ maxHeight: '48vh' }}>
+            {groups.map((group) => (
+              <div key={group.key} data-dev-option-group={grouped ? group.key : undefined}>
+                {grouped && (
+                  <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                    <span className={group.key === 'You' ? 'text-gold/90' : ''}>{group.label}</span>
+                    <span className="h-px flex-1 bg-border/40" />
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {group.opts.map((opt) => {
+                    const card = cards.get(opt.id);
+                    const isPicked = isSingle ? focusedId === opt.id : selected.has(opt.id);
+                    const isFocused = focusedId === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={() => toggle(opt.id)}
+                        className={`relative shrink-0 cursor-pointer rounded-lg transition-all duration-150 ${
+                          isPicked ? 'affordance-selected z-10' : isFocused ? 'ring-1 ring-gold/40' : 'hover:ring-1 hover:ring-border/60'
+                        }`}
+                      >
+                        {card ? (
+                          <CardView card={card} mode="art" interactive={false} preview={false} />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-card/60 p-2" style={{ width: 'clamp(72px,10vmin,140px)', height: 'clamp(100px,14vmin,196px)' }}>
+                            <span className="text-center text-sm font-semibold leading-tight">{opt.type === 'player' && opt.name === youName ? 'You' : opt.name}</span>
+                            {opt.type === 'player' && <span className="mt-1 text-xs text-muted-foreground">Life {opt.life}</span>}
+                          </div>
+                        )}
+                        {isPicked && !isSingle && (
+                          <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-gold-foreground shadow">
+                            {[...selected].indexOf(opt.id) + 1}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
           {/* What the focused card says */}
           <div className="w-full shrink-0 sm:w-[260px]">
-            <CardDetail card={focusedCard} zone={focusedOpt?.zone} />
+            <CardDetail card={focusedCard} zone={focusedOpt?.zone} controller={focusedOpt ? seatOf(focusedOpt) : null} owner={focusedOpt ? ownerOf(focusedOpt) : null} />
           </div>
         </div>
       ) : (

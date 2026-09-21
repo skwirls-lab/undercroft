@@ -16,7 +16,7 @@ import type { ForgeChoiceRequest } from '@/lib/forgeClient';
  * Query params:
  *   ?open=me | ai-2 | ai-3 | ai-4   open the expanded board for that player on load
  *   ?inspect=me | ai-2 | ai-3 | ai-4   open the seat inspector for that player on load
- *   ?choice=tutor | discard | confirm | modes | scry | targets
+ *   ?choice=tutor | discard | confirm | modes | scry | targets | attackers | ability | color
  *                                   seed a server prompt so the choice overlay renders
  */
 
@@ -49,7 +49,27 @@ function choicePreset(name: string, humanHandIds: number[]): ForgeChoiceRequest 
     case 'attackers':
       return { requestId: 'dev-attackers', choiceType: 'declare_attackers', data: { prompt: 'Declare attackers', possibleAttackers: [LIB(9002, 'Craterhoof Behemoth', 'Creature — Beast', '{5}{G}{G}{G}', 'Haste', 'G', [5, 5]), LIB(9011, 'Serra Angel', 'Creature — Angel', '{3}{W}{W}', 'Flying, vigilance', 'W', [4, 4])], defenders: [{ id: 2, name: 'Krenko AI' }, { id: 3, name: 'Ur-Dragon AI' }, { id: 4, name: 'Control AI' }] } };
     case 'targets':
-      return { requestId: 'dev-targets', choiceType: 'choose_targets', data: { prompt: 'Swords to Plowshares — choose target creature', validTargets: [LIB(9002, 'Craterhoof Behemoth', 'Creature — Beast', '{5}{G}{G}{G}', 'Haste', 'G', [5, 5]), LIB(9010, 'Krenko, Mob Boss', 'Legendary Creature — Goblin Warrior', '{2}{R}{R}', '{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.', 'R', [3, 3])], minTargets: 1, maxTargets: 1 } };
+      // Candidates from three seats plus the players themselves: the "any target" case.
+      return { requestId: 'dev-targets', choiceType: 'choose_targets', data: { prompt: 'Lightning Bolt — choose any target', validTargets: [
+        { ...LIB(9002, 'Craterhoof Behemoth', 'Creature — Beast', '{5}{G}{G}{G}', 'Haste', 'G', [5, 5]), zone: 'Battlefield' },
+        { ...LIB(9010, 'Krenko, Mob Boss', 'Legendary Creature — Goblin Warrior', '{2}{R}{R}', '{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.', 'R', [3, 3]), zone: 'Battlefield', owner: 'Krenko AI', controller: 'Krenko AI' },
+        { ...LIB(9012, 'Goblin Token', 'Creature — Goblin', '', '', 'R', [1, 1]), zone: 'Battlefield', owner: 'Krenko AI', controller: 'Krenko AI' },
+        { ...LIB(9013, 'Scion of the Ur-Dragon', 'Legendary Creature — Dragon Avatar', '{W}{U}{B}{R}{G}', 'Flying\n{2}: Search your library for a Dragon permanent card...', 'WUBRG', [4, 4]), zone: 'Battlefield', owner: 'Ur-Dragon AI', controller: 'Ur-Dragon AI' },
+        { ...LIB(9014, 'Sol Ring', 'Artifact', '{1}', '{T}: Add {C}{C}.', ''), zone: 'Battlefield', owner: 'Player', controller: 'Control AI' },
+        { id: 1, name: 'Player', type: 'player', life: 31 },
+        { id: 2, name: 'Krenko AI', type: 'player', life: 18 },
+        { id: 3, name: 'Ur-Dragon AI', type: 'player', life: 40 },
+        { id: 4, name: 'Control AI', type: 'player', life: 26 },
+      ], minTargets: 1, maxTargets: 1 } };
+    case 'ability':
+      return { requestId: 'dev-ability', choiceType: 'choose_ability', data: { cardName: 'Krenko, Mob Boss', cardId: 9010, abilities: [
+        { index: 0, description: '{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.', cardName: 'Krenko, Mob Boss', isAbility: true },
+        { index: 1, description: 'Cast Krenko, Mob Boss ({2}{R}{R})', cardName: 'Krenko, Mob Boss', isSpell: true },
+      ] } };
+    case 'color':
+      return { requestId: 'dev-color', choiceType: 'choose_color', data: { prompt: 'Command Tower — choose a colour of mana', colors: [
+        { mask: 1, name: 'White', symbol: 'W' }, { mask: 2, name: 'Blue', symbol: 'U' }, { mask: 4, name: 'Black', symbol: 'B' }, { mask: 8, name: 'Red', symbol: 'R' }, { mask: 16, name: 'Green', symbol: 'G' },
+      ] } };
     default:
       return null;
   }
