@@ -26,6 +26,23 @@ function isCrossOrigin(request: Request): boolean {
   }
 }
 
+/** Peek at the first bytes; a gzip file (not HTTP content-encoding) is inflated in the stream. */
+async function inflateIfGzip(body: ReadableStream<Uint8Array>): Promise<ReadableStream<Uint8Array>> {
+  const reader = body.getReader();
+  const first = await reader.read();
+  const head = first.value ?? new Uint8Array();
+  const rest = new ReadableStream<Uint8Array>({
+    start(controller) { if (head.length) controller.enqueue(head); if (first.done) controller.close(); },
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) controller.close(); else controller.enqueue(value);
+    },
+    cancel() { void reader.cancel(); },
+  });
+  const gz = head.length >= 2 && head[0] === 0x1f && head[1] === 0x8b;
+  return gz ? rest.pipeThrough(new DecompressionStream('gzip') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>) : rest;
+}
+
 export async function GET(request: Request) {
   if (isCrossOrigin(request)) {
     return NextResponse.json({ error: 'Cross-origin requests are not allowed' }, { status: 403 });
@@ -50,7 +67,7 @@ export async function GET(request: Request) {
           return;
         }
 
-        const bulkData = await bulkResponse.json() as { data: Array<{ type: string; download_uri: string; name: string }> };
+        const bulkData = await bulkResponse.json() as { data: Array<{ type: string; download_uri?: string; jsonl_download_uri?: string; uri?: string; name: string }> };
         // Use 'unique_artwork' to get one of each unique card including special editions
         const uniqueCards = bulkData.data.find(d => d.type === 'unique_artwork');
 
@@ -60,17 +77,29 @@ export async function GET(request: Request) {
           return;
         }
 
-        controller.enqueue(encoder.encode(`data: {"status": "Downloading ${uniqueCards.name}..."}\n\n`));
-
-        // Step 2: Stream the Scryfall data
-        const cardsResponse = await fetch(uniqueCards.download_uri);
-        if (!cardsResponse.body) {
-          controller.enqueue(encoder.encode('data: {"error": "No response body from Scryfall"}\n\n'));
+        // Scryfall moved from a JSON array (download_uri) to gzip-compressed JSON Lines
+        // (jsonl_download_uri) in September 2026; either is one card per line below.
+        let downloadUri = uniqueCards.download_uri || uniqueCards.jsonl_download_uri || null;
+        if (!downloadUri && uniqueCards.uri) {
+          const full = await fetch(uniqueCards.uri, { headers: { 'User-Agent': 'Undercroft/1.0', Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as { download_uri?: string; jsonl_download_uri?: string } | null;
+          downloadUri = full?.download_uri || full?.jsonl_download_uri || null;
+        }
+        if (!downloadUri) {
+          controller.enqueue(encoder.encode(`data: {"error": "Scryfall's listing for ${uniqueCards.name} has no download link (keys: ${Object.keys(uniqueCards).join(', ')})"}\n\n`));
           controller.close();
           return;
         }
 
-        const reader = cardsResponse.body.getReader();
+        controller.enqueue(encoder.encode(`data: {"status": "Downloading ${uniqueCards.name}..."}\n\n`));
+
+        // Step 2: Stream the Scryfall data, inflating it when the file itself is gzip.
+        const cardsResponse = await fetch(downloadUri);
+        if (!cardsResponse.ok || !cardsResponse.body) {
+          controller.enqueue(encoder.encode(`data: {"error": "Bulk file download failed: ${cardsResponse.status}"}\n\n`));
+          controller.close();
+          return;
+        }
+        const reader = (await inflateIfGzip(cardsResponse.body)).getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let totalSent = 0;

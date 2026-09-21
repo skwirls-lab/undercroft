@@ -9,7 +9,9 @@
  */
 
 import assert from 'node:assert/strict';
-import { slimCard, digest, isCommanderPlayable, resolveDownloadUri, printingRank, choosePreferred } from './sync-cards.mjs';
+import { slimCard, digest, isCommanderPlayable, resolveDownloadUri, printingRank, choosePreferred, inflateIfGzip } from './sync-cards.mjs';
+import { gzipSync } from 'node:zlib';
+import { Readable } from 'node:stream';
 
 let passed = 0;
 const test = (name, fn) => {
@@ -189,4 +191,39 @@ test('the slim record carries the release date and the preferred flag survives t
   const slim = slimCard({ ...base, released_at: '1993-08-05' });
   assert.equal(slim.released_at, '1993-08-05');
   assert.notEqual(digest({ ...slim, preferred: true }), digest({ ...slim, preferred: false }));
+});
+
+// --- Scryfall's September 2026 listing: jsonl_download_uri, gzip file -------------------
+
+await asyncTest('takes jsonl_download_uri inline when download_uri is gone', async () => {
+  const uri = await resolveDownloadUri({ name: 'Default Cards', jsonl_download_uri: 'https://d/x.jsonl.gz' }, () => { throw new Error('should not fetch'); });
+  assert.equal(uri, 'https://d/x.jsonl.gz');
+});
+
+await asyncTest('follows uri and takes jsonl_download_uri from the object endpoint', async () => {
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ object: 'bulk_data', jsonl_download_uri: 'https://d/y.jsonl.gz', compressed_size: 1 }) });
+  const uri = await resolveDownloadUri({ name: 'Default Cards', uri: 'https://api/bulk/1' }, fetchImpl);
+  assert.equal(uri, 'https://d/y.jsonl.gz');
+});
+
+await asyncTest('names both fields when neither is there', async () => {
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ object: 'bulk_data', compressed_size: 1 }) });
+  await assert.rejects(resolveDownloadUri({ name: 'Default Cards', uri: 'https://api/bulk/1' }, fetchImpl), /jsonl_download_uri/);
+});
+
+const read = async (stream) => { let out = ''; for await (const c of stream) out += c.toString(); return out; };
+
+await asyncTest('a gzip file is inflated', async () => {
+  const body = '{"name":"Sol Ring"}\n{"name":"Forest"}\n';
+  const text = await read(await inflateIfGzip(Readable.from([gzipSync(Buffer.from(body))])));
+  assert.equal(text, body);
+});
+
+await asyncTest('a plain file passes through untouched, first chunk included', async () => {
+  const text = await read(await inflateIfGzip(Readable.from([Buffer.from('[\n{"name":"Sol'), Buffer.from(' Ring"},\n]')])));
+  assert.equal(text, '[\n{"name":"Sol Ring"},\n]');
+});
+
+await asyncTest('an empty body does not hang', async () => {
+  assert.equal(await read(await inflateIfGzip(Readable.from([]))), '');
 });

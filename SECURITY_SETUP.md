@@ -78,6 +78,13 @@ add yourself as an admin **once, permanently**:
 Leave both in place. The point of the allowlist is that *only you* can write to `/cards`, not
 that nobody can.
 
+### Scryfall's bulk listing changed in September 2026
+
+The listing now offers `jsonl_download_uri` (gzip-compressed JSON Lines) instead of
+`download_uri`. Both the scheduled sync and the admin page's stream accept either link and
+inflate the file when it is gzip. A run that reports "No download_uri or jsonl_download_uri"
+means Scryfall changed the shape again; the message lists the keys it sent.
+
 ### Which printing the app shows
 
 The sync keeps paper printings only and marks, per card, the oldest ordinary one as

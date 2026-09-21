@@ -18,6 +18,7 @@
 import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
+import { createGunzip } from 'node:zlib';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const BATCH_SIZE = 400; // Firestore hard-caps a batch at 500 writes.
@@ -132,25 +133,55 @@ export const SCRYFALL_HEADERS = { 'User-Agent': 'Undercroft/1.0', Accept: 'appli
  * `fetchImpl` is injectable so this is testable without network access.
  */
 export async function resolveDownloadUri(entry, fetchImpl = fetch) {
-  if (typeof entry?.download_uri === 'string' && entry.download_uri) return entry.download_uri;
+  const pick = (o) => {
+    // Scryfall moved from a JSON array (`download_uri`) to JSON Lines (`jsonl_download_uri`,
+    // gzip-compressed) in September 2026. Either format is one card per line to us.
+    for (const key of ['download_uri', 'jsonl_download_uri']) {
+      if (typeof o?.[key] === 'string' && o[key]) return o[key];
+    }
+    return null;
+  };
+  const inline = pick(entry);
+  if (inline) return inline;
 
   if (typeof entry?.uri === 'string' && entry.uri) {
-    console.log(`  no inline download_uri; following ${entry.uri}`);
+    console.log(`  no inline download link; following ${entry.uri}`);
     const res = await fetchImpl(entry.uri, { headers: SCRYFALL_HEADERS });
     if (res.ok) {
       const full = await res.json();
-      if (typeof full?.download_uri === 'string' && full.download_uri) return full.download_uri;
+      const followed = pick(full);
+      if (followed) return followed;
       throw new Error(
-        `No download_uri at ${entry.uri}. Keys returned: ${Object.keys(full ?? {}).join(', ')}`
+        `No download_uri or jsonl_download_uri at ${entry.uri}. Keys returned: ${Object.keys(full ?? {}).join(', ')}`
       );
     }
     throw new Error(`Could not read ${entry.uri}: ${res.status} ${res.statusText}`);
   }
 
   throw new Error(
-    `Bulk entry "${entry?.name ?? 'unknown'}" has no download_uri and no uri to follow. ` +
+    `Bulk entry "${entry?.name ?? 'unknown'}" has no download link and no uri to follow. ` +
       `Keys present: ${Object.keys(entry ?? {}).join(', ')}`
   );
+}
+
+/**
+ * The bulk file may arrive gzip-compressed as a file (not as HTTP content-encoding, which
+ * fetch would undo by itself). Peek at the first bytes and inflate when they are gzip's.
+ */
+export async function inflateIfGzip(nodeReadable) {
+  const first = await new Promise((resolve, reject) => {
+    const tryRead = () => {
+      const chunk = nodeReadable.read();
+      if (chunk !== null) resolve(chunk);
+      else nodeReadable.once('readable', tryRead);
+    };
+    nodeReadable.once('error', reject);
+    nodeReadable.once('end', () => resolve(Buffer.alloc(0)));
+    tryRead();
+  });
+  if (first.length) nodeReadable.unshift(first);
+  const gz = first.length >= 2 && first[0] === 0x1f && first[1] === 0x8b;
+  return gz ? nodeReadable.pipe(createGunzip()) : nodeReadable;
 }
 
 async function main() {
@@ -219,7 +250,7 @@ async function main() {
   // the preferred printing of a card is only known once every printing has been seen.
   const slims = [];
   const ranks = [];
-  const lines = createInterface({ input: Readable.fromWeb(res.body), crlfDelay: Infinity });
+  const lines = createInterface({ input: await inflateIfGzip(Readable.fromWeb(res.body)), crlfDelay: Infinity });
   for await (const line of lines) {
     const trimmed = line.trim().replace(/,$/, '');
     if (!trimmed.startsWith('{')) continue;
