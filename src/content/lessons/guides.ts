@@ -60,7 +60,8 @@ export const PROMPT_GUIDE: Record<string, PromptGuide> = {
   announce_number: { what: 'The spell needs a number, usually X.', how: 'Choose a value you can pay for; the mana is asked for next.', ref: { lesson: 'mana', section: 'paying' } },
   choose_binary: { what: 'A two-way choice named by the card.', how: 'Pick either option.' },
   choose_color: { what: 'Name a colour.', how: 'Pick the colour that fits the effect and the board.' },
-  mana_payment: { what: 'Pay for what you chose. The engine lists what can produce mana.', how: 'Tap lands and rocks one at a time until the cost is met. Cancel to back out and keep the mana unspent.', ref: { lesson: 'mana', section: 'paying' } },
+  mana_payment: { what: 'Pay for what you chose. The engine lists what can produce mana.', how: 'Tap lands and rocks one at a time until the cost is met. A Phyrexian symbol such as {U/P} can be paid with two life instead. Cancel to back out and keep the mana unspent.', ref: { lesson: 'mana', section: 'paying' } },
+  choose_mana_combo: { what: 'A source makes several mana at once in any mix of its colours, like Vivi Ornitier or a "any combination of" ability.', how: 'Split the amount across the colours with the steppers to match what you are about to pay, then confirm.', ref: { lesson: 'mana', section: 'paying' } },
 };
 
 /** "Why?" beside each deck-check issue. */

@@ -41,6 +41,10 @@ export interface ForgePlayer {
   life: number;
   poison: number;
   isAI: boolean;
+  /** Out of the game, and why (a GameLossReason name). Older servers omit both. */
+  eliminated?: boolean;
+  lossReason?: string;
+  lossSpell?: string;
   isActivePlayer: boolean;
   hasPriority: boolean;
   manaPool: { white: number; blue: number; black: number; red: number; green: number; colorless: number };
@@ -90,14 +94,38 @@ export interface ForgeStackItem {
 
 export interface ForgeGameEvent {
   eventType: string;
+  /** Set by the engine's forwarder: the event is fully described (who, what, why). */
+  rich?: boolean;
+  /** Stamped by the client on arrival: the turn the event happened in. */
+  turn?: number;
   [key: string]: unknown;
+}
+
+/** One seat's outcome as the server reports it at game over. */
+export interface GameOverSeat {
+  name: string;
+  isAI: boolean;
+  life: number;
+  poison: number;
+  won: boolean;
+  eliminated: boolean;
+  lossReason?: string;
+  lossSpell?: string;
+}
+
+export interface GameOverPayload {
+  winner: string;
+  winnerIsHuman: boolean;
+  /** Sent by servers that describe outcomes; older ones send only the winner. */
+  turns?: number;
+  seats?: GameOverSeat[];
 }
 
 type MessageHandler = {
   onGameState?: (state: ForgeGameState) => void;
   onChoiceRequest?: (choice: ForgeChoiceRequest) => void;
   onGameEvent?: (event: ForgeGameEvent) => void;
-  onGameOver?: (payload: { winner: string; winnerIsHuman: boolean }) => void;
+  onGameOver?: (payload: GameOverPayload) => void;
   onError?: (message: string) => void;
   onConnectionChange?: (status: ConnectionStatus) => void;
 };
@@ -277,7 +305,7 @@ export class ForgeGameClient {
         break;
 
       case 'game_over':
-        this.handlers.onGameOver?.(msg.payload as { winner: string; winnerIsHuman: boolean });
+        this.handlers.onGameOver?.(msg.payload as GameOverPayload);
         break;
 
       case 'error':

@@ -29,9 +29,11 @@ interface GameBoardProps {
   hideActionBar?: boolean;
   // Forge-style mana payment: lands the player can tap to pay for a spell
   manaPaymentSourceIds?: Set<string>;
-  manaPaymentInfo?: { manaCost: string; spellName: string };
+  manaPaymentInfo?: { manaCost: string; spellName: string; lifeForPhyrexian?: number };
   onTapForManaPayment?: (cardInstanceId: string) => void;
   onCancelManaPayment?: () => void;
+  /** Pay two life for a Phyrexian shard ({U/P}) instead of the mana. Present only when the cost has one. */
+  onPayLifeForMana?: () => void;
   // External control of the expanded board
   externalExpandedPlayerId?: string | null;
   onExpandedPlayerChange?: (playerId: string | null) => void;
@@ -71,7 +73,7 @@ function seatStats(gameState: GameState, playerId: string): SeatStats {
 
 export function GameBoard({
   currentPlayerId, className, hideHand, hidePhaseTracker, hideActionBar,
-  manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment,
+  manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment, onPayLifeForMana,
   externalExpandedPlayerId, onExpandedPlayerChange,
 }: GameBoardProps) {
   const { gameState, legalActions, isProcessing, performAction, autoPassUntilNextTurn, setAutoPass, lockedTappedIds, forgeMode } = useGameStore();
@@ -327,7 +329,10 @@ export function GameBoard({
             {manaPaymentInfo && onCancelManaPayment && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/[0.06] px-3 py-1.5 text-xs">
                 <span>Pay <strong className="font-mono">{manaPaymentInfo.manaCost}</strong> for <strong>{manaPaymentInfo.spellName}</strong> — open your board to tap lands</span>
-                <Button size="sm" variant="ghost" onClick={onCancelManaPayment} className="ml-auto h-6 px-1.5 text-xs">Cancel</Button>
+                {onPayLifeForMana && manaPaymentInfo.lifeForPhyrexian ? (
+                  <Button size="sm" variant="ghost" onClick={onPayLifeForMana} className="ml-auto h-6 px-1.5 text-xs text-red-300 hover:text-red-200" data-dev-pay-life>Pay {manaPaymentInfo.lifeForPhyrexian} life</Button>
+                ) : null}
+                <Button size="sm" variant="ghost" onClick={onCancelManaPayment} className={cn('h-6 px-1.5 text-xs', !(onPayLifeForMana && manaPaymentInfo.lifeForPhyrexian) && 'ml-auto')}>Cancel</Button>
               </motion.div>
             )}
           </AnimatePresence>

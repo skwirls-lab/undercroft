@@ -282,7 +282,14 @@ export type GameEventType =
   | 'SPELL_RESOLVED'
   | 'CREATURE_ATTACKED'
   | 'CREATURE_BLOCKED'
-  | 'MANA_ADDED';
+  | 'MANA_ADDED'
+  // Described by the engine (GameEventForwarder) rather than diffed on the client.
+  | 'MANA_TAPPED'
+  | 'TOKEN_CREATED'
+  | 'CARD_MILLED'
+  | 'CARD_TO_COMMAND_ZONE'
+  | 'CARD_ATTACHED'
+  | 'POISON_CHANGED';
 
 export interface GameEvent {
   type: GameEventType;

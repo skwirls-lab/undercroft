@@ -14,6 +14,7 @@ import type { DeckCheck } from '@/lib/deckRules';
 import { frontFace, manaCurve } from '@/lib/deckCards';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import type { DeckContext, MatchContext, RecapContext } from './types';
+import { describeEvent } from '@/lib/gameLog';
 
 // ─── Deck ────────────────────────────────────────────────────────────────────
 
@@ -153,29 +154,10 @@ function pt(c: CardInstance): string | undefined {
 export const RECAP_MAX_EVENTS = 190;
 
 /** One line per Forge event, in the log's words, so the model reads what the player saw. */
-export function describeForgeEvent(e: Record<string, unknown>): string | null {
-  const type = String(e.eventType ?? '');
-  const who = (e.playerName as string) || '';
-  const card = (e.cardName as string) || '';
-  switch (type) {
-    case 'GAME_STARTED': return 'Game started';
-    case 'TURN_STARTED': return `Turn ${e.turnNumber ?? '?'} — ${e.activePlayer ?? who}`;
-    case 'SPELL_CAST': return `${who || 'Someone'} cast ${card || 'a spell'}`;
-    case 'CARD_PLAYED': return `${who || 'Someone'} played ${card || 'a card'}`;
-    case 'SPELL_RESOLVED': return card ? `${card} resolved` : null;
-    case 'CREATURE_ATTACKED': return `${card || who} attacked`;
-    case 'CREATURE_BLOCKED': return `${e.blockerName ?? 'A creature'} blocked ${card}`;
-    case 'DAMAGE_DEALT': return `${e.amount ?? 0} damage to ${e.targetName ?? 'a target'}`;
-    case 'LIFE_CHANGED': { const d = Number(e.delta ?? 0); return `${who || 'Someone'} ${d >= 0 ? 'gained' : 'lost'} ${Math.abs(d)} life → ${e.newLife}`; }
-    case 'CARD_DESTROYED': return `${card || 'A permanent'} was destroyed`;
-    case 'CARD_EXILED': return `${card || 'A card'} was exiled`;
-    case 'CARD_SACRIFICED': return `${card || 'A permanent'} was sacrificed`;
-    case 'CARD_DISCARDED': return `${who || 'Someone'} discarded ${card || 'a card'}`;
-    case 'PLAYER_LOST': return `${who || 'A player'} was eliminated`;
-    case 'PLAYER_WON': return `${who || card} won`;
-    case 'GAME_OVER': return 'Game over';
-    default: return null;
-  }
+export function describeForgeEvent(e: Record<string, unknown>, youName?: string): string | null {
+  const line = describeEvent(e, youName);
+  if (!line || line.detail) return null;
+  return line.text;
 }
 
 export function recapContext(
@@ -185,8 +167,8 @@ export function recapContext(
   winner: string | null,
   deck: { name: string; commanderName: string } | null
 ): RecapContext {
-  const lines = events.map(describeForgeEvent).filter((l): l is string => !!l);
   const you = state?.players.find((p) => p.id === youId);
+  const lines = events.map((e) => describeForgeEvent(e, you?.name)).filter((l): l is string => !!l);
   const winnerName = winner && winner !== 'draw' ? winner : (state?.winner ? state.players.find((p) => p.id === state.winner)?.name ?? 'nobody' : 'nobody');
   const finalLife: Record<string, number> = {};
   for (const p of state?.players ?? []) finalLife[p.name] = p.life;

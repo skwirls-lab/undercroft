@@ -25,6 +25,7 @@ import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { synthesizeGameEvents } from '@/lib/gameEventSynth';
 import { useGameStore } from '@/store/gameStore';
 import type { GameAction, GameState, CardData } from '@/lib/gameTypes';
+import type { GameOverPayload } from '@/lib/forgeClient';
 import type { ScryfallCardRecord } from '@/lib/cardTypes';
 
 // ===================================================================
@@ -153,6 +154,10 @@ export interface ForgeGameStoreState {
   gameState: ForgeGameState | null;
   pendingChoice: ForgeChoiceRequest | null;
   gameEvents: ForgeGameEvent[];
+  /** True once the server has sent a described event; the client then stops diffing snapshots for the log. */
+  richLog: boolean;
+  /** The server's account of the finished game: turns and every seat's outcome. */
+  gameOverDetails: GameOverPayload | null;
   isGameOver: boolean;
   winner: string | null;
 
@@ -253,6 +258,8 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   isAwaitingServer: false,
   lastStartPayload: null,
   gameEvents: [],
+  richLog: false,
+  gameOverDetails: null,
   isGameOver: false,
   winner: null,
 
@@ -266,10 +273,12 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         const prevState = get().gameState;
         set({ gameState: state, isAwaitingServer: false });
 
-        // Log lines are derived by diffing snapshots; see gameEventSynth.ts for the rules,
-        // including why nothing per-card is logged before turn 1.
+        // Log lines used to be derived by diffing snapshots (gameEventSynth.ts). A server
+        // that describes its own events makes that redundant — and wrong, since a diff can
+        // only say that life changed, never why. Once one described event has arrived the
+        // diff is only used for the opening line.
         const humanId = state.players.find((p) => !p.isAI)?.id;
-        const syntheticEvents = synthesizeGameEvents(prevState, state);
+        const syntheticEvents = get().richLog && prevState ? [] : synthesizeGameEvents(prevState, state);
         if (syntheticEvents.length > 0) {
           set((prev) => ({ gameEvents: [...prev.gameEvents.slice(-190), ...syntheticEvents] }));
           playSfxForEvents(syntheticEvents, humanId != null && state.turn.activePlayerId === humanId);
@@ -400,9 +409,18 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       },
 
       onGameEvent: (event) => {
+        // Stamp the turn so the log can be grouped and "since my last turn" filtered.
+        const turn = event.turn ?? get().gameState?.turn.turnNumber ?? 0;
+        const stamped = { ...event, turn };
         set((prev) => ({
-          gameEvents: [...prev.gameEvents.slice(-100), event], // Keep last 100 events
+          richLog: prev.richLog || event.rich === true,
+          gameEvents: [...prev.gameEvents.slice(-399), stamped],
         }));
+        if (event.rich) {
+          const gs = get().gameState;
+          const humanId = gs?.players.find((p) => !p.isAI)?.id;
+          playSfxForEvents([stamped], humanId != null && gs?.turn.activePlayerId === humanId);
+        }
       },
 
       onGameOver: (payload) => {
@@ -410,6 +428,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         set({
           isGameOver: true,
           winner: payload.winner,
+          gameOverDetails: payload,
           pendingChoice: null,
           isAwaitingServer: false,
         });
@@ -436,6 +455,8 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
       pendingChoice: null,
       isAwaitingServer: false,
       gameEvents: [],
+      richLog: false,
+      gameOverDetails: null,
       isGameOver: false,
       winner: null,
     });
@@ -450,6 +471,8 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         pendingAbilitySelection: null,
         isAwaitingServer: false,
         gameEvents: [],
+        richLog: false,
+        gameOverDetails: null,
         isGameOver: false,
         winner: null,
         // Remembered so a rematch can replay the exact same matchup.

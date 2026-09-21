@@ -22,6 +22,9 @@ export function PromptGuide({ choiceType }: { choiceType: string }) {
         {guide.ref && (
           <button type="button" onClick={() => useLessonSheet.getState().open(guide.ref!)} className="ml-1.5 inline-flex items-center gap-0.5 whitespace-nowrap text-gold/80 hover:text-gold">Learn more <BookOpen className="h-3 w-3" /></button>
         )}
+        {choiceType !== 'mulligan' && (
+          <span className="block text-foreground/60">Need to check the boards first? <span className="font-medium text-foreground/80">Peek at the table</span> hides this prompt until you come back; nothing is sent meanwhile.</span>
+        )}
       </p>
     </div>
   );

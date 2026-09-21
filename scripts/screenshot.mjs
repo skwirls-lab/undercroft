@@ -79,6 +79,11 @@ const SCREENS = [
   { name: 'prompt-peek', path: '/dev/board?choice=targets', click: '[data-dev-prompt-peek]' },
   { name: 'prompt-ability', path: '/dev/board?choice=ability' },
   { name: 'prompt-color', path: '/dev/board?choice=color' },
+  { name: 'prompt-combo', path: '/dev/board?choice=combo', clicks: ['[data-dev-mana-combo="U"] button:last-child', '[data-dev-mana-combo="U"] button:last-child', '[data-dev-mana-combo="R"] button:last-child'] },
+  { name: 'prompt-mana-life', path: '/dev/board?choice=mana' },
+  { name: 'game-log', path: '/dev/board', click: '[data-tour="board-ticker"]' },
+  { name: 'game-log-since', path: '/dev/board', clicks: ['[data-tour="board-ticker"]', '[data-dev-game-log] button:has-text("Since my last turn")'] },
+  { name: 'reader-tags', path: '/dev/board?open=me', clicks: ['[data-card-preview-safe]:has-text("Angel") >> nth=0', '[data-dev-reader-keyword] >> nth=0'] },
 ];
 
 const VIEWPORTS = [

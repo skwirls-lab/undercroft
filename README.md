@@ -118,6 +118,28 @@ poison against 10, library and hand counts, the mana pool, commander damage take
 opposing commander against the 21 that ends a game, and the graveyard, exile and command zone
 laid out as cards with a reader. Tabs across the top switch seats without closing.
 
+**The reader answers its own tags.** Tap a card to read it; under the text, every keyword
+and counter is a button that explains itself in one line (from the Apprentice's glossary),
+and an attachment — or the card this one is attached to — opens that card instead.
+
+**The log says why.** The engine describes every event as it happens (`GameEventForwarder`
+in the server): who cast or activated what and at whom, damage with its source and whether
+it was combat, every life change with its cause, poison, counters, attackers and blocks,
+tokens, sacrifices, what left the battlefield and what did it, eliminations and how. Tap the
+ticker for the full log, grouped by turn; **Since my last turn** shows only what happened
+after your last turn began, which is the question after an auto-pass; **Details** adds mana
+taps and phases. Hidden information stays hidden: an opponent's draw, tuck or search is a
+line without a card name. One function phrases every line (`src/lib/gameLog.ts`), and the
+recap the Archivist reads uses the same words.
+
+**Peek at the table.** Every prompt — targets, attackers, blockers, tutors, mana — has a
+Peek button that hides it so you can look at every board; a pill brings you back, Escape
+too, and nothing is sent in between.
+
+**Mana.** A source that makes several mana "in any combination" (Vivi Ornitier) asks how to
+split it; "activate only once each turn" holds for mana abilities; a Phyrexian symbol such
+as {U/P} offers two life instead of the mana.
+
 ## The Apprentice (learning, free)
 
 Apprentice mode is the rulebook read at the right moment, with no model involved. It is on
@@ -194,6 +216,7 @@ in. If you press it having done nothing that step while you still have plays ava
 table asks "End your main phase?" once; Pass anyway goes through, and the question is not
 repeated within the same step. It never asks with a spell on the stack, on an opponent's
 turn, in combat, or with auto-pass on. `scripts/test-pass-guard.ts` pins the rule.
+`scripts/test-game-log.ts` pins the log's phrasing and what it keeps hidden.
 
 ## Leaving the table
 

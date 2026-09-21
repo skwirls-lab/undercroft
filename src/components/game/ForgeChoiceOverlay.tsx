@@ -655,12 +655,28 @@ function ChoicePanel({ choice, onRespond }: {
     const manaCost = (data.manaCost as string) || '?';
     const sources = (data.sources || []) as CardOption[];
     const canCancel = data.canCancel as boolean;
+    const lifeForPhyrexian = typeof data.lifeForPhyrexian === 'number' ? data.lifeForPhyrexian : 0;
     return (
       <ManaPaymentPanel
         prompt={prompt || `Pay mana: ${manaCost}`}
         manaCost={manaCost}
         sources={sources}
         canCancel={canCancel}
+        lifeForPhyrexian={lifeForPhyrexian}
+        requestId={choice.requestId}
+        onRespond={onRespond}
+      />
+    );
+  }
+
+  // --- choose_mana_combo: "add X mana in any combination of {U} and/or {R}" ---
+  if (choiceType === 'choose_mana_combo') {
+    return (
+      <ManaComboPanel
+        prompt={prompt || 'Choose your mana'}
+        colors={(data.colors || []) as ColorOption[]}
+        amount={(data.amount as number) ?? 1}
+        different={!!data.different}
         requestId={choice.requestId}
         onRespond={onRespond}
       />
@@ -897,11 +913,13 @@ function DeclareAttackersPanel({ attackers, defenders, defaultDefenderId, reques
 // Backend expects one cardId per response (loops asking for lands one at a time)
 // ============================================================
 
-function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onRespond }: {
+function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexian = 0, requestId, onRespond }: {
   prompt: string;
   manaCost: string;
   sources: CardOption[];
   canCancel: boolean;
+  /** Life the server will take for one Phyrexian shard, or 0 when the cost has none. */
+  lifeForPhyrexian?: number;
   requestId: string;
   onRespond: (requestId: string, payload: Record<string, unknown>) => void;
 }) {
@@ -940,13 +958,31 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, requestId, onR
           ))}
         </div>
       ) : (
-        <p className="text-amber-400" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>No untapped mana sources available!</p>
+        <p className="text-amber-400" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+          {lifeForPhyrexian > 0 ? 'No untapped mana sources — but a Phyrexian symbol can be paid with life.' : 'No untapped mana sources available!'}
+        </p>
       )}
-      {canCancel && (
-        <Button variant="outline" onClick={cancel} className="rounded-lg border bg-card/60 font-medium hover:border-red-500/40 hover:bg-red-500/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
-          Cancel Spell
-        </Button>
-      )}
+      <div className="flex flex-wrap" style={{ gap: 'clamp(6px,1.2vmin,1000px)' }}>
+        {lifeForPhyrexian > 0 && (
+          // {W/P}, {U/P}, ...: one mana of that colour or two life. The option was never
+          // offered before, so Phyrexian costs could only be paid with mana.
+          <Button
+            variant="outline"
+            onClick={() => onRespond(requestId, { payLife: true })}
+            className="rounded-lg border border-red-400/40 bg-red-500/10 font-medium text-red-200 hover:border-red-400/60 hover:bg-red-500/20"
+            style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+            title="Pay a Phyrexian mana symbol with life instead of mana"
+            data-dev-pay-life
+          >
+            Pay {lifeForPhyrexian} life for a Phyrexian symbol
+          </Button>
+        )}
+        {canCancel && (
+          <Button variant="outline" onClick={cancel} className="rounded-lg border bg-card/60 font-medium hover:border-red-500/40 hover:bg-red-500/10" style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}>
+            Cancel Spell
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1308,6 +1344,69 @@ function ColorChoicePanel({ prompt, colors, requestId, onRespond }: {
           </Button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ManaComboPanel — "add X mana in any combination of {U} and/or {R}"
+// ============================================================
+
+/**
+ * One prompt for the whole amount: a stepper per colour, confirm when they add up. Sends
+ * `counts` keyed by the colour's mask, which is how the server names a colour. "Different"
+ * sources (one of each) cap every stepper at one.
+ */
+function ManaComboPanel({ prompt, colors, amount, different, requestId, onRespond }: {
+  prompt: string;
+  colors: ColorOption[];
+  amount: number;
+  different: boolean;
+  requestId: string;
+  onRespond: (requestId: string, payload: Record<string, unknown>) => void;
+}) {
+  const [counts, setCounts] = React.useState<Record<number, number>>({});
+  const total = Object.values(counts).reduce((s, n) => s + n, 0);
+  const cap = different ? 1 : amount;
+  const bump = (mask: number, by: number) =>
+    setCounts((prev) => {
+      const cur = prev[mask] ?? 0;
+      const next = Math.max(0, Math.min(cap, cur + by));
+      if (by > 0 && total >= amount) return prev;
+      return { ...prev, [mask]: next };
+    });
+  const submit = () => {
+    const payload: Record<string, number> = {};
+    for (const [mask, n] of Object.entries(counts)) if (n > 0) payload[mask] = n;
+    onRespond(requestId, { counts: payload });
+  };
+  return (
+    <div className="prompt-panel prompt-default" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
+      <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(2px,0.4vmin,1000px)' }}>{prompt}</h3>
+      <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+        {different ? `One of each of ${amount} different colours.` : `${amount} mana, in any mix of these colours.`}
+        {' '}<span className="tabular-nums text-foreground">{total}/{amount}</span> chosen
+      </p>
+      <div className="flex flex-wrap" style={{ gap: 'clamp(6px,1.2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+        {colors.map((c) => {
+          const n = counts[c.mask] ?? 0;
+          return (
+            <div key={c.mask} className={`flex items-center gap-1 rounded-lg border border-border/40 ${COLOR_SWATCH[c.symbol] ?? 'bg-card/60 text-foreground'}`} style={{ padding: 'clamp(2px,0.4vmin,1000px) clamp(4px,0.8vmin,1000px)' }} data-dev-mana-combo={c.symbol}>
+              <button type="button" onClick={() => bump(c.mask, -1)} disabled={n === 0} className="flex items-center justify-center rounded font-bold hover:bg-black/10 disabled:opacity-30" style={{ width: 'clamp(24px,3.5vmin,1000px)', height: 'clamp(24px,3.5vmin,1000px)', fontSize: 'clamp(14px,2.4vmin,1000px)' }} aria-label={`One less ${c.name}`}>−</button>
+              <span className="font-bold tabular-nums" style={{ minWidth: 'clamp(44px,7vmin,1000px)', textAlign: 'center', fontSize: 'clamp(12px,2vmin,1000px)' }}>{n} {c.symbol}</span>
+              <button type="button" onClick={() => bump(c.mask, 1)} disabled={n >= cap || total >= amount} className="flex items-center justify-center rounded font-bold hover:bg-black/10 disabled:opacity-30" style={{ width: 'clamp(24px,3.5vmin,1000px)', height: 'clamp(24px,3.5vmin,1000px)', fontSize: 'clamp(14px,2.4vmin,1000px)' }} aria-label={`One more ${c.name}`}>+</button>
+            </div>
+          );
+        })}
+      </div>
+      <Button
+        onClick={submit}
+        disabled={total !== amount}
+        className="rounded-lg border border-gold/40 bg-gold/15 font-medium hover:bg-gold/25 disabled:opacity-40 text-foreground"
+        style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
+      >
+        Add {amount} mana
+      </Button>
     </div>
   );
 }

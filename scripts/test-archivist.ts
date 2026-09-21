@@ -69,7 +69,8 @@ check(`recap keeps at most ${RECAP_MAX_EVENTS} lines`, rc.events.length === RECA
 check('recap keeps the newest events', rc.events[rc.events.length - 1] === 'Game over');
 check('recap knows who won', !rc.youWon && rc.winner === 'Krenko AI');
 check('unknown event types are dropped', describeForgeEvent({ eventType: 'CARD_TAPPED' }) === null);
-check('life changes read as a sentence', describeForgeEvent({ eventType: 'LIFE_CHANGED', playerName: 'Krenko AI', delta: -4, newLife: 18 }) === 'Krenko AI lost 4 life → 18');
+check('life changes read as a sentence', describeForgeEvent({ eventType: 'LIFE_CHANGED', playerName: 'Krenko AI', delta: -4, newLife: 18 }) === 'Krenko AI −4 life → 18');
+check('a described life change names its cause', describeForgeEvent({ eventType: 'LIFE_CHANGED', playerName: 'Player', delta: -3, newLife: 28, cause: 'Lightning Bolt', causeController: 'Control AI', causeKind: 'damage' }, 'Player') === 'You −3 life → 28 (Lightning Bolt, Control AI)');
 
 // ─── Prompt assembly ─────────────────────────────────────────────────────────
 console.log('prompts');
