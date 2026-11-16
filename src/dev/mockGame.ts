@@ -44,6 +44,7 @@ const creature = (
   keywords: opts.keywords,
   damage: opts.damage,
   isToken: opts.isToken,
+  colors: opts.colors,
 });
 
 const other = (name: string, cost: string, typeLine: string, extra: Partial<ForgeCard> = {}): ForgeCard => ({
@@ -54,8 +55,22 @@ const other = (name: string, cost: string, typeLine: string, extra: Partial<Forg
   oracleText: extra.oracleText ?? '',
   tapped: extra.tapped ?? false,
   loyalty: extra.loyalty,
+  counters: extra.counters,
   attachedTo: extra.attachedTo,
+  isToken: extra.isToken,
+  colors: extra.colors,
 });
+
+const JACE_TEXT =
+  "[+2]: Look at the top card of target player's library. You may put that card on the bottom of that player's library.\n" +
+  '[0]: Draw three cards, then put two cards from your hand on top of your library in any order.\n' +
+  "[-1]: Return target creature to its owner's hand.\n" +
+  "[-12]: Exile all cards from target player's library, then that player shuffles their hand into their library.";
+
+const CASTAWAY_TEXT =
+  '[+1]: Whenever one or more creatures you control deal combat damage to a player this turn, draw a card and discard a card.\n' +
+  '[-2]: Create a 2/2 blue Illusion creature token with "When this creature becomes the target of a spell, sacrifice it."\n' +
+  "[-5]: Create two tokens that are copies of Jace, Cunning Castaway, except they're not legendary.";
 
 const handCard = (name: string, cost: string, typeLine: string, oracle = ''): ForgeCard => ({
   id: id(),
@@ -117,14 +132,18 @@ export function buildMockGame(): ForgeGameState {
         power: 3,
         toughness: 3,
       }),
-      creature('Bird', '', 1, 1, { types: 'Bird', keywords: ['Flying'], isToken: true, sick: true }),
+      creature('Bird', '', 1, 1, { types: 'Bird', keywords: ['Flying'], isToken: true, sick: true, colors: ['U'] }),
+      creature('Illusion', '', 2, 2, { types: 'Illusion', isToken: true, colors: ['U'], oracleText: 'When this creature becomes the target of a spell, sacrifice it.' }),
       creature('Mulldrifter', '{4}{U}', 2, 2, { types: 'Elemental', keywords: ['Flying'], damage: 1 }),
       swordOfFire,
       other('Sol Ring', '{1}', 'Artifact', { tapped: true, oracleText: '{T}: Add {C}{C}.' }),
       other('Doubling Season', '{4}{G}', 'Enchantment', {
         oracleText: 'If an effect would create one or more tokens under your control, it creates twice that many instead.',
       }),
-      other('Jace, the Mind Sculptor', '{2}{U}{U}', 'Legendary Planeswalker — Jace', { loyalty: 5 }),
+      other('Jace, the Mind Sculptor', '{2}{U}{U}', 'Legendary Planeswalker — Jace', { loyalty: 5, counters: { LOYALTY: 5 }, oracleText: JACE_TEXT }),
+      // A token copy of a planeswalker: no art anywhere, which is exactly the face to get right.
+      other('Jace, Cunning Castaway', '{1}{U}{U}', 'Planeswalker — Jace', { loyalty: 3, counters: { LOYALTY: 3 }, oracleText: CASTAWAY_TEXT, isToken: true, colors: ['U'] }),
+      other('Treasure', '', 'Artifact — Treasure', { isToken: true, oracleText: '{T}, Sacrifice this artifact: Add one mana of any color.' }),
       land('Forest', 'Forest'),
       land('Forest', 'Forest', true),
       land('Plains', 'Plains'),
@@ -173,7 +192,7 @@ export function buildMockGame(): ForgeGameState {
     command: [],
     battlefield: [
       { ...creature('Krenko, Mob Boss', '{2}{R}{R}', 3, 3, { types: 'Goblin Warrior' }), typeLine: 'Legendary Creature — Goblin Warrior' },
-      ...Array.from({ length: 7 }, () => creature('Goblin', '', 1, 1, { types: 'Goblin', isToken: true })),
+      ...Array.from({ length: 7 }, () => creature('Goblin', '', 1, 1, { types: 'Goblin', isToken: true, colors: ['R'] })),
       creature('Goblin Chieftain', '{1}{R}{R}', 2, 2, { types: 'Goblin', keywords: ['Haste'] }),
       other('Skullclamp', '{1}', 'Artifact — Equipment'),
       ...Array.from({ length: 6 }, (_, i) => land('Mountain', 'Mountain', i < 3)),

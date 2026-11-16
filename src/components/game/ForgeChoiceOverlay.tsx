@@ -15,6 +15,8 @@ import type { CardInstance, CardData, ManaColor } from '@/lib/gameTypes';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
 import type { PendingAbilitySelection } from '@/store/forgeGameStore';
 import type { GameAction } from '@/lib/gameTypes';
+import { LoyaltyCost } from './LoyaltyAbilities';
+import { activatedLoyaltyThisTurn, currentLoyalty, isPlaneswalker, loyaltyUnavailableReason, matchLoyaltyAction, parseLoyaltyAbilities } from '@/lib/loyalty';
 
 // ============================================================
 // Interfaces for choice panel sub-components
@@ -151,7 +153,14 @@ export function ForgeChoiceOverlay() {
     // Must use the same modal shell as every other prompt. Rendered bare it lands in the
     // page's `flex-1 min-h-0 overflow-hidden` container and gets clipped.
     return (
-      <PromptShell id={`local-${pendingAbilitySelection.cardName}`} title={`${pendingAbilitySelection.cardName} — which ability?`}>
+      <PromptShell
+        id={`local-${pendingAbilitySelection.cardName}`}
+        title={
+          pendingAbilitySelection.card && isPlaneswalker(pendingAbilitySelection.card)
+            ? `${pendingAbilitySelection.cardName} · Loyalty ${currentLoyalty(pendingAbilitySelection.card) ?? '?'}`
+            : `${pendingAbilitySelection.cardName} — which ability?`
+        }
+      >
         <AbilitySelectionPanel
           selection={pendingAbilitySelection}
           onPick={(action) => {
@@ -988,8 +997,10 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
 }
 
 // ============================================================
-// AbilitySelectionPanel — pick which mode of a card to play
-// Local only: the server sent one legalPlay per mode, all for the same card.
+// AbilitySelectionPanel — pick which mode of a card to play, or which loyalty ability
+// Local only: the server sent one legalPlay per mode, all for the same card. For a
+// planeswalker every printed ability is listed, the ones with no legal play greyed with the
+// reason, so "nothing happened" becomes "not enough loyalty" or "already used this turn".
 // ============================================================
 
 function AbilitySelectionPanel({ selection, onPick, onCancel }: {
@@ -997,32 +1008,91 @@ function AbilitySelectionPanel({ selection, onPick, onCancel }: {
   onPick: (action: GameAction) => void;
   onCancel: () => void;
 }) {
+  const gameState = useGameStore((s) => s.gameState);
+  const gameEvents = useForgeGameStore((s) => s.gameEvents);
+  const card = selection.card;
+  const pw = !!card && isPlaneswalker(card);
+  const abilities = pw ? parseLoyaltyAbilities(card.cardData.oracleText) : [];
+  const matched = abilities.map((ability) => ({ ability, action: matchLoyaltyAction(ability, selection.actions) }));
+  const used = new Set(matched.map((m) => m.action).filter(Boolean));
+  const leftovers = selection.actions.filter((a) => !used.has(a));
+  const youName = gameState?.players.find((p) => !p.isAI)?.name;
+  const ctx = {
+    hasPriority: gameState?.priority.playerWithPriority === 'player-human',
+    isMyTurn: gameState?.turn.activePlayerId === 'player-human',
+    isMainPhase: (gameState?.turn.phase ?? '').includes('main'),
+    stackEmpty: (gameState?.stack.length ?? 0) === 0,
+    activatedThisTurn: card ? activatedLoyaltyThisTurn(gameEvents as ReadonlyArray<Record<string, unknown>>, card.cardData.name, gameState?.turn.turnNumber, youName) : false,
+  };
+  const fs = 'clamp(11px,2vmin,1000px)';
+  const pad = 'clamp(5px,0.9vmin,1000px) clamp(8px,1.4vmin,1000px)';
+
   return (
     <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <h3 className="font-semibold" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
-        How do you want to play {selection.cardName}?
+        {pw ? 'Which loyalty ability?' : `How do you want to play ${selection.cardName}?`}
       </h3>
-      <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-        {selection.actions.map((action, i) => (
-          <Button
-            key={`${action.payload.forgeAbilityIndex ?? i}`}
-            onClick={() => onPick(action)}
-            className="rounded-lg border border-border/40 bg-card/60 text-left hover:border-gold/40 hover:bg-gold/10 text-foreground"
-            style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)', maxWidth: 'clamp(200px,32vmin,1000px)' }}
-          >
-            <span className="block truncate">
-              {(action.payload.forgeDescription as string) || action.type.replace(/_/g, ' ').toLowerCase()}
-            </span>
-          </Button>
-        ))}
-      </div>
+      {pw && (
+        <p className="text-muted-foreground" style={{ fontSize: 'clamp(10px,1.7vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }}>
+          One loyalty ability per planeswalker each turn, in your main phase with an empty stack. The cost adds or spends loyalty; at zero it is gone.
+        </p>
+      )}
+      {pw && matched.length > 0 && (
+        <ul className="flex flex-col" style={{ gap: 'clamp(4px,0.7vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)', maxWidth: 'clamp(260px,56vmin,1000px)' }}>
+          {matched.map(({ ability, action }, i) =>
+            action ? (
+              <li key={i}>
+                <button
+                  type="button"
+                  onClick={() => onPick(action)}
+                  data-dev-loyalty-option
+                  className="flex w-full items-start rounded-lg border border-gold/50 bg-gold/10 text-left text-foreground transition-colors hover:border-gold hover:bg-gold/20"
+                  style={{ gap: 'clamp(6px,1vmin,1000px)', padding: pad, fontSize: fs }}
+                >
+                  <LoyaltyCost label={ability.label} size="md" />
+                  <span className="min-w-0 flex-1 leading-snug">{ability.text}</span>
+                </button>
+              </li>
+            ) : (
+              <li
+                key={i}
+                data-unavailable
+                className="flex items-start rounded-lg border border-border/30 bg-card/40 text-muted-foreground"
+                style={{ gap: 'clamp(6px,1vmin,1000px)', padding: pad, fontSize: fs }}
+              >
+                <span className="opacity-60"><LoyaltyCost label={ability.label} size="md" /></span>
+                <span className="min-w-0 flex-1 leading-snug">
+                  <span className="opacity-70">{ability.text}</span>
+                  <span className="block italic text-gold/80" style={{ fontSize: '0.85em' }}>{card ? loyaltyUnavailableReason(ability, card, ctx) : 'Not available'}</span>
+                </span>
+              </li>
+            )
+          )}
+        </ul>
+      )}
+      {leftovers.length > 0 && (
+        <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+          {leftovers.map((action, i) => (
+            <Button
+              key={`${action.payload.forgeAbilityIndex ?? i}`}
+              onClick={() => onPick(action)}
+              className="rounded-lg border border-border/40 bg-card/60 text-left hover:border-gold/40 hover:bg-gold/10 text-foreground"
+              style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: fs, maxWidth: 'clamp(200px,32vmin,1000px)' }}
+            >
+              <span className="block truncate">
+                {(action.payload.forgeDescription as string) || action.type.replace(/_/g, ' ').toLowerCase()}
+              </span>
+            </Button>
+          ))}
+        </div>
+      )}
       <Button
         variant="outline"
         onClick={onCancel}
         className="rounded-lg border bg-card/60 font-medium hover:border-border/40"
         style={{ height: 'clamp(32px,4.5vmin,1000px)', padding: '0 clamp(12px,2vmin,1000px)', fontSize: 'clamp(12px,2vmin,1000px)' }}
       >
-        Cancel
+        {pw ? 'Never mind' : 'Cancel'}
       </Button>
     </div>
   );

@@ -66,7 +66,7 @@ export const TOURS: Record<TourName, Tour> = {
     steps: [
       { target: 'board-phase', title: 'Where the turn is', body: 'The tracker shows whose turn it is and which phase and step the game is in. The gold gem is now; the text on the right is the step.', placement: 'bottom' },
       { target: 'board-apprentice', title: 'The Apprentice', body: 'While Apprentice mode is on, this line says what is happening and what you can do. Learn more opens the lesson. The cap in the header switches it off.', placement: 'bottom' },
-      { target: 'board-plaque', title: 'A seat', body: 'Each plaque is a seat: life, library, hand size, poison and commander damage at a glance. Tap the plaque to open that player’s full board.', placement: 'bottom' },
+      { target: 'board-plaque', title: 'A seat', body: 'Each plaque is a seat: life, library, hand size, poison and commander damage at a glance. Tap the plaque to open that player’s full board. There, tapping a card reads it; the gold button that appears on it is what casts or activates.', placement: 'bottom' },
       { target: 'board-inspect', title: 'The inspector', body: 'The (i) opens the seat inspector: every number, plus the graveyard, exile and command zone laid out as cards you can read.', placement: 'left' },
       { target: 'board-stack', title: 'The stack', body: 'When something is waiting to resolve it shows here, newest first. While it is showing you can still respond; nothing on it has happened yet.', placement: 'top' },
       { target: 'board-pass', title: 'Pass', body: 'The engine asks you at every point where you could act. Pass when you have nothing to do. It glows gold when it is your priority.', placement: 'top' },

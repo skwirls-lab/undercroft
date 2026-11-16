@@ -93,6 +93,8 @@ export interface CardInstance {
   summoningSick: boolean;
   modifiedPower?: number;
   modifiedToughness?: number;
+  /** A token, as the engine reports it (type lines do not say so). */
+  isToken?: boolean;
   abilities: Array<{
     name: string;
     text: string;

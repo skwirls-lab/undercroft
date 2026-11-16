@@ -24,7 +24,7 @@ import {
 import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { synthesizeGameEvents } from '@/lib/gameEventSynth';
 import { useGameStore } from '@/store/gameStore';
-import type { GameAction, GameState, CardData } from '@/lib/gameTypes';
+import type { GameAction, GameState, CardData, CardInstance } from '@/lib/gameTypes';
 import type { GameOverPayload } from '@/lib/forgeClient';
 import { buildMatchRecord, type MatchMeta } from '@/lib/matchHistory';
 import { useMatchHistoryStore } from '@/store/matchHistoryStore';
@@ -144,6 +144,8 @@ export interface PendingAbilitySelection {
   cardInstanceId: string;
   cardName: string;
   actions: GameAction[];
+  /** The card itself, when the chooser should show it (a planeswalker's loyalty abilities). */
+  card?: CardInstance;
 }
 
 // Re-use existing UI types where possible
