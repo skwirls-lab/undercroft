@@ -25,6 +25,7 @@
     "test:game-log": "tsx scripts/test-game-log.ts",
     "test:match-history": "tsx scripts/test-match-history.ts",
     "test:loyalty": "tsx scripts/test-loyalty.ts",
+    "test:board-order": "tsx scripts/test-board-order.ts",
     "test:rules": "firebase emulators:exec --only firestore --project demo-undercroft \"node scripts/test-rules.mjs\""
   },
   "dependencies": {

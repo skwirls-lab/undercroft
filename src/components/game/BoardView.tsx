@@ -15,6 +15,7 @@ import type { CardInstance, GameState, GameAction, CombatState, ManaColor } from
 import { Heart, Crown, Sword, Gem, Library, X, ChevronLeft, ChevronRight, Skull, Ban, BookOpen, Hand as HandIcon, Droplets, Info, Sparkles, Zap } from 'lucide-react';
 import { useCardPreview } from './CardPreviewContext';
 import { cardActionLabel, isPlaneswalker } from '@/lib/loyalty';
+import { sortOtherPermanents } from '@/lib/boardOrder';
 
 /**
  * The expanded board for one player: what you open when you tap a seat.
@@ -161,10 +162,12 @@ export function BoardView(props: BoardViewProps) {
     const t = c.cardData.typeLine.toLowerCase();
     return t.includes('planeswalker') && !t.includes('creature') && !t.includes('land');
   });
-  const others = bf.filter((c) => {
+  // Sorted by kind (equipment, mana rocks, artifacts, enchantments, the rest) rather than by
+  // the order they were played, so a mixed row still reads as groups.
+  const others = sortOtherPermanents(bf.filter((c) => {
     const t = c.cardData.typeLine.toLowerCase();
     return !t.includes('creature') && !t.includes('land') && !t.includes('planeswalker') && !attached.has(c.instanceId);
-  });
+  }));
 
   // ── Affordances (only meaningful on your own seat with priority) ──────────
   const mine = isMe && hasPriority ? legalActions : [];
