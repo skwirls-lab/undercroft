@@ -6,6 +6,8 @@ import type { CardInstance } from '@/lib/gameTypes';
 import { getLandProducibleColors } from '@/lib/OracleTextParser';
 import { useCardPreview } from './CardPreviewContext';
 import { ManaSymbol, parseManaSymbols } from './ManaSymbol';
+import { currentLoyalty } from '@/lib/loyalty';
+import { Cog, Flame, Gem, Mountain, ScrollText, Shield, Sparkles, Sword } from 'lucide-react';
 
 // Resolve the active face for DFC cards on the battlefield
 function getActiveFace(card: CardInstance) {
@@ -35,6 +37,8 @@ function getActiveFace(card: CardInstance) {
   };
 }
 
+type CardFace = ReturnType<typeof getActiveFace>;
+
 // Calculate effective P/T including counters, pump, and equipment
 function getDisplayPT(card: CardInstance): { power: string; toughness: string; boosted: boolean } {
   const basePower = parseInt(card.cardData.power || '0', 10);
@@ -49,6 +53,7 @@ function getDisplayPT(card: CardInstance): { power: string; toughness: string; b
 }
 
 function isToken(card: CardInstance): boolean {
+  if (card.isToken) return true;
   const typeLine = card.cardData.typeLine.toLowerCase();
   const name = card.cardData.name.toLowerCase();
   return typeLine.includes('token') || name.includes('token');
@@ -95,16 +100,102 @@ function getCardColorClass(card: CardInstance): string {
   return colorMap[colors[0]] || 'border-zinc-500/60';
 }
 
-/** Type-line accent for the no-art slab, so a glance still says "creature" or "land". */
-function slabTone(typeLine: string): string {
+/**
+ * The face a card wears when there is no art for it: a token, a card the image lookup missed,
+ * a card still loading. It must say what the card is from across the table, so it borrows
+ * the two things a printed card uses — the colour of the frame and the shape of the type —
+ * rather than a blank slab with a name on it.
+ */
+interface SlabPalette { gradient: string; ink: 'light' | 'dark'; glyph: string }
+
+function slabPalette(colors: readonly string[] | undefined, typeLine: string): SlabPalette {
+  const cs = (colors ?? []).filter((c) => 'WUBRG'.includes(c));
   const t = typeLine.toLowerCase();
-  if (t.includes('creature')) return 'from-[oklch(0.24_0.03_40)]';
-  if (t.includes('land')) return 'from-[oklch(0.22_0.03_100)]';
-  if (t.includes('planeswalker')) return 'from-[oklch(0.24_0.04_300)]';
-  if (t.includes('artifact')) return 'from-[oklch(0.24_0.01_60)]';
-  if (t.includes('enchantment')) return 'from-[oklch(0.22_0.03_320)]';
-  if (t.includes('instant') || t.includes('sorcery')) return 'from-[oklch(0.22_0.03_240)]';
-  return 'from-[oklch(0.22_0.014_55)]';
+  if (cs.length > 1) return { gradient: 'linear-gradient(160deg, oklch(0.76 0.12 85), oklch(0.44 0.09 70))', ink: 'dark', glyph: 'oklch(0.32 0.06 70)' };
+  switch (cs[0]) {
+    case 'W': return { gradient: 'linear-gradient(160deg, oklch(0.92 0.03 90), oklch(0.7 0.05 85))', ink: 'dark', glyph: 'oklch(0.5 0.05 85)' };
+    case 'U': return { gradient: 'linear-gradient(160deg, oklch(0.52 0.13 250), oklch(0.25 0.09 258))', ink: 'light', glyph: 'oklch(0.82 0.08 240)' };
+    case 'B': return { gradient: 'linear-gradient(160deg, oklch(0.36 0.04 300), oklch(0.15 0.02 300))', ink: 'light', glyph: 'oklch(0.74 0.04 300)' };
+    case 'R': return { gradient: 'linear-gradient(160deg, oklch(0.57 0.18 30), oklch(0.28 0.11 25))', ink: 'light', glyph: 'oklch(0.86 0.08 40)' };
+    case 'G': return { gradient: 'linear-gradient(160deg, oklch(0.52 0.12 145), oklch(0.25 0.07 150))', ink: 'light', glyph: 'oklch(0.85 0.1 140)' };
+  }
+  if (t.includes('land')) return { gradient: 'linear-gradient(160deg, oklch(0.44 0.05 70), oklch(0.21 0.03 60))', ink: 'light', glyph: 'oklch(0.8 0.06 75)' };
+  if (t.includes('artifact')) return { gradient: 'linear-gradient(160deg, oklch(0.62 0.02 240), oklch(0.31 0.015 240))', ink: 'light', glyph: 'oklch(0.9 0.02 240)' };
+  return { gradient: 'linear-gradient(160deg, oklch(0.42 0.015 55), oklch(0.19 0.012 55))', ink: 'light', glyph: 'oklch(0.77 0.02 55)' };
+}
+
+function TypeGlyph({ typeLine, ...props }: { typeLine: string } & React.ComponentProps<typeof Gem>) {
+  const t = typeLine.toLowerCase();
+  if (t.includes('creature')) return <Sword {...props} />;
+  if (t.includes('planeswalker')) return <Sparkles {...props} />;
+  if (t.includes('land')) return <Mountain {...props} />;
+  if (t.includes('artifact')) return <Cog {...props} />;
+  if (t.includes('enchantment')) return <ScrollText {...props} />;
+  if (t.includes('instant') || t.includes('sorcery')) return <Flame {...props} />;
+  if (t.includes('battle')) return <Shield {...props} />;
+  return <Gem {...props} />;
+}
+
+/** "Legendary Planeswalker — Jace" → ["Planeswalker", "Jace"]; Forge writes the dash as " - ". */
+function splitTypeLine(typeLine: string): [string, string] {
+  const [main, sub] = typeLine.replace(/^(Legendary |Basic |Token |Snow )+/, '').split(/\s+[—–-]\s+/);
+  return [main ?? '', sub ?? ''];
+}
+
+function SlabFace({ card, face, detail = false }: { card: CardInstance; face: CardFace; detail?: boolean }) {
+  const palette = slabPalette(card.cardData.colors, face.typeLine);
+  const token = isToken(card);
+  const [mainType, subType] = splitTypeLine(face.typeLine);
+  const ink = palette.ink === 'dark' ? 'text-[oklch(0.2_0.03_60)]' : 'text-white';
+  const inkSoft = palette.ink === 'dark' ? 'text-[oklch(0.3_0.03_60)]/80' : 'text-white/75';
+  const hasCost = parseManaSymbols(face.manaCost).length > 0;
+
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden" style={{ background: palette.gradient }} data-card-slab>
+      {/* Linen texture and a light from the top-left corner, so it reads as a surface. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ backgroundImage: 'radial-gradient(circle at 28% 18%, rgba(255,255,255,0.45), transparent 58%), repeating-linear-gradient(135deg, transparent 0 3px, rgba(0,0,0,0.16) 3px 4px)', opacity: 0.35 }}
+      />
+      {/* The type, as a watermark: a sword is a creature from across the table. */}
+      <TypeGlyph
+        typeLine={face.typeLine}
+        aria-hidden
+        strokeWidth={1.25}
+        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[40%]"
+        style={{ width: 'calc(var(--card-w) * 0.5)', height: 'calc(var(--card-w) * 0.5)', color: palette.glyph, opacity: 0.42 }}
+      />
+      {/* A token wears a stamped inner frame, the way a token card has a different border. */}
+      {token && <div className="pointer-events-none absolute rounded-[calc(var(--card-w)*0.06)] border border-dashed" style={{ inset: 'calc(var(--card-w) * 0.055)', borderColor: palette.ink === 'dark' ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)' }} />}
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col" style={{ padding: 'calc(var(--card-w) * 0.08)', paddingTop: hasCost ? 'calc(var(--card-w) * 0.17)' : 'calc(var(--card-w) * 0.1)' }}>
+        <p className={cn('font-display font-bold leading-[1.05] drop-shadow-sm', ink)} style={{ fontSize: 'calc(var(--card-w) * 0.125)' }}>
+          {face.name}
+        </p>
+        <p className={cn('truncate font-medium', inkSoft)} style={{ fontSize: 'calc(var(--card-w) * 0.08)', marginTop: 'calc(var(--card-w) * 0.03)' }}>
+          {token ? 'Token ' : ''}{mainType}
+        </p>
+        {subType && subType !== face.name && (
+          <p className={cn('truncate', inkSoft)} style={{ fontSize: 'calc(var(--card-w) * 0.075)' }}>{subType}</p>
+        )}
+        {detail && face.oracleText && (
+          <p className={cn('mt-auto overflow-hidden leading-tight', inkSoft)} style={{ fontSize: 'calc(var(--card-w) * 0.068)', maxHeight: 'calc(var(--card-w) * 0.6)' }}>{face.oracleText}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The art-less face on its own, card-shaped, for readers that have no image to show. */
+export function CardSlab({ card, className, detail = false }: { card: CardInstance; className?: string; detail?: boolean }) {
+  const face = getActiveFace(card);
+  return (
+    <div
+      className={cn('relative aspect-[5/7] w-full overflow-hidden rounded-xl border-2', getCardColorClass(card), className)}
+      style={{ containerType: 'inline-size', ['--card-w' as string]: '100cqw' } as React.CSSProperties}
+    >
+      <SlabFace card={card} face={face} detail={detail} />
+    </div>
+  );
 }
 
 // ==================== PIP VIEW ====================
@@ -150,6 +241,9 @@ function PipView({ card, className }: { card: CardInstance; className?: string }
           <span className="text-[0.75em] font-bold text-amber-400" title={card.attachmentNames.join(', ')}>{card.attachmentNames.length}x⚔</span>
         )}
         {isToken(card) && <span className="text-[0.75em] font-bold text-purple-400">TKN</span>}
+        {face.typeLine.toLowerCase().includes('planeswalker') && currentLoyalty(card) != null && (
+          <span className="rounded bg-[oklch(0.4_0.1_300)] px-1 py-px text-[0.85em] font-bold text-white" title="Loyalty">◆{currentLoyalty(card)}</span>
+        )}
         {card.damage > 0 && <span className="text-[0.85em] font-bold text-red-400">-{card.damage}</span>}
         {isCreature && card.cardData.power && (() => {
           const pt = getDisplayPT(card);
@@ -173,7 +267,9 @@ function ArtView({ card, size, className }: { card: CardInstance; size?: CardSiz
   const isTapped = card.tapped;
   const artCropUrl = face.artCrop;
   const pt = isCreature && card.cardData.power ? getDisplayPT(card) : null;
+  const loyalty = !pt && face.typeLine.toLowerCase().includes('planeswalker') ? currentLoyalty(card) : null;
   const hasArt = !!artCropUrl;
+  const costSymbols = parseManaSymbols(face.manaCost).slice(0, 6);
 
   // A custom property is not in CSSProperties' type; it is in the browser's.
   const style = {
@@ -195,33 +291,26 @@ function ArtView({ card, size, className }: { card: CardInstance; size?: CardSiz
       {hasArt ? (
         <Image src={artCropUrl} alt={face.name} fill sizes="200px" className="object-cover" unoptimized />
       ) : (
-        // No art yet (or none available): a carved slab that still tells you what the card is.
-        <div className={cn('flex h-full w-full flex-col justify-between bg-gradient-to-b to-[oklch(0.14_0.012_55)] p-[calc(var(--card-w)*0.07)]', slabTone(face.typeLine))}>
-          <div className="min-h-0 flex-1 overflow-hidden pt-[calc(var(--card-w)*0.16)]">
-            <p className="font-display font-bold leading-[1.05] text-foreground" style={{ fontSize: 'calc(var(--card-w) * 0.13)' }}>
-              {face.name}
-            </p>
-            <p className="mt-[calc(var(--card-w)*0.03)] truncate text-muted-foreground" style={{ fontSize: 'calc(var(--card-w) * 0.085)' }}>
-              {face.typeLine.replace(/^(Legendary |Basic )?/, '').split(' — ')[0]}
-            </p>
-          </div>
-        </div>
+        // No art (a token, or the lookup missed): a face that still says what the card is.
+        <SlabFace card={card} face={face} />
       )}
 
       {/* Mana cost, top right */}
-      <div
-        className="absolute inset-x-0 top-0 flex items-center justify-end bg-gradient-to-b from-black/70 to-transparent"
-        style={{ gap: 'calc(var(--card-w) * 0.02)', padding: 'calc(var(--card-w) * 0.035) calc(var(--card-w) * 0.045) calc(var(--card-w) * 0.12)' }}
-      >
-        {parseManaSymbols(face.manaCost).slice(0, 6).map((sym, i) => (
-          <ManaSymbol key={i} symbol={sym} size="xs" className="shadow-sm" style={{ width: 'calc(var(--card-w) * 0.13)', height: 'calc(var(--card-w) * 0.13)', fontSize: 'calc(var(--card-w) * 0.07)' }} />
-        ))}
-      </div>
+      {costSymbols.length > 0 && (
+        <div
+          className={cn('absolute inset-x-0 top-0 flex items-center justify-end', hasArt && 'bg-gradient-to-b from-black/70 to-transparent')}
+          style={{ gap: 'calc(var(--card-w) * 0.02)', padding: 'calc(var(--card-w) * 0.035) calc(var(--card-w) * 0.045) calc(var(--card-w) * 0.12)' }}
+        >
+          {costSymbols.map((sym, i) => (
+            <ManaSymbol key={i} symbol={sym} size="xs" className="shadow-sm" style={{ width: 'calc(var(--card-w) * 0.13)', height: 'calc(var(--card-w) * 0.13)', fontSize: 'calc(var(--card-w) * 0.07)' }} />
+          ))}
+        </div>
+      )}
 
       {/* Name plate, bottom — only over art; the slab already shows the name */}
       {hasArt && (
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/92 via-black/70 to-transparent" style={{ padding: 'calc(var(--card-w) * 0.16) calc(var(--card-w) * 0.06) calc(var(--card-w) * 0.045)' }}>
-          <p className="truncate font-semibold leading-tight text-white drop-shadow-md" style={{ fontSize: 'calc(var(--card-w) * 0.115)', paddingRight: pt ? 'calc(var(--card-w) * 0.42)' : undefined }}>
+          <p className="truncate font-semibold leading-tight text-white drop-shadow-md" style={{ fontSize: 'calc(var(--card-w) * 0.115)', paddingRight: pt || loyalty != null ? 'calc(var(--card-w) * 0.42)' : undefined }}>
             {face.name}
           </p>
         </div>
@@ -237,8 +326,26 @@ function ArtView({ card, size, className }: { card: CardInstance; size?: CardSiz
         </div>
       )}
 
-      {/* Token */}
-      {isToken(card) && (
+      {/* Loyalty, bottom right — the shield from the printed card */}
+      {loyalty != null && (
+        <div
+          className="absolute flex items-center justify-center font-black tabular-nums text-white"
+          data-loyalty={loyalty}
+          title={`Loyalty ${loyalty}`}
+          style={{
+            right: 'calc(var(--card-w) * 0.04)', bottom: 'calc(var(--card-w) * 0.03)',
+            width: 'calc(var(--card-w) * 0.3)', height: 'calc(var(--card-w) * 0.32)', fontSize: 'calc(var(--card-w) * 0.15)',
+            background: 'linear-gradient(180deg, oklch(0.5 0.1 300), oklch(0.3 0.09 300))',
+            clipPath: 'polygon(50% 0, 100% 20%, 100% 68%, 50% 100%, 0 68%, 0 20%)',
+            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
+          }}
+        >
+          {loyalty}
+        </div>
+      )}
+
+      {/* Token — over art only; the slab already prints "Token" in the type line */}
+      {isToken(card) && hasArt && (
         <div className="absolute left-0 rounded-r bg-purple-600/90 font-bold text-purple-100 shadow" style={{ top: 'calc(var(--card-w) * 0.2)', fontSize: 'calc(var(--card-w) * 0.075)', padding: '1px calc(var(--card-w) * 0.05)' }}>
           TOKEN
         </div>
@@ -259,7 +366,7 @@ function ArtView({ card, size, className }: { card: CardInstance; size?: CardSiz
       )}
 
       {/* Modifier dot — keywords or counters present. Bottom-left, clear of the name. */}
-      {(card.cardData.keywords.length > 0 || Object.keys(card.counters).length > 0) && (
+      {(card.cardData.keywords.length > 0 || Object.keys(card.counters).some((k) => k !== 'loyalty')) && (
         <div className="absolute rounded-full bg-gold shadow-[0_0_6px_var(--gold-glow-strong)]" style={{ left: 'calc(var(--card-w) * 0.05)', bottom: 'calc(var(--card-w) * 0.05)', width: 'calc(var(--card-w) * 0.08)', height: 'calc(var(--card-w) * 0.08)' }} />
       )}
 
@@ -282,12 +389,9 @@ function FullView({ card, size, className }: { card: CardInstance; size?: CardSi
       {imageUrl ? (
         <Image src={imageUrl} alt={face.name} fill sizes="190px" className="object-cover" unoptimized />
       ) : (
-        <div className="flex h-full w-full flex-col gap-2 bg-card p-3">
-          <p className="font-display text-sm font-bold">{face.name}</p>
-          <p className="text-[10px] text-muted-foreground">{face.manaCost}</p>
-          <p className="text-xs text-muted-foreground">{face.typeLine}</p>
-          <p className="flex-1 text-[10px] leading-tight text-foreground/80">{face.oracleText}</p>
-          {card.cardData.power && <p className="self-end text-sm font-bold">{card.cardData.power}/{card.cardData.toughness}</p>}
+        <div className="h-full w-full" style={{ ['--card-w' as string]: size ? `${size.w}px` : 'clamp(140px,20vmin,1000px)' } as React.CSSProperties}>
+          <SlabFace card={card} face={face} detail />
+          {card.cardData.power && <p className="absolute bottom-1 right-1.5 rounded bg-black/70 px-1 text-sm font-bold text-white">{card.cardData.power}/{card.cardData.toughness}</p>}
         </div>
       )}
     </div>

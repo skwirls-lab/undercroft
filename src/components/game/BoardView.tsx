@@ -12,7 +12,9 @@ import { useFitToRow } from '@/hooks/useFitToRow';
 import { getCardsInZone, getZoneCardCount } from '@/lib/ZoneManager';
 import { cardArrive } from '@/lib/motion';
 import type { CardInstance, GameState, GameAction, CombatState, ManaColor } from '@/lib/gameTypes';
-import { Heart, Crown, Sword, Gem, Library, X, ChevronLeft, ChevronRight, Skull, Ban, BookOpen, Hand as HandIcon, Droplets, Info } from 'lucide-react';
+import { Heart, Crown, Sword, Gem, Library, X, ChevronLeft, ChevronRight, Skull, Ban, BookOpen, Hand as HandIcon, Droplets, Info, Sparkles, Zap } from 'lucide-react';
+import { useCardPreview } from './CardPreviewContext';
+import { cardActionLabel, isPlaneswalker } from '@/lib/loyalty';
 
 /**
  * The expanded board for one player: what you open when you tap a seat.
@@ -32,6 +34,11 @@ import { Heart, Crown, Sword, Gem, Library, X, ChevronLeft, ChevronRight, Skull,
  * The overlay covers the table only; the page's priority bar and hand strip stay visible
  * beneath it. So your own hand is on screen under every board, including opponents' —
  * deciding what to do about their board is exactly when you need to see what you hold.
+ *
+ * 4. A tap on a permanent never does anything to the game. It selects the card: the reader
+ *    opens, and if the card has a legal play right now a button appears on it (Cast, Equip,
+ *    Activate, Loyalty). Only that button commits. Before this, tapping your commander to
+ *    read it started casting it, and tapping a planeswalker put its first ability on the stack.
  */
 
 export interface TargetingInfo {
@@ -61,6 +68,11 @@ export interface BoardViewProps {
   onCastCommander?: (card: CardInstance) => void;
   onEquipClick?: (card: CardInstance) => void;
   onActivateAbility?: (card: CardInstance) => void;
+  /**
+   * The player pressed the action button on a permanent (or the commander): here are that
+   * card's legal plays. When absent, the three handlers above are used in its place.
+   */
+  onCardAction?: (card: CardInstance, actions: GameAction[]) => void;
 
   pendingManaChoice?: { cardInstanceId: string; actions: GameAction[] } | null;
   onManaColorPicked?: (color: ManaColor | 'C') => void;
@@ -85,7 +97,7 @@ export function BoardView(props: BoardViewProps) {
   const {
     gameState, viewedPlayerId, onViewPlayer, onClose, onInspect, currentPlayerId, hasPriority, legalActions, combat,
     targeting, onSelectTarget, onCancelTargeting,
-    onTapLand, onUntapLand, onCastCommander, onEquipClick, onActivateAbility,
+    onTapLand, onUntapLand, onCastCommander, onEquipClick, onActivateAbility, onCardAction,
     pendingManaChoice, onManaColorPicked, onCancelManaChoice,
     manaPaymentSourceIds, manaPaymentInfo, onTapForManaPayment, onCancelManaPayment,
   } = props;
@@ -142,9 +154,16 @@ export function BoardView(props: BoardViewProps) {
   const attached = useMemo(() => new Set(bf.filter((c) => c.attachedTo).map((c) => c.instanceId)), [bf]);
   const creatures = bf.filter((c) => c.cardData.typeLine.toLowerCase().includes('creature'));
   const lands = bf.filter((c) => c.cardData.typeLine.toLowerCase().includes('land'));
+  // Planeswalkers get their own row: they are attacked like players and act like spells, and
+  // in the "other" row a Jace looked like an enchantment. A creature-planeswalker stays with
+  // the creatures, where it fights.
+  const planeswalkers = bf.filter((c) => {
+    const t = c.cardData.typeLine.toLowerCase();
+    return t.includes('planeswalker') && !t.includes('creature') && !t.includes('land');
+  });
   const others = bf.filter((c) => {
     const t = c.cardData.typeLine.toLowerCase();
-    return !t.includes('creature') && !t.includes('land') && !attached.has(c.instanceId);
+    return !t.includes('creature') && !t.includes('land') && !t.includes('planeswalker') && !attached.has(c.instanceId);
   });
 
   // ── Affordances (only meaningful on your own seat with priority) ──────────
@@ -153,27 +172,82 @@ export function BoardView(props: BoardViewProps) {
   const tappable = idsOf((a) => a.type === 'TAP_FOR_MANA');
   const untappable = idsOf((a) => a.type === 'UNTAP_PERMANENT');
   const castableCommander = idsOf((a) => a.type === 'CAST_SPELL' && a.payload.fromZone === 'command');
-  const equippable = idsOf((a) => a.type === 'ACTIVATE_ABILITY' && a.payload.ability === 'equip');
   const activatable = idsOf((a) => a.type === 'ACTIVATE_ABILITY' && a.payload.ability === 'forge_activated');
   const targets = targeting?.validTargetIds;
 
+  // ── Selection: tap to read, press the button to act ──────────────────────
+  // The reader (CardPreviewContext) already tracks the tapped card; the selected card is
+  // that one. Dismissing the reader clears the selection with it. Without a provider the
+  // board keeps its own.
+  const { previewCard, setPreviewCard, hasProvider } = useCardPreview();
+  const [localSelected, setLocalSelected] = useState<string | null>(null);
+  const selectedId = hasProvider ? previewCard?.instanceId ?? null : localSelected;
+
+  /** Every legal play on this permanent except mana (lands have their own row). */
+  const actionsFor = (card: CardInstance): GameAction[] =>
+    mine.filter((a) => a.payload.cardInstanceId === card.instanceId && (a.type === 'ACTIVATE_ABILITY' || a.type === 'CAST_SPELL'));
+
+  const fire = (card: CardInstance, actions: GameAction[]) => {
+    setPreviewCard(null);
+    setLocalSelected(null);
+    if (onCardAction) { onCardAction(card, actions); return; }
+    const a = actions[0];
+    if (a.type === 'CAST_SPELL') onCastCommander?.(card);
+    else if (a.payload.ability === 'equip') onEquipClick?.(card);
+    else onActivateAbility?.(card);
+  };
+
   const decorate = (card: CardInstance) => {
     const isTarget = targets?.has(card.instanceId) ?? false;
-    const canEquip = equippable.has(card.instanceId);
-    const canActivate = activatable.has(card.instanceId);
+    const canAct = !isTarget && actionsFor(card).length > 0;
     return {
-      highlighted: isTarget || canEquip || canActivate,
+      highlighted: isTarget || canAct,
       className: cn(
         isTarget && 'affordance-target cursor-crosshair',
-        !isTarget && (canEquip || canActivate) && 'affordance-actionable'
+        canAct && (selectedId === card.instanceId ? 'affordance-selected' : 'affordance-actionable')
       ),
       onClick: (c: CardInstance) => {
-        if (isTarget) onSelectTarget?.(c.instanceId);
-        else if (canEquip) onEquipClick?.(c);
-        else if (canActivate) onActivateAbility?.(c);
+        if (isTarget) { onSelectTarget?.(c.instanceId); return; }
+        if (!hasProvider) setLocalSelected((cur) => (cur === c.instanceId ? null : c.instanceId));
       },
       combatRole: combatRole(card.instanceId, combat),
     };
+  };
+
+  /** The card plus, when it is the selected card with a legal play, the button that commits. */
+  const withAction = (card: CardInstance, size: CardSize, node: React.ReactNode) => {
+    const actions = actionsFor(card);
+    const isTarget = targets?.has(card.instanceId) ?? false;
+    const show = !isTarget && actions.length > 0 && selectedId === card.instanceId;
+    return (
+      <div className="relative" data-card-name={card.cardData.name} data-card-actions={actions.length || undefined}>
+        {node}
+        <AnimatePresence>
+          {show && (
+            <motion.div
+              key="action"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+              className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+            >
+              <button
+                type="button"
+                data-card-preview-safe
+                data-dev-card-action
+                className="pointer-events-auto flex touch-manipulation items-center gap-1 rounded-full bg-gold font-bold text-gold-foreground shadow-lg shadow-black/50 hover:bg-gold/90 active:bg-gold/80"
+                style={{ fontSize: Math.max(10, Math.min(13, size.w * 0.12)), padding: `${Math.max(3, size.w * 0.04)}px ${Math.max(8, size.w * 0.1)}px` }}
+                onClick={(e) => { e.stopPropagation(); fire(card, actions); }}
+              >
+                {isPlaneswalker(card) ? <Sparkles className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                {cardActionLabel(card, actions)}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
   };
 
   const commander = commandZone[0];
@@ -331,13 +405,19 @@ export function BoardView(props: BoardViewProps) {
                   commander
                     ? (size) => (
                         <div className="relative flex shrink-0 items-start">
-                          <div
-                            onClick={() => (commanderCastable ? onCastCommander?.(commander) : undefined)}
-                            className={cn('relative', commanderCastable && 'cursor-pointer')}
-                            title={commanderCastable ? 'Cast commander' : 'Commander (in command zone)'}
-                          >
-                            <CardView card={commander} mode="art" size={size} interactive highlighted={commanderCastable} className={cn(commanderCastable && 'affordance-actionable card-glow-strong')} />
-                            <span className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-gold-foreground shadow-md" title="Command zone">
+                          <div className="relative" title={commanderCastable ? 'Commander — tap to read, then Cast' : 'Commander (in command zone)'}>
+                            {withAction(commander, size, (
+                              <CardView
+                                card={commander}
+                                mode="art"
+                                size={size}
+                                interactive
+                                highlighted={commanderCastable}
+                                onClick={decorate(commander).onClick}
+                                className={cn(commanderCastable && (selectedId === commander.instanceId ? 'affordance-selected' : 'affordance-actionable card-glow-strong'))}
+                              />
+                            ))}
+                            <span className="absolute -left-1 -top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-gold-foreground shadow-md" title="Command zone">
                               <Crown className="h-3 w-3" />
                             </span>
                           </div>
@@ -348,7 +428,21 @@ export function BoardView(props: BoardViewProps) {
                 }
                 render={(card, size) => {
                   const d = decorate(card);
-                  return <CardView card={card} mode="art" size={size} interactive onClick={d.onClick} highlighted={d.highlighted} className={d.className} combatRole={d.combatRole} />;
+                  return withAction(card, size, <CardView card={card} mode="art" size={size} interactive onClick={d.onClick} highlighted={d.highlighted} className={d.className} combatRole={d.combatRole} />);
+                }}
+              />
+            )}
+
+            {planeswalkers.length > 0 && (
+              <ZoneRow
+                icon={<Sparkles className="h-3 w-3" />}
+                label="Planeswalkers"
+                count={planeswalkers.length}
+                grow={2}
+                cards={planeswalkers}
+                render={(card, size) => {
+                  const d = decorate(card);
+                  return withAction(card, size, <CardView card={card} mode="art" size={size} interactive onClick={d.onClick} highlighted={d.highlighted} className={d.className} />);
                 }}
               />
             )}
@@ -362,7 +456,7 @@ export function BoardView(props: BoardViewProps) {
                 cards={others}
                 render={(card, size) => {
                   const d = decorate(card);
-                  return <CardView card={card} mode="art" size={size} interactive onClick={d.onClick} highlighted={d.highlighted} className={d.className} />;
+                  return withAction(card, size, <CardView card={card} mode="art" size={size} interactive onClick={d.onClick} highlighted={d.highlighted} className={d.className} />);
                 }}
               />
             )}
@@ -377,7 +471,7 @@ export function BoardView(props: BoardViewProps) {
                 pendingManaChoice={pendingManaChoice}
                 onTap={onTapLand}
                 onUntap={onUntapLand}
-                onActivate={onActivateAbility}
+                onActivate={(c) => (onCardAction ? onCardAction(c, actionsFor(c)) : onActivateAbility?.(c))}
                 onTapForPayment={onTapForManaPayment}
                 onManaColorPicked={onManaColorPicked}
                 onCancelManaChoice={onCancelManaChoice}

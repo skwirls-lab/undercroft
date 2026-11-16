@@ -129,6 +129,7 @@ export function adaptForgeState(forgeState: ForgeGameState): GameState {
           flipped: fc.flipped ?? false,
           faceDown: fc.faceDown ?? false,
           counters: normalizeCounters(fc.counters),
+          isToken: fc.isToken ?? false,
           attachedTo: fc.attachedTo ? `forge-${fc.attachedTo.id}` : undefined,
           attachedToName: fc.attachedTo?.name,
           attachments: [],
@@ -402,7 +403,8 @@ function forgeCardToCardData(fc: ForgeCard): CardData {
     cmc,
     typeLine,
     oracleText: fc.oracleText ?? '',
-    colors: [] as ManaColor[],
+    // The engine's colours when it sends them (tokens have no cost to read them from).
+    colors: Array.isArray(fc.colors) ? (fc.colors.filter((c) => 'WUBRG'.includes(c)) as ManaColor[]) : colors,
     colorIdentity: (undefined as unknown) as ManaColor[],
     keywords: (fc.keywords || []) as string[],
     power: fc.basePower != null ? String(fc.basePower) : (fc.power != null ? String(fc.power) : undefined),

@@ -82,6 +82,8 @@ export interface ForgeCard {
   controller?: string;
   controllerId?: number;
   isToken?: boolean;
+  /** W U B R G as the rules see the card; absent from older servers. */
+  colors?: string[];
   damage?: number;
 }
 

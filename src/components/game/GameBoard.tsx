@@ -201,6 +201,29 @@ export function GameBoard({
     [filteredLegalActions, performAction]
   );
 
+  /**
+   * The action button on a battlefield card (or the commander) was pressed. One plain play
+   * goes straight through; a planeswalker, or a card with several legal plays, opens the
+   * chooser so the player picks the ability by its text. Lands have no selection step (their
+   * chips tap for mana), so an ability on a land always goes through the chooser.
+   */
+  const handleCardAction = useCallback(
+    (card: CardInstance, actions: GameAction[]) => {
+      if (actions.length === 0) return;
+      const typeLine = card.cardData.typeLine.toLowerCase();
+      const needsChooser = actions.length > 1 || typeLine.includes('planeswalker') || typeLine.includes('land');
+      if (needsChooser) {
+        setPendingAbilitySelection({ cardInstanceId: card.instanceId, cardName: card.cardData.name, actions, card });
+        return;
+      }
+      const a = actions[0];
+      if (a.type === 'CAST_SPELL') { performAction(a); return; }
+      if (a.payload.ability === 'equip') { handleEquipClick(card); return; }
+      handleActivateAbility(card);
+    },
+    [setPendingAbilitySelection, performAction, handleEquipClick, handleActivateAbility]
+  );
+
   const handleResolveChoice = useCallback(
     (chosenCardIds: string[]) => {
       if (!gameState?.pendingChoice) return;
@@ -416,6 +439,7 @@ export function GameBoard({
             onCastCommander={handleCastCommander}
             onEquipClick={handleEquipClick}
             onActivateAbility={handleActivateAbility}
+            onCardAction={handleCardAction}
             pendingManaChoice={pendingManaChoice}
             onManaColorPicked={handleManaColorPicked}
             onCancelManaChoice={() => setPendingManaChoice(null)}

@@ -17,6 +17,9 @@ import { Button } from '@/components/ui/button';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { cn } from '@/lib/utils';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
+import { CardSlab } from '@/components/game/CardView';
+import { LoyaltyAbilityList } from '@/components/game/LoyaltyAbilities';
+import { currentLoyalty, isPlaneswalker, parseLoyaltyAbilities } from '@/lib/loyalty';
 import type { CardInstance, GameAction } from '@/lib/gameTypes';
 import { PhaseTracker } from '@/components/game/PhaseTracker';
 import { Keystone } from '@/components/brand/Keystone';
@@ -534,8 +537,17 @@ function HandStrip({
 // ============================================================
 function CardPreviewFloating() {
   const { previewCard, setPreviewCard } = useCardPreview();
+  const legalActions = useGameStore((s) => s.legalActions);
   const imageUrl = previewCard?.cardData.imageUris?.normal
     ?? previewCard?.cardData.cardFaces?.[0]?.imageUris?.normal;
+
+  // A planeswalker reads as its loyalty abilities, each with its cost badge, not as a wall of
+  // "[+2]:" text; and the reader says whether one can be used from here.
+  const pw = previewCard && isPlaneswalker(previewCard);
+  const loyaltyAbilities = pw ? parseLoyaltyAbilities(previewCard.cardData.oracleText) : [];
+  const loyalty = pw ? currentLoyalty(previewCard) : null;
+  const mineOnField = !!previewCard && previewCard.controllerId === HUMAN_PLAYER_ID && previewCard.zone === 'battlefield';
+  const hasPlay = !!previewCard && legalActions.some((a) => a.payload.cardInstanceId === previewCard.instanceId && (a.type === 'ACTIVATE_ABILITY' || a.type === 'CAST_SPELL'));
 
   // Dismiss on any click that is NOT on a card element (data-card-preview-safe).
   // Uses rAF delay so the click that opened the preview doesn't immediately close it.
@@ -577,9 +589,7 @@ function CardPreviewFloating() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt={previewCard.cardData.name} className="w-full" />
             ) : (
-              <div className="aspect-[5/7] bg-card/80 border border-border/30 flex items-center justify-center" style={{ padding: 'clamp(6px,1vmin,1000px)' }}>
-                <p className="text-center text-muted-foreground" style={{ fontSize: 'clamp(11px,1.8vmin,1000px)' }}>{previewCard.cardData.name}</p>
-              </div>
+              <CardSlab card={previewCard} />
             )}
           </div>
           {/* Card details text panel — pointer-events-auto so oracle text is scrollable */}
@@ -595,15 +605,27 @@ function CardPreviewFloating() {
               </div>
             )}
             {previewCard.cardData.typeLine && (
-              <div className="text-sky-300/70 italic border-b border-white/10" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', paddingBottom: 'clamp(4px,0.6vmin,1000px)' }}>
-                {previewCard.cardData.typeLine}
+              <div className="flex items-center gap-2 text-sky-300/70 italic border-b border-white/10" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', paddingBottom: 'clamp(4px,0.6vmin,1000px)' }}>
+                <span className="min-w-0 flex-1 truncate">{previewCard.cardData.typeLine}</span>
+                {loyalty != null && (
+                  <span className="shrink-0 rounded bg-[oklch(0.4_0.1_300)] px-1.5 py-px font-bold not-italic text-white" data-dev-loyalty title="Loyalty">Loyalty {loyalty}</span>
+                )}
               </div>
             )}
-            {previewCard.cardData.oracleText && (
+            {pw && loyaltyAbilities.length > 0 ? (
+              <div className="overflow-y-auto" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', maxHeight: 'clamp(110px,18vmin,1000px)' }}>
+                <LoyaltyAbilityList abilities={loyaltyAbilities} fontSize="1em" gap="clamp(3px,0.5vmin,1000px)" />
+                {mineOnField && (
+                  <p className="mt-1 italic text-gold/80" style={{ fontSize: '0.85em' }}>
+                    {hasPlay ? 'Tap Loyalty on the card to use one.' : 'Usable in your main phase with an empty stack, once per turn.'}
+                  </p>
+                )}
+              </div>
+            ) : previewCard.cardData.oracleText ? (
               <div className="text-white/80 overflow-y-auto" style={{ fontSize: 'clamp(10px,1.6vmin,1000px)', maxHeight: 'clamp(100px,16vmin,1000px)' }}>
                 <OracleText text={previewCard.cardData.oracleText} />
               </div>
-            )}
+            ) : null}
             {/* Keywords, counters and attachments — each one answers a tap */}
             <ReaderTags card={previewCard} onSwap={(c) => setPreviewCard(c)} fontSize="clamp(8px,1.3vmin,1000px)" gap="clamp(3px,0.4vmin,1000px)" />
             {previewCard.cardData.power !== undefined && (

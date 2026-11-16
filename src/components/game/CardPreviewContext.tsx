@@ -6,11 +6,14 @@ import type { CardInstance } from '@/lib/gameTypes';
 interface CardPreviewContextType {
   previewCard: CardInstance | null;
   setPreviewCard: (card: CardInstance | null) => void;
+  /** False outside a provider, where previewCard is never set; consumers keep their own state. */
+  hasProvider: boolean;
 }
 
 const CardPreviewContext = createContext<CardPreviewContextType>({
   previewCard: null,
   setPreviewCard: () => {},
+  hasProvider: false,
 });
 
 export function CardPreviewProvider({ children }: { children: ReactNode }) {
@@ -27,7 +30,7 @@ export function CardPreviewProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <CardPreviewContext.Provider value={{ previewCard, setPreviewCard }}>
+    <CardPreviewContext.Provider value={{ previewCard, setPreviewCard, hasProvider: true }}>
       {children}
     </CardPreviewContext.Provider>
   );

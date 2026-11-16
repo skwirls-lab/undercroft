@@ -8,6 +8,7 @@ import { buildMockGame } from '@/dev/mockGame';
 import { ForgeGamePage } from '@/app/game/forge/page';
 import type { GameAction } from '@/lib/gameTypes';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
+import { parseLoyaltyAbilities } from '@/lib/loyalty';
 
 /**
  * Seeds both stores the same way a live game would — the mock ForgeGameState goes through
@@ -109,6 +110,22 @@ export function DevBoard() {
       if (!c) continue;
       if (c.cardData.typeLine.toLowerCase().includes('land') && !c.tapped) {
         legal.push({ type: 'TAP_FOR_MANA', playerId: 'player-human', payload: { cardInstanceId: cid, manaColor: 'G' }, timestamp: Date.now() });
+      }
+    }
+    // Planeswalker loyalty abilities and equipment, described the way the server describes
+    // them, so the board's action button and the chooser have something to show.
+    for (const cid of humanBf) {
+      const c = adapted.cardInstances.get(cid);
+      if (!c) continue;
+      const typeLine = c.cardData.typeLine.toLowerCase();
+      if (typeLine.includes('planeswalker')) {
+        const loyalty = c.counters.loyalty ?? 0;
+        parseLoyaltyAbilities(c.cardData.oracleText).forEach((a, i) => {
+          if (a.cost != null && a.cost < 0 && -a.cost > loyalty) return; // the server withholds these
+          legal.push({ type: 'ACTIVATE_ABILITY', playerId: 'player-human', payload: { cardInstanceId: cid, ability: 'forge_activated', forgeAbilityIndex: 100 + i, forgeDescription: `${a.label.replace('−', '-')}: ${a.text}` }, timestamp: Date.now() });
+        });
+      } else if (typeLine.includes('equipment')) {
+        legal.push({ type: 'ACTIVATE_ABILITY', playerId: 'player-human', payload: { cardInstanceId: cid, ability: 'forge_activated', forgeAbilityIndex: 200, forgeDescription: 'Equip {2}' }, timestamp: Date.now() });
       }
     }
     const cmd = adapted.zones.get('player-human:command')?.cards ?? [];
