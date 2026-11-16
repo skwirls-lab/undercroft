@@ -136,7 +136,10 @@ export function buildMockGame(): ForgeGameState {
       creature('Illusion', '', 2, 2, { types: 'Illusion', isToken: true, colors: ['U'], oracleText: 'When this creature becomes the target of a spell, sacrifice it.' }),
       creature('Mulldrifter', '{4}{U}', 2, 2, { types: 'Elemental', keywords: ['Flying'], damage: 1 }),
       swordOfFire,
+      other('Rhystic Study', '{2}{U}', 'Enchantment', { oracleText: 'Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.' }),
       other('Sol Ring', '{1}', 'Artifact', { tapped: true, oracleText: '{T}: Add {C}{C}.' }),
+      other('Lightning Greaves', '{2}', 'Artifact — Equipment', { oracleText: 'Equipped creature has haste and shroud.\nEquip {0}' }),
+      other('Arcane Signet', '{2}', 'Artifact', { oracleText: "{T}: Add one mana of any color in your commander's color identity." }),
       other('Doubling Season', '{4}{G}', 'Enchantment', {
         oracleText: 'If an effect would create one or more tokens under your control, it creates twice that many instead.',
       }),
