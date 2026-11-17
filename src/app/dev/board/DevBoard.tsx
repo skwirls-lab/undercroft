@@ -76,6 +76,7 @@ function choicePreset(name: string, humanHandIds: number[]): ForgeChoiceRequest 
         { id: 9103, name: 'Command Tower', type: 'Land', produces: ['W', 'U', 'B', 'G'], amount: 1 },
         { id: 9104, name: 'Breeding Pool', type: 'Land — Forest Island', produces: ['G', 'U'], amount: 1 },
         { id: 9105, name: 'Birds of Paradise', type: 'Creature — Bird', produces: ['Any'], amount: 1 },
+        { id: 9107, name: 'Sungrass Prairie', type: 'Land', produces: ['G', 'W'], amount: 2, extraCost: '{1}' },
         // An older server sends no produces; the rules text carries it.
         { id: 9106, name: 'Arcane Signet', type: 'Artifact', oracleText: "{T}: Add one mana of any color in your commander's color identity." },
       ] } };

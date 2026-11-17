@@ -57,6 +57,8 @@ interface CardOption {
   /** Mana sources: what one tap makes ("W", "U", "Any"), and the most one ability makes. */
   produces?: string[];
   amount?: number;
+  /** Mana this source needs before it makes any ("{1}" for Sungrass Prairie). */
+  extraCost?: string;
 }
 
 /**
@@ -674,6 +676,9 @@ function ChoicePanel({ choice, onRespond }: {
       <ManaPaymentPanel
         prompt={prompt || `Pay mana: ${manaCost}`}
         manaCost={manaCost}
+        spellName={(data.spellName as string) || 'the spell'}
+        forSpell={data.isAbilityCost ? (data.forSpell as string | undefined) ?? null : null}
+        notice={typeof data.notice === 'string' ? data.notice : null}
         sources={sources}
         canCancel={canCancel}
         lifeForPhyrexian={lifeForPhyrexian}
@@ -927,9 +932,20 @@ function DeclareAttackersPanel({ attackers, defenders, defaultDefenderId, reques
 // Backend expects one cardId per response (loops asking for lands one at a time)
 // ============================================================
 
-function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexian = 0, requestId, onRespond }: {
+/** "1", "R/W" or "2 G" from the server's short form → "{1}", "{R/W}", "{2}{G}"; braces pass through. */
+function bracedCost(cost: string): string {
+  if (cost.includes('{')) return cost;
+  return cost.trim().split(/\s+/).filter(Boolean).map((t) => `{${t}}`).join('');
+}
+
+function ManaPaymentPanel({ prompt, manaCost, spellName, forSpell = null, notice = null, sources, canCancel, lifeForPhyrexian = 0, requestId, onRespond }: {
   prompt: string;
   manaCost: string;
+  spellName: string;
+  /** Set when this prompt pays a mana ability's own cost; names the spell that is waiting. */
+  forSpell?: string | null;
+  /** The server's one line about why the last tap did nothing. */
+  notice?: string | null;
   sources: CardOption[];
   canCancel: boolean;
   /** Life the server will take for one Phyrexian shard, or 0 when the cost has none. */
@@ -955,7 +971,9 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
   return (
     <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
       <div className="flex items-center justify-between" style={{ gap: 'clamp(8px,1.5vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-        <span className="font-semibold text-emerald-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Pay for the spell</span>
+        <span className="min-w-0 truncate font-semibold text-emerald-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>
+          {forSpell ? `${spellName} needs mana first` : `Pay for ${spellName}`}
+        </span>
         <span
           className="flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/10"
           style={{ gap: 'clamp(3px,0.5vmin,1000px)', padding: 'clamp(3px,0.5vmin,1000px) clamp(6px,1vmin,1000px)' }}
@@ -968,6 +986,16 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
             : <span className="font-mono text-emerald-300" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>{manaCost}</span>}
         </span>
       </div>
+      {forSpell && (
+        <p className="text-sky-200/90" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }} data-dev-mana-nested>
+          {spellName} costs mana to activate. Pay that from another source; its mana then goes toward {forSpell}.
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-200" style={{ fontSize: 'clamp(11px,2vmin,1000px)', padding: 'clamp(4px,0.7vmin,1000px) clamp(8px,1.2vmin,1000px)', marginBottom: 'clamp(6px,1vmin,1000px)' }} data-dev-mana-notice>
+          {notice}
+        </p>
+      )}
       <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
         Tap a source to pay with it; the circles show what it makes. A grey number is paid by any mana. Keep going until nothing is owed.
       </p>
@@ -990,6 +1018,11 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
                 <span className="min-w-0">
                   <span className="block font-medium leading-tight">{src.name}</span>
                   {src.type && <span className="block truncate text-muted-foreground" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>{src.type}</span>}
+                  {src.extraCost && (
+                    <span className="flex items-center gap-1 text-amber-300/90" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }} title={`${src.name} costs ${src.extraCost} to activate; that is paid from another source first`}>
+                      needs <ManaCostDisplay manaCost={bracedCost(src.extraCost)} size="xs" /> first
+                    </span>
+                  )}
                 </span>
               </Button>
             );
