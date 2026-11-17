@@ -46,6 +46,14 @@ export function ManaSymbol({ symbol, size = 'sm', className, style }: ManaSymbol
     );
   }
 
+  // Any colour: the five colours around the circle.
+  if (s === 'ANY') {
+    return (
+      <span aria-label="Any colour" title="Any colour" className={cn(base, 'border border-white/50')}
+        style={{ background: 'conic-gradient(from 200deg, #f5e9c8, #f5e9c8 20%, #3b82f6 20%, #3b82f6 40%, #27272a 40%, #27272a 60%, #dc2626 60%, #dc2626 80%, #16a34a 80%, #16a34a)', ...style }} />
+    );
+  }
+
   // Tap / Untap
   if (s === 'T') return <span aria-label="Tap" title="Tap" className={cn(base, TAP_BG)} style={style}>↷</span>;
   if (s === 'Q') return <span aria-label="Untap" title="Untap" className={cn(base, TAP_BG)} style={style}>↺</span>;
@@ -57,9 +65,11 @@ export function ManaSymbol({ symbol, size = 'sm', className, style }: ManaSymbol
     const rightStyle = COLORED_STYLES[parts[1]];
     // Simple: use the first color as background if it's a color, else generic
     const bg = leftStyle?.bg ?? rightStyle?.bg ?? GENERIC_BG;
+    const phyrexian = parts[1] === 'P';
+    const label = phyrexian ? `${leftStyle?.label ?? parts[0]} or 2 life (Phyrexian)` : s;
     return (
-      <span aria-label={s} title={s} className={cn(base, bg)} style={style}>
-        {!leftStyle && !rightStyle ? s : ''}
+      <span aria-label={label} title={label} className={cn(base, bg, phyrexian && 'text-white/90 drop-shadow')} style={style}>
+        {phyrexian ? 'Φ' : !leftStyle && !rightStyle ? s : ''}
       </span>
     );
   }

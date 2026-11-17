@@ -8,6 +8,7 @@ import { StackDisplay } from './StackDisplay';
 import { CommanderDamage } from './CommanderDamage';
 import { ManaColorPicker } from './ManaColorPicker';
 import { ManaPoolDisplay } from './ManaPoolDisplay';
+import { ManaCostDisplay } from './ManaSymbol';
 import { useFitToRow } from '@/hooks/useFitToRow';
 import { getCardsInZone, getZoneCardCount } from '@/lib/ZoneManager';
 import { cardArrive } from '@/lib/motion';
@@ -329,7 +330,7 @@ export function BoardView(props: BoardViewProps) {
         <AnimatePresence>
           {manaPaymentInfo && (
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/[0.06] px-3 py-1.5 text-xs">
-              <span>Pay <strong className="font-mono">{manaPaymentInfo.manaCost}</strong> for <strong>{manaPaymentInfo.spellName}</strong> — tap lands</span>
+              <span className="flex items-center gap-1">Pay <ManaCostDisplay manaCost={manaPaymentInfo.manaCost} size="md" /> for <strong>{manaPaymentInfo.spellName}</strong> — tap lands</span>
               <button onClick={onCancelManaPayment} className="ml-auto rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted/40 hover:text-foreground">Cancel</button>
             </motion.div>
           )}
