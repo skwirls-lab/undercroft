@@ -8,7 +8,7 @@ import { PromptGuide } from './PromptGuide';
 import { useForgeGameStore } from '@/store/forgeGameStore';
 import { useGameStore } from '@/store/gameStore';
 import { CardView } from './CardView';
-import { ManaCostDisplay, OracleText } from './ManaSymbol';
+import { ManaCostDisplay, OracleText, parseManaSymbols } from './ManaSymbol';
 import { getCardsInZone } from '@/lib/ZoneManager';
 import { prefetchImageUris } from '@/store/forgeGameStore';
 import type { CardInstance, CardData, ManaColor } from '@/lib/gameTypes';
@@ -16,6 +16,8 @@ import type { ForgeChoiceRequest } from '@/lib/forgeClient';
 import type { PendingAbilitySelection } from '@/store/forgeGameStore';
 import type { GameAction } from '@/lib/gameTypes';
 import { LoyaltyCost } from './LoyaltyAbilities';
+import { ManaSymbol } from './ManaSymbol';
+import { describeManaSymbols, manaSourceSymbols } from '@/lib/manaSources';
 import { activatedLoyaltyThisTurn, currentLoyalty, isPlaneswalker, loyaltyUnavailableReason, matchLoyaltyAction, parseLoyaltyAbilities } from '@/lib/loyalty';
 
 // ============================================================
@@ -52,6 +54,9 @@ interface CardOption {
   oracleText?: string;
   /** Colour letters, e.g. "WU". */
   colors?: string;
+  /** Mana sources: what one tap makes ("W", "U", "Any"), and the most one ability makes. */
+  produces?: string[];
+  amount?: number;
 }
 
 /**
@@ -521,11 +526,11 @@ function ChoicePanel({ choice, onRespond }: {
           <Button
               key={a.index}
               onClick={() => onRespond(choice.requestId, abilityResponse(a.index))}
-              className="rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10 text-foreground"
-              style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+              className="flex h-auto flex-col items-start gap-0.5 whitespace-normal rounded-lg border border-border/40 bg-card/60 text-left transition-colors hover:border-gold/40 hover:bg-gold/10 text-foreground"
+              style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)', maxWidth: 'min(80vw, 440px)' }}
             >
               <span className="font-medium">{a.cardName || 'Ability'}</span>
-              <div className="text-muted-foreground/70 max-w-[250px] truncate" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>{a.description}</div>
+              <div className="text-muted-foreground/80" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}><OracleText text={a.description ?? ''} /></div>
             </Button>
           ))}
         </div>
@@ -932,8 +937,14 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
   requestId: string;
   onRespond: (requestId: string, payload: Record<string, unknown>) => void;
 }) {
-  // Tap a single land - backend will loop and ask again if more mana needed
-  const tapLand = (cardId: number) => {
+  // The cost and the sources as symbols. A new player does not know that U is blue or that
+  // {2} is "any two"; the pips say it, and each source shows what one tap makes.
+  const cardInstances = useGameStore((s) => s.gameState?.cardInstances);
+  const costSymbols = parseManaSymbols(manaCost);
+  void prompt;
+
+  // Tap a single source — the server loops and asks again while mana is still owed.
+  const tap = (cardId: number) => {
     onRespond(requestId, { cardId });
   };
 
@@ -943,28 +954,46 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
 
   return (
     <div className="prompt-panel prompt-action" style={{ padding: 'clamp(10px,2vmin,1000px)' }}>
-      <div className="flex items-center justify-between" style={{ marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-        <span className="font-semibold text-emerald-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Pay Mana Cost</span>
-        <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 font-mono text-emerald-300" style={{ padding: 'clamp(2px,0.4vmin,1000px) clamp(6px,1vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}>
-          {manaCost}
+      <div className="flex items-center justify-between" style={{ gap: 'clamp(8px,1.5vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
+        <span className="font-semibold text-emerald-400" style={{ fontSize: 'clamp(13px,2.5vmin,1000px)' }}>Pay for the spell</span>
+        <span
+          className="flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/10"
+          style={{ gap: 'clamp(3px,0.5vmin,1000px)', padding: 'clamp(3px,0.5vmin,1000px) clamp(6px,1vmin,1000px)' }}
+          title={`Still to pay: ${manaCost}`}
+          data-dev-mana-owed={manaCost}
+        >
+          <span className="eyebrow text-emerald-300/80" style={{ fontSize: 'clamp(8px,1.3vmin,1000px)', marginRight: 'clamp(3px,0.5vmin,1000px)' }}>Still to pay</span>
+          {costSymbols.length > 0
+            ? costSymbols.map((sym, i) => <ManaSymbol key={i} symbol={sym} size="lg" />)
+            : <span className="font-mono text-emerald-300" style={{ fontSize: 'clamp(11px,2vmin,1000px)' }}>{manaCost}</span>}
         </span>
       </div>
       <p className="text-muted-foreground" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-        Click a land to tap it for mana. Continue until cost is paid.
+        Tap a source to pay with it; the circles show what it makes. A grey number is paid by any mana. Keep going until nothing is owed.
       </p>
       {sources.length > 0 ? (
         <div className="flex flex-wrap" style={{ gap: 'clamp(4px,0.8vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
-          {sources.map((src) => (
-            <Button
-              key={src.id}
-              onClick={() => tapLand(src.id)}
-              className="rounded-lg border border-border/40 bg-card/80 text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300 text-foreground"
-              style={{ padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
-            >
-              <div className="font-medium">{src.name}</div>
-              {src.type && <div className="text-muted-foreground" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>{src.type}</div>}
-            </Button>
-          ))}
+          {sources.map((src) => {
+            const symbols = manaSourceSymbols(src, cardInstances?.get(`forge-${src.id}`)?.cardData.oracleText);
+            return (
+              <Button
+                key={src.id}
+                onClick={() => tap(src.id)}
+                className="flex h-auto items-center rounded-lg border border-border/40 bg-card/80 text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300 text-foreground"
+                style={{ gap: 'clamp(6px,1vmin,1000px)', padding: 'clamp(4px,0.8vmin,1000px) clamp(8px,1.5vmin,1000px)', fontSize: 'clamp(11px,2vmin,1000px)' }}
+                title={`${src.name} makes ${describeManaSymbols(symbols)}`}
+                data-dev-mana-source={src.name}
+              >
+                <span className="flex shrink-0 items-center" style={{ gap: 'clamp(2px,0.3vmin,1000px)' }} aria-label={`Makes ${describeManaSymbols(symbols)}`}>
+                  {symbols.map((sym, i) => <ManaSymbol key={i} symbol={sym} size="md" />)}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-medium leading-tight">{src.name}</span>
+                  {src.type && <span className="block truncate text-muted-foreground" style={{ fontSize: 'clamp(9px,1.5vmin,1000px)' }}>{src.type}</span>}
+                </span>
+              </Button>
+            );
+          })}
         </div>
       ) : (
         <p className="text-amber-400" style={{ fontSize: 'clamp(11px,2vmin,1000px)', marginBottom: 'clamp(8px,1.5vmin,1000px)' }}>
@@ -983,7 +1012,7 @@ function ManaPaymentPanel({ prompt, manaCost, sources, canCancel, lifeForPhyrexi
             title="Pay a Phyrexian mana symbol with life instead of mana"
             data-dev-pay-life
           >
-            Pay {lifeForPhyrexian} life for a Phyrexian symbol
+            Pay {lifeForPhyrexian} life for a Phyrexian symbol (Φ)
           </Button>
         )}
         {canCancel && (

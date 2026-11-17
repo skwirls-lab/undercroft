@@ -70,7 +70,15 @@ function choicePreset(name: string, humanHandIds: number[]): ForgeChoiceRequest 
     case 'combo':
       return { requestId: 'dev-combo', choiceType: 'choose_mana_combo', data: { prompt: 'Vivi Ornitier — choose 3 mana', cardName: 'Vivi Ornitier', amount: 3, different: false, colors: [{ mask: 2, name: 'Blue', symbol: 'U' }, { mask: 8, name: 'Red', symbol: 'R' }] } };
     case 'mana':
-      return { requestId: 'dev-mana', choiceType: 'mana_payment', data: { manaCost: '{1}{U/P}', spellName: 'Gitaxian Probe', canCancel: true, lifeForPhyrexian: 2, sources: [{ id: 9101, name: 'Island', type: 'Basic Land — Island' }, { id: 9102, name: 'Sol Ring', type: 'Artifact' }] } };
+      return { requestId: 'dev-mana', choiceType: 'mana_payment', data: { manaCost: '{1}{U/P}', spellName: 'Gitaxian Probe', canCancel: true, lifeForPhyrexian: 2, sources: [
+        { id: 9101, name: 'Island', type: 'Basic Land — Island', produces: ['U'], amount: 1 },
+        { id: 9102, name: 'Sol Ring', type: 'Artifact', produces: ['C'], amount: 2 },
+        { id: 9103, name: 'Command Tower', type: 'Land', produces: ['W', 'U', 'B', 'G'], amount: 1 },
+        { id: 9104, name: 'Breeding Pool', type: 'Land — Forest Island', produces: ['G', 'U'], amount: 1 },
+        { id: 9105, name: 'Birds of Paradise', type: 'Creature — Bird', produces: ['Any'], amount: 1 },
+        // An older server sends no produces; the rules text carries it.
+        { id: 9106, name: 'Arcane Signet', type: 'Artifact', oracleText: "{T}: Add one mana of any color in your commander's color identity." },
+      ] } };
     case 'color':
       return { requestId: 'dev-color', choiceType: 'choose_color', data: { prompt: 'Command Tower — choose a colour of mana', colors: [
         { mask: 1, name: 'White', symbol: 'W' }, { mask: 2, name: 'Blue', symbol: 'U' }, { mask: 4, name: 'Black', symbol: 'B' }, { mask: 8, name: 'Red', symbol: 'R' }, { mask: 16, name: 'Green', symbol: 'G' },

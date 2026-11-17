@@ -53,14 +53,14 @@ export const PROMPT_GUIDE: Record<string, PromptGuide> = {
   scry: { what: 'Look at the top cards of your library.', how: 'Send cards you do not want to the bottom; the rest go back on top in the order you choose.', ref: { lesson: 'keywords' } },
   choose_type: { what: 'Name a card type, creature type or colour for an effect.', how: 'Pick the one that matters most on this board.' },
   choose_modes: { what: 'A modal spell: choose which of its effects happen.', how: 'Pick the number of modes the card allows, then confirm.', ref: { lesson: 'card-types', section: 'spells' } },
-  choose_ability: { what: 'The card has several abilities that could apply; choose one.', how: 'Pick the ability to activate.' },
+  choose_ability: { what: 'The card has several abilities that could apply; choose one. While paying for a spell, this is a land or rock that makes more than one colour: pick the colour you want it to make.', how: 'Pick the ability to activate.' },
   choose_single_spell: { what: 'Choose one spell from several the effect could cast.', how: 'Tap the spell you want.' },
   choose_spell_abilities: { what: 'A card can be cast or activated in more than one way (kicker, adventure, flashback).', how: 'Pick the mode; the cost shown is what you will pay.', ref: { lesson: 'mana', section: 'paying' } },
   choose_order: { what: 'Several things happen at once; you choose their order.', how: 'Drag or tap into order. The first in the list resolves first.', ref: { lesson: 'the-stack', section: 'triggers' } },
   announce_number: { what: 'The spell needs a number, usually X.', how: 'Choose a value you can pay for; the mana is asked for next.', ref: { lesson: 'mana', section: 'paying' } },
   choose_binary: { what: 'A two-way choice named by the card.', how: 'Pick either option.' },
   choose_color: { what: 'Name a colour.', how: 'Pick the colour that fits the effect and the board.' },
-  mana_payment: { what: 'Pay for what you chose. The engine lists what can produce mana.', how: 'Tap lands and rocks one at a time until the cost is met. A Phyrexian symbol such as {U/P} can be paid with two life instead. Cancel to back out and keep the mana unspent.', ref: { lesson: 'mana', section: 'paying' } },
+  mana_payment: { what: 'Pay for what you chose. The circles at the top are what is still owed: a colour is that colour, a grey number is that many of any mana. Each source shows what one tap makes.', how: 'Tap lands and rocks one at a time until nothing is owed. A Phyrexian symbol (Φ) can be paid with two life instead. Cancel to back out and keep the mana unspent.', ref: { lesson: 'mana', section: 'paying' } },
   choose_mana_combo: { what: 'A source makes several mana at once in any mix of its colours, like Vivi Ornitier or a "any combination of" ability.', how: 'Split the amount across the colours with the steppers to match what you are about to pay, then confirm.', ref: { lesson: 'mana', section: 'paying' } },
 };
 

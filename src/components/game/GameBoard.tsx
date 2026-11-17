@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { SeatPlaque, type SeatStats } from './SeatPlaque';
 import { SeatInspector } from './SeatInspector';
+import { ManaCostDisplay } from './ManaSymbol';
 import { BoardView } from './BoardView';
 import { Hand } from './Hand';
 import { CardView } from './CardView';
@@ -351,7 +352,7 @@ export function GameBoard({
           <AnimatePresence>
             {manaPaymentInfo && onCancelManaPayment && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/[0.06] px-3 py-1.5 text-xs">
-                <span>Pay <strong className="font-mono">{manaPaymentInfo.manaCost}</strong> for <strong>{manaPaymentInfo.spellName}</strong> — open your board to tap lands</span>
+                <span className="flex items-center gap-1">Pay <ManaCostDisplay manaCost={manaPaymentInfo.manaCost} size="md" /> for <strong>{manaPaymentInfo.spellName}</strong> — open your board to tap lands</span>
                 {onPayLifeForMana && manaPaymentInfo.lifeForPhyrexian ? (
                   <Button size="sm" variant="ghost" onClick={onPayLifeForMana} className="ml-auto h-6 px-1.5 text-xs text-red-300 hover:text-red-200" data-dev-pay-life>Pay {manaPaymentInfo.lifeForPhyrexian} life</Button>
                 ) : null}
