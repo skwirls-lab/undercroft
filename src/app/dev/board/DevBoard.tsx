@@ -9,6 +9,7 @@ import { ForgeGamePage } from '@/app/game/forge/page';
 import type { GameAction } from '@/lib/gameTypes';
 import type { ForgeChoiceRequest } from '@/lib/forgeClient';
 import { parseLoyaltyAbilities } from '@/lib/loyalty';
+import type { ServerError } from '@/lib/serverErrors';
 
 /**
  * Seeds both stores the same way a live game would — the mock ForgeGameState goes through
@@ -16,6 +17,7 @@ import { parseLoyaltyAbilities } from '@/lib/loyalty';
  *
  * Query params:
  *   ?open=me | ai-2 | ai-3 | ai-4   open the expanded board for that player on load
+ *   ?servererror=full | auth | unavailable | start | crash   the screen for a server refusal or a dead game
  *   ?inspect=me | ai-2 | ai-3 | ai-4   open the seat inspector for that player on load
  *   ?choice=tutor | discard | confirm | modes | scry | targets | attackers | ability | color | combo | mana
  *                                   seed a server prompt so the choice overlay renders
@@ -156,8 +158,20 @@ export function DevBoard() {
       (preset.data as { options: { id: number; name: string }[] }).options = forgeState.players[0].hand.map((c) => ({ id: c.id, name: c.name }));
     }
 
+    // ?servererror=full | auth | unavailable | start | crash — the screen for a server refusal or a dead game.
+    const errorName = new URLSearchParams(window.location.search).get('servererror');
+    const SERVER_ERRORS: Record<string, ServerError> = {
+      full: { code: 'server_full', message: 'Every table on the game server is taken right now. Try again in a few minutes.', activeGames: 8, maxGames: 8 },
+      auth: { code: 'auth_required', message: 'Sign in to start a game. If you are signed in, refresh the page and try again.' },
+      unavailable: { code: 'auth_unavailable', message: 'The game server could not check sign-ins just now. Try again in a minute.' },
+      start: { code: 'start_failed', message: 'The game could not be started: no commander was found in the deck.' },
+      crash: { code: 'game_crashed', message: 'The game server ran out of memory and had to end this game.' },
+    };
+
     useForgeGameStore.setState({
       connectionStatus: 'connected',
+      serverError: errorName ? SERVER_ERRORS[errorName] ?? null : null,
+      lastStartPayload: errorName ? { deckList: ['99 Island'], commander: 'Talrand, Sky Summoner', playerName: 'Player', aiCount: 3 } : null,
       gameState: forgeState,
       isGameOver: false,
       pendingChoice: preset,
