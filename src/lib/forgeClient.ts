@@ -128,7 +128,8 @@ type MessageHandler = {
   onChoiceRequest?: (choice: ForgeChoiceRequest) => void;
   onGameEvent?: (event: ForgeGameEvent) => void;
   onGameOver?: (payload: GameOverPayload) => void;
-  onError?: (message: string) => void;
+  /** The server's error text, and the whole payload (it carries a `code` when the player must be told). */
+  onError?: (message: string, payload?: Record<string, unknown>) => void;
   onConnectionChange?: (status: ConnectionStatus) => void;
 };
 
@@ -258,6 +259,8 @@ export class ForgeGameClient {
     playerName?: string,
     aiCount?: number,
     aiDecks?: Array<{ deckList: string[]; commander?: string; name?: string }>,
+    /** Firebase ID token: proof to the game server that a signed-in player is asking. */
+    idToken?: string,
   ) {
     this.send('start_game', {
       deckList,
@@ -266,6 +269,7 @@ export class ForgeGameClient {
       format: 'commander',
       aiCount: aiCount ?? 1,
       ...(aiDecks && aiDecks.length > 0 ? { aiDecks } : {}),
+      ...(idToken ? { idToken } : {}),
     });
   }
 
@@ -311,7 +315,7 @@ export class ForgeGameClient {
         break;
 
       case 'error':
-        this.handlers.onError?.((msg.payload as { message: string }).message);
+        this.handlers.onError?.((msg.payload as { message: string }).message, msg.payload as Record<string, unknown>);
         break;
 
       default:

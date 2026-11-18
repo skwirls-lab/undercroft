@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { ManaCostDisplay, OracleText } from '@/components/game/ManaSymbol';
 import { CardSlab } from '@/components/game/CardView';
 import { LoyaltyAbilityList } from '@/components/game/LoyaltyAbilities';
+import { ServerErrorScreen } from '@/components/game/ServerErrorScreen';
 import { currentLoyalty, isPlaneswalker, parseLoyaltyAbilities } from '@/lib/loyalty';
 import type { CardInstance, GameAction } from '@/lib/gameTypes';
 import { PhaseTracker } from '@/components/game/PhaseTracker';
@@ -69,6 +70,7 @@ export function ForgeGamePage() {
     isAwaitingServer,
     rematch,
     canRematch,
+    serverError,
   } = useForgeGameStore();
 
   const { gameState, legalActions, performAction, isProcessing, autoPassUntilNextTurn, setAutoPass, actedThisStep, markActed } = useGameStore();
@@ -242,6 +244,17 @@ export function ForgeGamePage() {
       router.replace('/game');
     }
   }, [connectionStatus, router]);
+
+  // The server refused the start, or the game died: say so, and offer the way on.
+  if (serverError) {
+    return (
+      <ServerErrorScreen
+        error={serverError}
+        onRetry={canRematch() ? rematch : undefined}
+        onBack={() => { disconnect(); router.replace('/game'); }}
+      />
+    );
+  }
 
   // Still connecting or waiting for first game state / choice
   if (connectionStatus !== 'connected' || (!gameState && !isGameOver && !pendingChoice)) {

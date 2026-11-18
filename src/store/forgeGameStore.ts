@@ -25,6 +25,7 @@ import { adaptForgeState } from '@/lib/forgeStateAdapter';
 import { synthesizeGameEvents } from '@/lib/gameEventSynth';
 import { useGameStore } from '@/store/gameStore';
 import type { GameAction, GameState, CardData, CardInstance } from '@/lib/gameTypes';
+import { parseServerError, type ServerError } from '@/lib/serverErrors';
 import type { GameOverPayload } from '@/lib/forgeClient';
 import { buildMatchRecord, type MatchMeta } from '@/lib/matchHistory';
 import { useMatchHistoryStore } from '@/store/matchHistoryStore';
@@ -139,6 +140,19 @@ export async function prefetchImageUris(names: string[]): Promise<Map<string, Ca
   return out;
 }
 
+/** The signed-in player's Firebase ID token, or undefined (dev mock, signed out, or offline). */
+async function currentIdToken(): Promise<string | undefined> {
+  try {
+    const { isDevMock } = await import('@/lib/devMock');
+    if (isDevMock()) return undefined;
+    const { getFirebaseAuth } = await import('@/lib/firebase/config');
+    return (await getFirebaseAuth()?.currentUser?.getIdToken()) ?? undefined;
+  } catch (err) {
+    console.warn('[ForgeGameStore] could not get a sign-in token:', err);
+    return undefined;
+  }
+}
+
 /** One card's competing legal plays, awaiting a local pick. */
 export interface PendingAbilitySelection {
   cardInstanceId: string;
@@ -153,6 +167,8 @@ export interface ForgeGameStoreState {
   // Connection
   connectionStatus: ConnectionStatus;
   client: ForgeGameClient | null;
+  /** A server error the player has to be told about (full, not signed in, game crashed). */
+  serverError: ServerError | null;
 
   // Game state (mapped from Forge server)
   gameState: ForgeGameState | null;
@@ -265,6 +281,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
   // Initial state
   connectionStatus: 'disconnected',
   client: null,
+  serverError: null,
   gameState: null,
   pendingChoice: null,
   pendingAbilitySelection: null,
@@ -476,9 +493,17 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         get().recordMatch(false);
       },
 
-      onError: (message) => {
+      onError: (message, payload) => {
         console.error('[ForgeGameStore] Server error:', message);
-        set({ isAwaitingServer: false });
+        const serverError = parseServerError(payload);
+        if (!serverError) {
+          set({ isAwaitingServer: false });
+          return;
+        }
+        // The game is over as far as the server is concerned: nothing is waiting on a
+        // decision, and a game that was under way goes into the history as left.
+        if (serverError.code === 'game_crashed' && get().gameState && !get().isGameOver) get().recordMatch(true);
+        set({ serverError, pendingChoice: null, pendingAbilitySelection: null, isAwaitingServer: false });
       },
     });
 
@@ -494,6 +519,7 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
     imageUrisCache.clear();
     set({
       client: null,
+      serverError: null,
       connectionStatus: 'disconnected',
       gameState: null,
       pendingChoice: null,
@@ -527,12 +553,18 @@ export const useForgeGameStore = create<ForgeGameStoreState>((set, get) => ({
         gameOverDetails: null,
         isGameOver: false,
         winner: null,
+        serverError: null,
         // Remembered so a rematch can replay the exact same matchup.
         lastStartPayload: { deckList, commander, playerName, aiCount, aiDecks },
       });
       // Put the main game store into forge mode so existing UI components render correctly
       useGameStore.getState().enterForgeMode();
-      client.startGame(deckList, commander, playerName, aiCount, aiDecks);
+      // The game server only starts games for signed-in players; the token is the proof.
+      // Fetched fresh each time (Firebase renews it when it is close to expiring).
+      void currentIdToken().then((idToken) => {
+        if (get().client !== client) return; // left before the token came back
+        client.startGame(deckList, commander, playerName, aiCount, aiDecks, idToken);
+      });
     }
   },
 
